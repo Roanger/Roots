@@ -110,6 +110,10 @@ graph TD
 - [x] Create basic grass and ground textures
 - [x] Add simple water plane
 - [x] Implement fog and skybox
+- [x] Integrate FBX trees and rocks with scale/rotation variation
+- [x] Biome-based props (e.g. dead trees in Plains/Mountains/Snow)
+- [x] Solid terrain rendering (vertex-colored ground, single-sided shader)
+- [x] KayKit Forest Nature Pack: 3D grass and bushes
 
 #### 1.5 Basic UI Framework
 - [x] Create main menu with single/multiplayer options
@@ -131,11 +135,9 @@ graph TD
 #### 2.1 Inventory System
 - [x] Design item database structure
 - [x] Implement grid-based inventory UI
-- [ ] Create drag-and-drop functionality *(in progress – leave off here)*
+- [x] Create drag-and-drop functionality (inventory ↔ inventory, inventory ↔ hotbar, inventory ↔ equipment)
 - [x] Add item stacking and splitting
 - [x] Implement hotbar system (8 separate slots; drag from inventory to hotbar/character UI)
-
-**Session note (pick up later):** Drag-and-drop is partially implemented: inventory ↔ inventory, inventory → character equipment slots, inventory → hotbar. Data layer (e.g. `move_to_hotbar`) and UI wiring (drop_data, can_drop_data, get_drag_data) are in place; debugging why drops from inventory to hotbar/character sometimes don’t register (input/overlap, or drag not starting). Inventory/character UI layout adjusted (left/right halves, hover feedback). Farming unchanged and working. Remove debug prints once drag-and-drop is confirmed working.
 
 #### 2.2 Item System
 - [x] Create base Item class
@@ -548,12 +550,14 @@ For solo development, prioritize these skills:
 
 ## Next Steps
 
-1. Review and approve this plan
-2. Begin Phase 1.1: Project Setup
-3. Set up development environment
-4. Create initial prototype
+1. ~~Review and approve this plan~~ ✓
+2. ~~Phase 1.4: Basic World Generation (terrain, assets)~~ ✓
+3. ~~Phase 2.1: Drag-and-drop (inventory, hotbar, equipment)~~ ✓
+4. Phase 2.2–2.6: Item tiers, tool animations, crafting menu, skill architecture
+5. Phase 3+: Professions, content, world expansion
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
-*Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*
+*Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
+*Last updated: Jan 2026 – Phase 2.1 drag-and-drop complete; world assets and terrain improvements in place.*

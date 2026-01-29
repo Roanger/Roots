@@ -22,6 +22,10 @@ func _ready() -> void:
 	# Set up slot appearance
 	custom_minimum_size = Vector2(slot_size, slot_size + 30)
 	
+	# Enable mouse input for drag-and-drop; children should not block
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	_set_children_mouse_filter_ignore(self)
+	
 	# Set label text
 	if slot_label != "":
 		label.text = slot_label
@@ -49,6 +53,12 @@ func _ready() -> void:
 	
 	# Hide durability bar initially
 	durability_bar.visible = false
+
+func _set_children_mouse_filter_ignore(node: Node) -> void:
+	for child in node.get_children():
+		if child is Control:
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_set_children_mouse_filter_ignore(child)
 
 func update_slot(p_item: InventoryItem) -> void:
 	item = p_item
