@@ -1,0 +1,58 @@
+[gd_scene load_steps=6 format=3 uid="uid://player_scene"]
+
+[ext_resource type="Script" path="res://src/player/player_controller.gd" id="1_player"]
+[ext_resource type="Script" path="res://src/player/camera_controller.gd" id="2_camera"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
+top_radius = 0.4
+bottom_radius = 0.4
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_player"]
+albedo_color = Color(0.8, 0.6, 0.4, 1)
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 1
+collision_mask = 3
+script = ExtResource("1_player")
+move_speed = 5.0
+run_speed = 8.0
+crouch_speed = 3.0
+jump_force = 8.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_player")
+surface_material_override/0 = SubResource("StandardMaterial3D_player")
+
+[node name="CameraPivot" type="Node3D" parent="."]
+script = ExtResource("2_camera")
+camera = NodePath("Camera3D")
+third_person_distance = 3.5
+third_person_height = 2.0
+third_person_side_offset = 1.0
+first_person_height = 1.7
+mouse_sensitivity = 0.003
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+fov = 75.0
+near = 0.1
+far = 1000.0
+
+[node name="RayCast3D" type="RayCast3D" parent="CameraPivot/Camera3D"]
+target_position = Vector3(0, 0, -3)
+collision_mask = 2
+
+[node name="GroundRay" type="RayCast3D" parent="."]
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 1
+
+[node name="AnimationTree" type="AnimationTree" parent="."]

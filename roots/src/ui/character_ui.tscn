@@ -1,0 +1,138 @@
+[gd_scene load_steps=9 format=3 uid="uid://character_ui"]
+
+[ext_resource type="Script" path="res://src/ui/character_ui.gd" id="1_character_ui"]
+[ext_resource type="PackedScene" uid="uid://equipment_slot" path="res://src/ui/equipment_slot.tscn" id="2_equip_slot"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.15, 0.15, 0.2, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.3, 0.3, 0.4, 1)
+
+[node name="CharacterUI" type="Control"]
+layout_mode = 3
+anchors_preset = 6
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_character_ui")
+slot_size = 64
+
+[node name="CharacterPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -300.0
+offset_right = 500.0
+offset_bottom = 300.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CharacterPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CharacterPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeaderContainer" type="HBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/HeaderContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "Character"
+horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="CharacterPanel/MarginContainer/VBoxContainer/HeaderContainer"]
+layout_mode = 2
+text = "X"
+
+[node name="HSeparator" type="HSeparator" parent="CharacterPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ContentContainer" type="HBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="GearContainer" type="VBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GearLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/GearContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Gear"
+horizontal_alignment = 1
+
+[node name="GearHeadSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/GearContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 0
+slot_label = "Head"
+
+[node name="GearChestSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/GearContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 1
+slot_label = "Chest"
+
+[node name="GearLegsSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/GearContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 2
+slot_label = "Legs"
+
+[node name="GearFeetSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/GearContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 3
+slot_label = "Feet"
+
+[node name="ToolsContainer" type="VBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ToolsLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Tools"
+horizontal_alignment = 1
+
+[node name="Tool1Slot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 4
+slot_label = "Tool 1"
+
+[node name="Tool2Slot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 5
+slot_label = "Tool 2"
+
+[node name="Tool3Slot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 6
+slot_label = "Tool 3"
+
+[node name="WeaponContainer" type="VBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="WeaponLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/WeaponContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Weapon"
+horizontal_alignment = 1
+
+[node name="WeaponSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/WeaponContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 7
+slot_label = "Weapon"

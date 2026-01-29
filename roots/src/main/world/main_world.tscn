@@ -1,0 +1,65 @@
+[gd_scene load_steps=6 format=3 uid="uid://main_world"]
+
+[ext_resource type="Script" path="res://src/main/world/main_world.gd" id="1_world"]
+[ext_resource type="PackedScene" uid="uid://player_scene" path="res://src/player/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" uid="uid://chunk_manager" path="res://src/world/chunks/chunk_manager.tscn" id="3_chunk"]
+[ext_resource type="PackedScene" uid="uid://farm_plot" path="res://src/world/crops/farm_plot.tscn" id="4_farmplot"]
+[ext_resource type="PackedScene" uid="uid://inventory_ui" path="res://src/ui/inventory_ui.tscn" id="5_inventory"]
+[ext_resource type="PackedScene" uid="uid://character_ui" path="res://src/ui/character_ui.tscn" id="6_character"]
+[ext_resource type="PackedScene" uid="uid://hotbar_ui" path="res://src/ui/hotbar_ui.tscn" id="7_hotbar"]
+
+[sub_resource type="Environment" id="Environment_sky"]
+background_mode = 1
+background_color = Color(0.529412, 0.807843, 0.921569, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.6, 0.7, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.5
+glow_bloom = 0.3
+fog_enabled = true
+fog_light_color = Color(0.7, 0.8, 0.9, 1)
+fog_density = 0.002
+
+[node name="MainWorld" type="Node3D"]
+script = ExtResource("1_world")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sky")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 20, 0)
+light_color = Color(1, 0.95, 0.9, 1)
+light_energy = 1.0
+shadow_enabled = true
+shadow_opacity = 0.7
+shadow_blur = 1.0
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+
+[node name="TerrainContainer" type="Node3D" parent="."]
+
+[node name="ChunkManager" parent="." instance=ExtResource("3_chunk")]
+
+[node name="FarmPlots" type="Node3D" parent="."]
+
+[node name="FarmPlot1" parent="FarmPlots" instance=ExtResource("4_farmplot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 12, 2)
+
+[node name="FarmPlot2" parent="FarmPlots" instance=ExtResource("4_farmplot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 12, 2)
+
+[node name="FarmPlot3" parent="FarmPlots" instance=ExtResource("4_farmplot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 12, 4)
+
+[node name="FarmPlot4" parent="FarmPlots" instance=ExtResource("4_farmplot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 12, 4)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="InventoryUI" parent="UI" instance=ExtResource("5_inventory")]
+
+[node name="CharacterUI" parent="UI" instance=ExtResource("6_character")]
+
+[node name="HotbarUI" parent="UI" instance=ExtResource("7_hotbar")]

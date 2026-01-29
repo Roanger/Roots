@@ -1,0 +1,143 @@
+[gd_scene format=3 uid="uid://kjd36q3rrmam"]
+
+[ext_resource type="Script" uid="uid://cu7r4u32j4wxr" path="res://src/main/menu/main_menu.gd" id="1_main_menu"]
+
+[node name="MainMenu" type="Control" unique_id=1984830092]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main_menu")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1582722574]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.529412, 0.807843, 0.921569, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1990421694]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -250.0
+offset_right = 200.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer" unique_id=105582620]
+layout_mode = 2
+text = "ROOTS"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=823008782]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 40
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/MarginContainer" unique_id=1808672324]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="NewGameBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=105595717]
+layout_mode = 2
+text = "New Game"
+
+[node name="LoadGameBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=543210388]
+layout_mode = 2
+text = "Load Game"
+
+[node name="MultiplayerBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=878124448]
+layout_mode = 2
+text = "Multiplayer"
+
+[node name="SettingsBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1386263875]
+layout_mode = 2
+text = "Settings"
+
+[node name="QuitBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=621706321]
+layout_mode = 2
+text = "Quit"
+
+[node name="VersionLabel" type="Label" parent="VBoxContainer" unique_id=1806554257]
+layout_mode = 2
+text = "Version 0.1.0"
+horizontal_alignment = 1
+
+[node name="SaveSlotsContainer" type="VBoxContainer" parent="." unique_id=1327198336]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MultiplayerMenu" type="Control" parent="." unique_id=1218520157]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="MultiplayerMenu" unique_id=2023315082]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -20.0
+offset_right = 100.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Multiplayer Coming Soon"
+horizontal_alignment = 1
+
+[node name="SettingsMenu" type="Control" parent="." unique_id=2058629643]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="SettingsMenu" unique_id=1631491726]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -20.0
+offset_right = 100.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Settings Coming Soon"
+horizontal_alignment = 1

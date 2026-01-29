@@ -1,0 +1,20 @@
+# Godot
+.godot/
+*.import
+*.translation
+
+# Build / export
+/android/
+/export/
+*.apk
+*.dmg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE (optional)
+.idea/
+*.swp
+*.swo
+*~

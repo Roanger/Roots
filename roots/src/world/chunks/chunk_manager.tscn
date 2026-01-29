@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://chunk_manager"]
+
+[ext_resource type="Script" path="res://src/world/chunks/chunk_manager.gd" id="1_chunk"]
+
+[node name="ChunkManager" type="Node"]
+script = ExtResource("1_chunk")
+chunk_size = 32
+view_distance = 4
+height_scale = 1.0
+generate_objects = true
+save_chunks = true

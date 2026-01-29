@@ -1,0 +1,35 @@
+[gd_scene load_steps=5 format=3 uid="uid://farm_plot"]
+
+[ext_resource type="Script" path="res://src/world/crops/farm_plot.gd" id="1_farmplot"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_plot"]
+size = Vector3(1, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_soil"]
+size = Vector3(1, 0.2, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_crop"]
+top_radius = 0.1
+bottom_radius = 0.1
+height = 0.5
+
+[node name="FarmPlot" type="StaticBody3D"]
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("1_farmplot")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_plot")
+
+[node name="SoilMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_soil")
+
+[node name="CropMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+mesh = SubResource("CylinderMesh_crop")
+visible = false
+
+[node name="WaterParticles" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+emitting = false
+one_shot = true
