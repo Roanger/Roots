@@ -3,6 +3,8 @@ extends CharacterBody3D
 
 signal position_changed(new_position: Vector3)
 signal state_changed(new_state: PlayerState)
+signal health_changed(current: float, maximum: float)
+signal stamina_changed(current: float, maximum: float)
 
 enum PlayerState {
 	IDLE,
@@ -14,6 +16,17 @@ enum PlayerState {
 	CROUCHING,
 	FIRST_PERSON
 }
+
+# Player stats
+@export var max_health: float = 100.0
+@export var max_stamina: float = 100.0
+@export var stamina_drain_rate: float = 15.0  # Per second while sprinting
+@export var stamina_regen_rate: float = 10.0  # Per second while not sprinting
+@export var stamina_regen_delay: float = 1.0  # Seconds before regen starts
+
+var current_health: float = 100.0
+var current_stamina: float = 100.0
+var stamina_regen_timer: float = 0.0
 
 @export var move_speed: float = 5.0
 @export var run_speed: float = 8.0
@@ -99,6 +112,7 @@ func _physics_process(delta: float) -> void:
 	_handle_movement_input()
 	_apply_gravity(delta)
 	_update_terrain_height()
+	_update_stamina(delta)
 	_move_character(delta)
 	_update_animation()
 	_check_interaction()
@@ -440,3 +454,67 @@ func get_available_seeds() -> Array[String]:
 			seeds.append(item.item_data.item_id)
 	
 	return seeds
+
+# =====================
+# STAMINA & HEALTH SYSTEM
+# =====================
+
+func _update_stamina(delta: float) -> void:
+	var old_stamina = current_stamina
+	
+	if is_sprinting and move_input.length() > 0:
+		# Drain stamina while sprinting
+		current_stamina = max(0.0, current_stamina - stamina_drain_rate * delta)
+		stamina_regen_timer = stamina_regen_delay
+		
+		# Stop sprinting if out of stamina
+		if current_stamina <= 0:
+			is_sprinting = false
+	else:
+		# Regenerate stamina after delay
+		if stamina_regen_timer > 0:
+			stamina_regen_timer -= delta
+		else:
+			current_stamina = min(max_stamina, current_stamina + stamina_regen_rate * delta)
+	
+	# Emit signal if changed
+	if abs(old_stamina - current_stamina) > 0.01:
+		stamina_changed.emit(current_stamina, max_stamina)
+
+func use_stamina(amount: float) -> bool:
+	if current_stamina >= amount:
+		current_stamina -= amount
+		stamina_regen_timer = stamina_regen_delay
+		stamina_changed.emit(current_stamina, max_stamina)
+		return true
+	return false
+
+func take_damage(amount: float) -> void:
+	var old_health = current_health
+	current_health = max(0.0, current_health - amount)
+	
+	if current_health != old_health:
+		health_changed.emit(current_health, max_health)
+	
+	if current_health <= 0:
+		_on_death()
+
+func heal(amount: float) -> void:
+	var old_health = current_health
+	current_health = min(max_health, current_health + amount)
+	
+	if current_health != old_health:
+		health_changed.emit(current_health, max_health)
+
+func _on_death() -> void:
+	# For now, just respawn at origin
+	print("Player died! Respawning...")
+	current_health = max_health
+	health_changed.emit(current_health, max_health)
+	global_position = Vector3(0, 20, 0)
+
+func get_health_percent() -> float:
+	return current_health / max_health
+
+func get_stamina_percent() -> float:
+	return current_stamina / max_stamina

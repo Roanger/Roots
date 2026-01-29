@@ -10,6 +10,8 @@ extends Node3D
 @onready var character_ui: Control = $UI/CharacterUI
 @onready var hotbar_ui: Control = $UI/HotbarUI
 
+var hud_scene = preload("res://src/ui/hud/hud.tscn")
+var hud: Control = null
 var water_plane: MeshInstance3D = null
 
 # Explicit references to autoload singletons
@@ -43,6 +45,9 @@ func _ready() -> void:
 	# Setup hotbar UI
 	call_deferred("_setup_hotbar_ui")
 	
+	# Setup HUD
+	call_deferred("_setup_hud")
+	
 	# Connect signals
 	if game_manager:
 		game_manager.time_changed.connect(_on_time_changed)
@@ -61,8 +66,8 @@ func _spawn_player() -> void:
 		print("Player spawned at height: ", spawn_height + 5)
 
 func _initialize_world() -> void:
-	# Create water plane
-	_create_water_plane()
+	# Create water plane - DISABLED FOR TESTING
+	# _create_water_plane()
 	
 	# Setup chunk manager
 	if chunk_manager:
@@ -144,7 +149,14 @@ func _process(_delta: float) -> void:
 		var mat = water_plane.material_override as StandardMaterial3D
 		if mat:
 			var wave_height = sin(time * 0.5) * 0.1
-			water_plane.position.y = 10.0 + wave_height
+			# Make water follow player on X/Z but stay at water level + wave height on Y
+			var target_x = 0.0
+			var target_z = 0.0
+			if player:
+				target_x = player.global_position.x
+				target_z = player.global_position.z
+			
+			water_plane.position = Vector3(target_x, 10.0 + wave_height, target_z)
 
 func _toggle_pause() -> void:
 	if not game_manager:
@@ -268,6 +280,21 @@ func _setup_hotbar_ui() -> void:
 			print("Warning: Player inventory not found for hotbar")
 	else:
 		print("Warning: Player doesn't have get_inventory method")
+
+func _setup_hud() -> void:
+	if not player:
+		return
+	
+	# Wait for player to be ready
+	await get_tree().process_frame
+	
+	# Instance HUD and add to UI layer
+	hud = hud_scene.instantiate()
+	$UI.add_child(hud)
+	
+	# Initialize with player reference
+	if hud.has_method("initialize"):
+		hud.initialize(player)
 
 func _input(event: InputEvent) -> void:
 	# Handle Tab key to toggle both inventory and character UI

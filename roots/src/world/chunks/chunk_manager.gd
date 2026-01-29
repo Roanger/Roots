@@ -6,7 +6,7 @@ signal chunk_unloaded(chunk_pos: Vector2i)
 signal chunk_mesh_updated(chunk_pos: Vector2i)
 
 @export var chunk_size: int = 32
-@export var view_distance: int = 4
+@export var view_distance: int = 20
 @export var height_scale: float = 1.0
 @export var generate_objects: bool = true
 @export var save_chunks: bool = true
@@ -34,7 +34,7 @@ var _terrain_ground_shader: Shader = null
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
 
 # Update timing
-var update_interval: float = 0.5
+var update_interval: float = 0.1
 var last_update_time: float = 0.0
 var is_updating: bool = false
 
@@ -114,11 +114,17 @@ func _process(delta: float) -> void:
 		player_node = get_tree().get_first_node_in_group("player")
 		return
 	
-	# Update chunks based on player position
-	var current_time = Time.get_unix_time_from_system()
-	if current_time - last_update_time >= update_interval and not is_updating:
-		last_update_time = current_time
-		_update_visible_chunks()
+	# Update timing
+	last_update_time += delta
+	
+	# Always process generation queue (throttled)
+	_process_generation_queue()
+	
+	if is_updating or last_update_time < update_interval:
+		return
+	
+	last_update_time = 0.0 # Reset timer
+	_update_visible_chunks()
 
 func _update_visible_chunks() -> void:
 	is_updating = true
@@ -136,19 +142,18 @@ func _update_visible_chunks() -> void:
 		for z in range(-view_distance, view_distance + 1):
 			var chunk_pos = current_chunk + Vector2i(x, z)
 			
-			# Calculate distance for circular view distance
-			var distance = Vector2(x, z).length()
-			if distance <= view_distance:
-				if not loaded_chunks.has(chunk_pos):
-					chunks_to_load.append(chunk_pos)
+			# Square loading logic - load everything in range
+			if not loaded_chunks.has(chunk_pos):
+				chunks_to_load.append(chunk_pos)
 	
 	# Find chunks to unload
 	for chunk_pos in loaded_chunks.keys():
-		var chunk_center = chunk_pos * chunk_size
-		var player_pos = Vector2(player_node.global_position.x, player_node.global_position.z)
-		var chunk_center_vec = Vector2(chunk_center.x + chunk_size / 2.0, chunk_center.y + chunk_size / 2.0)
+		# Square unloading logic (Chebyshev distance)
+		var dist_x = abs(chunk_pos.x - player_chunk_x)
+		var dist_z = abs(chunk_pos.y - player_chunk_z)
 		
-		if player_pos.distance_to(chunk_center_vec) > (view_distance + 2) * chunk_size:
+		# Unload if outside square view distance + buffer
+		if max(dist_x, dist_z) > view_distance + 2:
 			chunks_to_unload.append(chunk_pos)
 	
 	# Queue chunks for generation
@@ -157,18 +162,23 @@ func _update_visible_chunks() -> void:
 			pending_chunks[chunk_pos] = true
 			generation_queue.append(chunk_pos)
 	
-	# Process generation queue
-	_process_generation_queue()
+	# Process generation queue - DONE in _process now
+	# _process_generation_queue()
 	
-	# Unload old chunks
-	for chunk_pos in chunks_to_unload:
-		_unload_chunk(chunk_pos)
+	# TEMPORARILY DISABLED: Unload old chunks
+	# This was causing chunks to disappear incorrectly
+	# for chunk_pos in chunks_to_unload:
+	# 	_unload_chunk(chunk_pos)
 	
 	is_updating = false
 
 func _process_generation_queue() -> void:
-	while generation_queue.size() > 0:
+	var processed_count = 0
+	var max_per_frame = 64
+	
+	while generation_queue.size() > 0 and processed_count < max_per_frame:
 		var chunk_pos = generation_queue.pop_front()
+		processed_count += 1
 		
 		# Generate chunk data
 		var chunk_data = _generate_chunk_data(chunk_pos)
@@ -246,8 +256,10 @@ func _generate_chunk_objects(chunk: ChunkData) -> void:
 func _create_chunk_mesh(chunk: ChunkData) -> void:
 	if not terrain_container:
 		terrain_container = get_node_or_null("../TerrainContainer")
+		print("WARN: terrain_container was null, tried fallback: ", terrain_container)
 	
 	if not terrain_container:
+		print("ERROR: terrain_container still null! Cannot create mesh for chunk ", chunk.chunk_position)
 		return
 	
 	# Create mesh instance for this chunk
@@ -282,43 +294,44 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 			var c11 = _get_terrain_vertex_color(biome11, world_ox + x + 1, world_oz + z + 1)
 			
 			# Quad: v0=bl, v1=br, v2=tl, v3=tr. Normals point UP (top face).
-			# Shader draws both sides but discards when NORMAL.y < 0 so only top is visible.
+			# Uses standard CCW winding and cull_back for opaque terrain rendering.
 			var v0 = Vector3(x, h00, z)
 			var v1 = Vector3(x + 1, h10, z)
 			var v2 = Vector3(x, h01, z + 1)
 			var v3 = Vector3(x + 1, h11, z + 1)
 			
-			# Tri 1: v0, v2, v1 — normal points UP (top face)
+			# Tri 1: v0, v1, v2 — CCW winding for top face (normal UP)
+			# Cross product for Normal UP: (v2 - v0) x (v1 - v0) = (0,0,1) x (1,0,0) = (0,1,0)
 			var n1 = (v2 - v0).cross(v1 - v0).normalized()
 			st.set_normal(n1)
 			st.set_uv(Vector2(x, z) / float(chunk.size))
 			st.set_color(c00)
 			st.add_vertex(v0)
 			st.set_normal(n1)
-			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
-			st.set_color(c01)
-			st.add_vertex(v2)
-			st.set_normal(n1)
 			st.set_uv(Vector2(x + 1, z) / float(chunk.size))
 			st.set_color(c10)
 			st.add_vertex(v1)
+			st.set_normal(n1)
+			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
+			st.set_color(c01)
+			st.add_vertex(v2)
 			
-			# Tri 2: v1, v2, v3 — normal points UP (top face)
+			# Tri 2: v1, v3, v2 — CCW winding for top face (normal UP)
 			var n2 = (v2 - v1).cross(v3 - v1).normalized()
 			st.set_normal(n2)
 			st.set_uv(Vector2(x + 1, z) / float(chunk.size))
 			st.set_color(c10)
 			st.add_vertex(v1)
 			st.set_normal(n2)
-			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
-			st.set_color(c01)
-			st.add_vertex(v2)
-			st.set_normal(n2)
 			st.set_uv(Vector2(x + 1, z + 1) / float(chunk.size))
 			st.set_color(c11)
 			st.add_vertex(v3)
+			st.set_normal(n2)
+			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
+			st.set_color(c01)
+			st.add_vertex(v2)
 	
-	# Normals point UP. Shader uses discard when NORMAL.y < 0 so only top face is drawn.
+	# Standard CCW winding for front-facing (top) rendering.
 	var mesh = st.commit()
 	mesh_instance.mesh = mesh
 	
@@ -639,7 +652,25 @@ func set_view_distance(new_distance: int) -> void:
 	view_distance = max(1, new_distance)
 
 func force_update() -> void:
-	last_update_time = 0.0
+	# Generate chunks around the spawn point synchronously
+	_update_visible_chunks()
+	
+	# Drain the generation queue completely - this ensures terrain
+	# is fully loaded BEFORE the player spawns
+	while generation_queue.size() > 0:
+		var chunk_pos = generation_queue.pop_front()
+		
+		# Generate chunk data
+		var chunk_data = _generate_chunk_data(chunk_pos)
+		if chunk_data:
+			loaded_chunks[chunk_pos] = chunk_data
+			pending_chunks.erase(chunk_pos)
+			
+			# Create mesh for chunk
+			_create_chunk_mesh(chunk_data)
+			emit_signal("chunk_loaded", chunk_pos)
+	
+	print("Force update complete: ", loaded_chunks.size(), " chunks loaded")
 
 func clear_all_chunks() -> void:
 	for chunk_pos in loaded_chunks.keys():

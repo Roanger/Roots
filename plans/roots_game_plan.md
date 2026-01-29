@@ -89,7 +89,7 @@ graph TD
 - [ ] Configure Godot project settings for optimal performance
 - [x] Set up version control (git ignore, branching strategy)
 - [x] Create project folder structure
-- [ ] Document coding standards and conventions
+- [x] Document coding standards and conventions
 
 #### 1.2 Core Player Controller
 - [x] Implement 3D character movement with controller/keyboard
@@ -118,7 +118,7 @@ graph TD
 #### 1.5 Basic UI Framework
 - [x] Create main menu with single/multiplayer options
 - [x] Implement pause menu
-- [ ] Set up HUD (health bar, stamina, mini-map)
+- [x] Set up HUD (health bar, stamina, mini-map)
 - [x] Create inventory slot system
 
 #### 1.6 GD-Sync Integration

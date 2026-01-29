@@ -20,7 +20,7 @@ glow_intensity = 0.5
 glow_bloom = 0.3
 fog_enabled = true
 fog_light_color = Color(0.7, 0.8, 0.9, 1)
-fog_density = 0.002
+fog_density = 0.001
 
 [node name="MainWorld" type="Node3D"]
 script = ExtResource("1_world")

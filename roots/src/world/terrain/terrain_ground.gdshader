@@ -1,11 +1,6 @@
 shader_type spatial;
 
-render_mode cull_disabled, depth_draw_opaque;
-
-// Draw both faces but discard underside using FRONT_FACING (works at any distance).
-
-// Preserves vertex (biome) color and adds subtle procedural ground variation
-// so terrain reads as solid ground while staying color-coded by type.
+render_mode depth_draw_opaque;
 
 varying vec3 world_pos;
 
@@ -19,11 +14,6 @@ void vertex() {
 }
 
 void fragment() {
-	// Only draw TOP of terrain using FRONT_FACING (works at any distance).
-	// Our winding makes front face = underside, so discard when FRONT_FACING.
-	if (FRONT_FACING) {
-		discard;
-	}
 
 	// Two scales of noise for a more natural ground feel (dirt/grass variation)
 	vec2 uv = world_pos.xz * 0.5;
