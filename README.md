@@ -42,7 +42,13 @@ For more detail (controls, structure, phases), see [roots/README.md](roots/READM
 ## Status
 
 - **Phase 1 (Foundation):** Mostly complete — player, camera, terrain, chunks, water, fog, main menu, pause, inventory slots.
-- **Phase 2 (Core Mechanics):** In progress — inventory UI, hotbar, character/equipment UI, farming (plant, grow, water, harvest). Drag-and-drop between inventory/hotbar/equipment is next.
+- **Phase 2 (Core Mechanics):** In progress — inventory UI, hotbar, character/equipment UI, farming (plant, grow, water, harvest). **Drag-and-drop between inventory/hotbar/equipment is now working!**
+
+### Recent Updates (Jan 2026)
+- ✅ Fixed item pickup bug (world items now properly destroyed after pickup)
+- ✅ Implemented drag-and-drop system with Godot 4.7 workaround
+- ✅ Items can be moved between inventory, hotbar, and equipment slots
+- ⚠️ Equipment slot visuals need polish (items persist but icons not displaying)
 
 Development plan and checklist: [plans/roots_game_plan.md](plans/roots_game_plan.md).
 

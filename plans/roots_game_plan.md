@@ -135,9 +135,12 @@ graph TD
 #### 2.1 Inventory System
 - [x] Design item database structure
 - [x] Implement grid-based inventory UI
-- [ ] Create drag-and-drop functionality (inventory ↔ inventory, inventory ↔ hotbar, inventory ↔ equipment)
+- [x] Create drag-and-drop functionality (inventory ↔ inventory, inventory ↔ hotbar, inventory ↔ equipment)
+  - **Note:** Uses custom drag detection with `force_drag()` and `NOTIFICATION_DRAG_END` workaround for Godot 4.7
+  - Uses Engine meta for shared state to prevent duplicate drop processing
 - [x] Add item stacking and splitting
 - [x] Implement hotbar system (8 separate slots; drag from inventory to hotbar/character UI)
+- [x] Equipment system with persistence (items persist when UI is closed/reopened)
 
 #### 2.2 Item System
 - [x] Create base Item class
