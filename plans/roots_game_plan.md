@@ -135,7 +135,7 @@ graph TD
 #### 2.1 Inventory System
 - [x] Design item database structure
 - [x] Implement grid-based inventory UI
-- [x] Create drag-and-drop functionality (inventory ↔ inventory, inventory ↔ hotbar, inventory ↔ equipment)
+- [ ] Create drag-and-drop functionality (inventory ↔ inventory, inventory ↔ hotbar, inventory ↔ equipment)
 - [x] Add item stacking and splitting
 - [x] Implement hotbar system (8 separate slots; drag from inventory to hotbar/character UI)
 

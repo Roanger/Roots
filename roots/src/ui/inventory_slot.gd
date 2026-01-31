@@ -25,6 +25,8 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# Let this slot receive all mouse input; children would otherwise eat hover/click/drag
 	_set_children_mouse_filter_ignore(self)
+	# Ensure slot processes input even when game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var existing = get_theme_stylebox("panel")
 	if existing is StyleBoxFlat:
 		_default_panel_style = (existing as StyleBoxFlat).duplicate()
@@ -97,83 +99,223 @@ func set_inventory(p_inventory: Inventory) -> void:
 	inventory = p_inventory
 
 func get_drag_data(position: Vector2) -> Variant:
+	print("[DragDebug] get_drag_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
+	print("[DragDebug]   item=%s, empty=%s, inventory=%s" % [item, item.is_empty() if item else "N/A", inventory])
+	
 	if not item or item.is_empty():
+		print("[DragDebug]   -> returning null: no item")
 		return null
 	if not inventory:
+		print("[DragDebug]   -> returning null: no inventory")
 		return null
+	
 	var source = DragData.DragSource.HOTBAR if is_hotbar_slot else DragData.DragSource.INVENTORY
 	var drag_data = DragData.new(source, slot_index, item, inventory)
 	var preview = _create_drag_preview()
-	set_drag_preview(preview)
-	if not is_hotbar_slot:
-		print("[Inventory] get_drag_data: slot %d \"%s\" - drag started (move mouse to target, then release)" % [slot_index, item.get_item_name()])
+	if preview:
+		set_drag_preview(preview)
+		print("[DragDebug]   -> drag preview set")
+	else:
+		print("[DragDebug]   -> WARNING: preview is null")
+	print("[DragDebug]   -> drag started successfully with data: source=%d, slot=%d" % [source, slot_index])
 	return drag_data
 
 func can_drop_data(position: Vector2, data: Variant) -> bool:
+	print("[DragDebug] can_drop_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
+	# Clear previous state
+	_last_drag_data = null
+	_last_can_drop = false
+	
 	if data == null:
+		print("[DragDebug]   -> false: data is null")
 		return false
 	var drag_data = data as DragData
 	if drag_data == null:
+		print("[DragDebug]   -> false: data is not DragData (type=%s)" % [typeof(data)])
 		return false
+	
+	print("[DragDebug]   drag_data: source_type=%d, source_slot=%d" % [drag_data.source_type, drag_data.source_slot_index])
+	
+	# Prevent dropping on same slot
 	if drag_data.source_type == DragData.DragSource.INVENTORY and drag_data.source_slot_index == slot_index and not is_hotbar_slot:
+		print("[DragDebug]   -> false: same inventory slot")
 		return false
 	if drag_data.source_type == DragData.DragSource.HOTBAR and drag_data.source_slot_index == slot_index and is_hotbar_slot:
+		print("[DragDebug]   -> false: same hotbar slot")
 		return false
-	var accept = false
-	if drag_data.source_type == DragData.DragSource.INVENTORY:
-		accept = true
-	elif drag_data.source_type == DragData.DragSource.HOTBAR:
-		accept = true
-	elif drag_data.source_type == DragData.DragSource.EQUIPMENT:
-		accept = true
-	if accept and is_hotbar_slot:
-		print("[Hotbar] can_drop_data: slot %d accepts drop" % slot_index)
-	return accept
+	
+	# Store for potential manual drop handling
+	_last_drag_data = drag_data
+	_last_can_drop = true
+	# Tag this slot with current global counter and unique slot ID
+	var global_counter = _get_drop_counter()
+	_my_drop_counter = global_counter
+	_slot_id = slot_index + (1000 if is_hotbar_slot else 0)  # Unique ID
+	_set_last_drop_slot(_slot_id)
+	
+	print("[DragDebug]   -> true: accepting drop (counter=%d, slot_id=%d)" % [_my_drop_counter, _slot_id])
+	return true
+
+var _last_drag_data: DragData = null
+var _last_can_drop: bool = false
+
+# Use Engine meta to share state across all slot types
+const DROP_COUNTER_KEY = "_global_drop_counter"
+const LAST_DROP_SLOT_KEY = "_last_drop_slot_id"
+
+func _get_drop_counter() -> int:
+	if Engine.has_meta(DROP_COUNTER_KEY):
+		return Engine.get_meta(DROP_COUNTER_KEY)
+	return 0
+
+func _set_drop_counter(value: int) -> void:
+	Engine.set_meta(DROP_COUNTER_KEY, value)
+
+func _get_last_drop_slot() -> int:
+	if Engine.has_meta(LAST_DROP_SLOT_KEY):
+		return Engine.get_meta(LAST_DROP_SLOT_KEY)
+	return -1
+
+func _set_last_drop_slot(slot_id: int) -> void:
+	Engine.set_meta(LAST_DROP_SLOT_KEY, slot_id)
+
+var _my_drop_counter: int = 0
+var _slot_id: int = 0
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
 		modulate = Color.WHITE
 		_clear_hover_style()
+		var global_counter = _get_drop_counter()
+		print("[DragDebug] NOTIFICATION_DRAG_END received on slot %d (my_counter=%d, global=%d)" % [slot_index, _my_drop_counter, global_counter])
+		
+		# Only process if this slot was the LAST one to have can_drop_data called
+		# and it was called in this drag operation
+		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and _get_last_drop_slot() == _slot_id:
+			print("[DragDebug] Executing manual drop on slot %d" % slot_index)
+			# Increment counter to prevent other slots from processing
+			_set_drop_counter(global_counter + 1)
+			_set_last_drop_slot(-1)
+			# Execute the drop logic directly
+			if is_hotbar_slot:
+				_handle_hotbar_drop(_last_drag_data)
+			else:
+				_handle_inventory_drop(_last_drag_data)
+		
+		# Always clear this slot's state
+		_last_drag_data = null
+		_last_can_drop = false
+		_my_drop_counter = 0
+		_slot_id = 0
 
 func drop_data(position: Vector2, data: Variant) -> void:
+	print("[DragDebug] drop_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
 	if data == null:
+		print("[DragDebug]   -> data is null, returning")
 		return
 	var drag_data = data as DragData
 	if drag_data == null:
+		print("[DragDebug]   -> data is not DragData, returning")
 		return
+	
+	print("[DragDebug]   processing drop from source_type=%d, slot=%d" % [drag_data.source_type, drag_data.source_slot_index])
+	
+	# Handle hotbar slot drops
 	if is_hotbar_slot:
-		if drag_data.source_type == DragData.DragSource.INVENTORY:
-			if inventory:
-				var ok = inventory.move_to_hotbar(drag_data.source_slot_index, slot_index)
-				print("[Hotbar] drop_data: move_to_hotbar bag %d -> hotbar %d = %s" % [drag_data.source_slot_index, slot_index, ok])
-			else:
-				print("[Hotbar] drop_data: no inventory ref on hotbar slot")
-		elif drag_data.source_type == DragData.DragSource.HOTBAR:
-			if inventory:
-				inventory.move_hotbar_to_hotbar(drag_data.source_slot_index, slot_index)
+		print("[DragDebug]   -> handling as hotbar drop")
+		_handle_hotbar_drop(drag_data)
 		return
-	if drag_data.source_type == DragData.DragSource.INVENTORY:
-		if inventory:
+	
+	# Handle inventory slot drops
+	print("[DragDebug]   -> handling as inventory drop")
+	_handle_inventory_drop(drag_data)
+
+func _handle_hotbar_drop(drag_data: DragData) -> void:
+	if not inventory:
+		return
+	
+	match drag_data.source_type:
+		DragData.DragSource.INVENTORY:
+			# Move from inventory bag to hotbar
+			inventory.move_to_hotbar(drag_data.source_slot_index, slot_index)
+		
+		DragData.DragSource.HOTBAR:
+			# Move between hotbar slots
+			inventory.move_hotbar_to_hotbar(drag_data.source_slot_index, slot_index)
+		
+		DragData.DragSource.EQUIPMENT:
+			# Equip from equipment to hotbar (equip to tool slot)
+			if drag_data.equipment and drag_data.item:
+				# Only tools can go to hotbar from equipment
+				if drag_data.item.item_data and drag_data.item.item_data.item_type == ItemData.ItemType.TOOL:
+					# Unequip and put in hotbar
+					var unequipped = drag_data.equipment.unequip_item(drag_data.source_slot_index)
+					if unequipped:
+						# Check if hotbar slot has item - swap back to equipment
+						var existing_hotbar_item = inventory.get_hotbar_slot(slot_index)
+						if existing_hotbar_item and not existing_hotbar_item.is_empty():
+							# Try to equip the hotbar item in the equipment slot
+							if drag_data.equipment._can_equip_in_slot(existing_hotbar_item.item_data, drag_data.source_slot_index):
+								drag_data.equipment.equip_item(existing_hotbar_item, drag_data.source_slot_index)
+						
+						# Put unequipped item in hotbar
+						inventory.hotbar_slots[slot_index] = unequipped
+						inventory.hotbar_changed.emit(slot_index)
+
+func _handle_inventory_drop(drag_data: DragData) -> void:
+	if not inventory:
+		return
+	
+	match drag_data.source_type:
+		DragData.DragSource.INVENTORY:
+			# Move within inventory
 			inventory.move_item(drag_data.source_slot_index, slot_index)
 			item_dropped.emit(drag_data.source_slot_index, slot_index)
-	elif drag_data.source_type == DragData.DragSource.HOTBAR:
-		if inventory:
-			inventory.move_to_bag(drag_data.source_slot_index, slot_index)
-	elif drag_data.source_type == DragData.DragSource.EQUIPMENT:
-		if inventory and drag_data.equipment:
-			var unequipped_item = drag_data.equipment.unequip_item(drag_data.source_slot_index)
-			if unequipped_item:
-				var current_item = inventory.get_slot(slot_index)
-				if not current_item or current_item.is_empty():
-					inventory.slots[slot_index] = unequipped_item
-					inventory.inventory_changed.emit(slot_index)
-				else:
-					for i in range(inventory.max_slots):
-						var slot_item = inventory.get_slot(i)
-						if not slot_item or slot_item.is_empty():
-							inventory.slots[i] = unequipped_item
-							inventory.inventory_changed.emit(i)
-							break
+		
+		DragData.DragSource.HOTBAR:
+			# Move from hotbar to specific inventory slot
+			var ok = inventory.move_to_bag(drag_data.source_slot_index, slot_index)
+			if ok:
+				print("[Inventory] Moved from hotbar %d to bag slot %d" % [drag_data.source_slot_index, slot_index])
+		
+		DragData.DragSource.EQUIPMENT:
+			# Unequip to specific inventory slot
+			if drag_data.equipment:
+				var unequipped_item = drag_data.equipment.unequip_item(drag_data.source_slot_index)
+				if unequipped_item:
+					var current_item = inventory.get_slot(slot_index)
+					
+					if not current_item or current_item.is_empty():
+						# Slot is empty, place item here
+						inventory.slots[slot_index] = unequipped_item
+						inventory.inventory_changed.emit(slot_index)
+					elif current_item.can_stack_with(unequipped_item):
+						# Can stack, combine them
+						var overflow = current_item.add_amount(unequipped_item.quantity)
+						if overflow > 0:
+							unequipped_item.quantity = overflow
+							# Find another slot for overflow
+							for i in range(inventory.max_slots):
+								var slot_item = inventory.get_slot(i)
+								if not slot_item or slot_item.is_empty():
+									inventory.slots[i] = unequipped_item
+									inventory.inventory_changed.emit(i)
+									break
+						inventory.inventory_changed.emit(slot_index)
+					else:
+						# Swap items - put current item in equipment
+						if drag_data.equipment._can_equip_in_slot(current_item.item_data, drag_data.source_slot_index):
+							drag_data.equipment.equip_item(current_item, drag_data.source_slot_index)
+							inventory.slots[slot_index] = unequipped_item
+							inventory.inventory_changed.emit(slot_index)
+						else:
+							# Can't swap, find empty slot for unequipped item
+							for i in range(inventory.max_slots):
+								var slot_item = inventory.get_slot(i)
+								if not slot_item or slot_item.is_empty():
+									inventory.slots[i] = unequipped_item
+									inventory.inventory_changed.emit(i)
+									break
 
 func _create_drag_preview() -> Control:
 	# Create visual preview for dragging
@@ -225,10 +367,47 @@ func _create_drag_preview() -> Control:
 	
 	return preview
 
+var _is_dragging: bool = false
+var _drag_start_pos: Vector2 = Vector2.ZERO
+const DRAG_THRESHOLD: float = 5.0
+
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.pressed:
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_drag_start_pos = get_global_mouse_position()
+			_is_dragging = true
+			print("[DragDebug] Mouse pressed on slot %d" % slot_index)
+		elif not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_is_dragging = false
+			print("[DragDebug] Mouse released on slot %d" % slot_index)
+			# Note: click event is emitted regardless; drag operation handles itself via force_drag
 			slot_clicked.emit(slot_index, event.button_index)
+
+func _process(delta: float) -> void:
+	if _is_dragging:
+		var current_pos = get_global_mouse_position()
+		var distance = _drag_start_pos.distance_to(current_pos)
+		if distance > DRAG_THRESHOLD:
+			_is_dragging = false
+			print("[DragDebug] Drag threshold reached on slot %d" % slot_index)
+			_start_drag()
+
+func _start_drag() -> void:
+	if not item or item.is_empty():
+		print("[DragDebug] Cannot drag: no item in slot %d" % slot_index)
+		return
+	if not inventory:
+		print("[DragDebug] Cannot drag: no inventory reference in slot %d" % slot_index)
+		return
+	
+	var source = DragData.DragSource.HOTBAR if is_hotbar_slot else DragData.DragSource.INVENTORY
+	var drag_data = DragData.new(source, slot_index, item, inventory)
+	var preview = _create_drag_preview()
+	if preview:
+		set_drag_preview(preview)
+		print("[DragDebug] Drag preview created for slot %d" % slot_index)
+	print("[DragDebug] Starting force_drag from slot %d" % slot_index)
+	force_drag(drag_data, preview)
 
 func _on_mouse_entered() -> void:
 	slot_hovered.emit(slot_index)

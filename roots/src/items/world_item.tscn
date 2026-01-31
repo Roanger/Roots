@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://world_item_scene"]
+
+[ext_resource type="Script" path="res://src/items/world_item.gd" id="1_world_item"]
+
+[node name="WorldItem" type="Area3D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_world_item")
+item_id = "basic_axe"
+quantity = 1
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+billboard = 1
+double_sided = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]

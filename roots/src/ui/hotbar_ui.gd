@@ -62,6 +62,7 @@ func _create_slots() -> void:
 		slot.set_inventory(inventory)
 		slot.slot_clicked.connect(_on_slot_clicked)
 		slot.slot_hovered.connect(_on_slot_hovered)
+		slot.item_dropped.connect(_on_item_dropped)
 		
 		slots_container.add_child(slot)
 		slots.append(slot)
@@ -80,6 +81,11 @@ func _create_slots() -> void:
 		number_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		number_label.position = Vector2(4, 4)  # Position in top-left corner
 		slot.add_child(number_label)
+
+func _on_item_dropped(from_slot: int, to_slot: int) -> void:
+	# Item was moved via drag-and-drop to hotbar
+	# Slots will update automatically via hotbar_changed signal
+	print("[Hotbar] Item dropped from slot %d to slot %d" % [from_slot, to_slot])
 
 func _update_all_slots() -> void:
 	if not inventory:
