@@ -36,7 +36,7 @@ func get_save_files() -> Array[Dictionary]:
 	for i in range(MAX_SAVE_SLOTS):
 		var save_path = SAVE_DIR + "save_" + str(i + 1) + ".json"
 		var save_info = get_save_info(save_path)
-		if save_info != null:
+		if save_info.get("exists", false):
 			saves.append(save_info)
 	
 	return saves
@@ -79,9 +79,9 @@ func save_game(slot: int = -1) -> bool:
 			# Find oldest save
 			var oldest_timestamp = Time.get_unix_time_from_system() + 1
 			for save in saves:
-				if save.timestamp < oldest_timestamp:
-					oldest_timestamp = save.timestamp
-					slot = save.slot
+				if save.get("timestamp", 0) < oldest_timestamp:
+					oldest_timestamp = save.get("timestamp", 0)
+					slot = save.get("slot", 1)
 	
 	filepath = SAVE_DIR + "save_" + str(slot) + ".json"
 	current_save_path = filepath
@@ -110,9 +110,9 @@ func load_game(filepath: String = "") -> bool:
 				# Load most recent save
 				var most_recent = saves[0]
 				for save in saves:
-					if save.timestamp > most_recent.timestamp:
+					if save.get("timestamp", 0) > most_recent.get("timestamp", 0):
 						most_recent = save
-				filepath = most_recent.filepath
+				filepath = most_recent.get("filepath", "")
 			else:
 				push_error("No save files found")
 				return false
@@ -158,15 +158,17 @@ func copy_save(from_slot: int, to_slot: int) -> bool:
 func get_save_slot_name(slot: int) -> String:
 	var saves = get_save_files()
 	for save in saves:
-		if save.slot == slot:
-			var date_time = Time.get_datetime_dict_from_unix_time(save.timestamp)
+		if save.get("slot", -1) == slot:
+			var date_time = Time.get_datetime_dict_from_unix_time(save.get("timestamp", 0))
 			var date_str = "%04d-%02d-%02d %02d:%02d" % [date_time.year, date_time.month, date_time.day, date_time.hour, date_time.minute]
 			
 			var season_name = "Unknown"
 			if game_manager:
-				season_name = game_manager.Season.keys()[save.season]
+				var season_idx = save.get("season", 0)
+				if season_idx >= 0 and season_idx < game_manager.Season.size():
+					season_name = game_manager.Season.keys()[season_idx]
 			
-			return "%s - Day %d (%s)" % [date_str, save.day, season_name]
+			return "%s - Day %d (%s)" % [date_str, save.get("day", 0), season_name]
 	return "Empty Slot"
 
 func format_timestamp(timestamp: int) -> String:

@@ -24,6 +24,7 @@ signal crop_watered(position: Vector3)
 signal animal_interacted(animal_id: String, action: String)
 
 # Crafting events
+signal open_crafting_station(station_type: int)
 signal crafting_started(station_type: String, recipe_id: String)
 signal crafting_completed(recipe_id: String, output: Dictionary)
 signal crafting_cancelled(recipe_id: String)

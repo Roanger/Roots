@@ -11,8 +11,13 @@ extends Node3D
 @onready var hotbar_ui: Control = $UI/HotbarUI
 
 var hud_scene = preload("res://src/ui/hud/hud.tscn")
+const CraftingUIScript = preload("res://src/ui/crafting_ui.gd")
+const BaseEnemy = preload("res://src/entities/base_enemy.gd")
+const CraftingStationObject = preload("res://src/world/crafting_station_object.gd")
 var hud: Control = null
 var water_plane: MeshInstance3D = null
+var skill_tree_ui: Control = null
+var crafting_ui: CraftingUI = null
 
 # Explicit references to autoload singletons
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
@@ -47,6 +52,19 @@ func _ready() -> void:
 	
 	# Setup HUD
 	call_deferred("_setup_hud")
+	
+	# Setup Skill Tree UI
+	call_deferred("_setup_skill_tree_ui")
+	
+	# Setup Crafting UI
+	call_deferred("_setup_crafting_ui")
+	
+	# Spawn enemies
+	call_deferred("_spawn_enemies")
+	
+	# Restore saved data (player inventory/equipment/stats, farm plots)
+	call_deferred("_load_player_data")
+	call_deferred("_load_farm_plots")
 	
 	# Connect signals
 	if game_manager:
@@ -84,7 +102,7 @@ func _find_spawn_height() -> float:
 	# Get terrain height at spawn point from chunk manager
 	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
 		return chunk_manager.get_terrain_height(Vector3(0, 0, 0))
-	return 15.0  # Default spawn height
+	return 25.0  # Default spawn height (adjusted for new terrain range)
 
 func _position_farm_plots() -> void:
 	# Wait a few frames for chunks to generate, then position farm plots
@@ -134,13 +152,13 @@ func _create_water_plane() -> void:
 	water_material.emission_energy_multiplier = 0.2
 	
 	water_plane.material_override = water_material
-	water_plane.position = Vector3(0, 10, 0)  # Water level
+	water_plane.position = Vector3(0, 16, 0)  # Water level
 	
 	terrain_container.add_child(water_plane)
 
 func _process(_delta: float) -> void:
 	# Handle pause input
-	if Input.is_action_pressed("pause"):
+	if Input.is_action_just_pressed("pause"):
 		_toggle_pause()
 	
 	# Animate water
@@ -156,7 +174,7 @@ func _process(_delta: float) -> void:
 				target_x = player.global_position.x
 				target_z = player.global_position.z
 			
-			water_plane.position = Vector3(target_x, 10.0 + wave_height, target_z)
+			water_plane.position = Vector3(target_x, 16.0 + wave_height, target_z)
 
 func _toggle_pause() -> void:
 	if not game_manager:
@@ -210,6 +228,9 @@ func _update_lighting(hour: float) -> void:
 func save_world() -> void:
 	if game_manager:
 		game_manager.world_data["terrain"] = _serialize_terrain()
+		game_manager.world_data["farm_plots"] = _serialize_farm_plots()
+		if player and player.has_method("serialize"):
+			game_manager.player_data = player.serialize()
 	if save_manager:
 		save_manager.save_game()
 
@@ -221,11 +242,39 @@ func _serialize_terrain() -> Dictionary:
 		}
 	return {"version": "1.0.0", "seed": 0}
 
+func _serialize_farm_plots() -> Array:
+	var plots_data: Array = []
+	if farm_plots_container:
+		for child in farm_plots_container.get_children():
+			if child is FarmPlot:
+				plots_data.append(child.get_save_data())
+	return plots_data
+
+func _load_player_data() -> void:
+	if not game_manager or not player:
+		return
+	if game_manager.player_data.size() > 0 and player.has_method("deserialize"):
+		player.deserialize(game_manager.player_data)
+		print("Player data restored from save")
+
+func _load_farm_plots() -> void:
+	if not game_manager or not farm_plots_container:
+		return
+	var plots_data = game_manager.world_data.get("farm_plots", [])
+	if plots_data.is_empty():
+		return
+	var crop_db = get_node_or_null("/root/CropDatabase")
+	var plots = farm_plots_container.get_children()
+	for i in range(min(plots_data.size(), plots.size())):
+		if plots[i] is FarmPlot:
+			plots[i].load_from_data(plots_data[i], crop_db)
+	print("Farm plot data restored from save")
+
 func get_chunk_manager() -> Node:
 	return chunk_manager
 
 func get_water_level() -> float:
-	return 10.0
+	return 16.0
 
 func _setup_inventory_ui() -> void:
 	if not inventory_ui or not player:
@@ -275,11 +324,19 @@ func _setup_hotbar_ui() -> void:
 		var player_inventory = player.get_inventory()
 		if player_inventory:
 			hotbar_ui.initialize(player_inventory)
+			hotbar_ui.hotbar_slot_selected.connect(_on_hotbar_slot_selected)
 			print("Hotbar UI initialized")
 		else:
 			print("Warning: Player inventory not found for hotbar")
 	else:
 		print("Warning: Player doesn't have get_inventory method")
+
+func _on_hotbar_slot_selected(_slot_index: int) -> void:
+	if not player or not hotbar_ui:
+		return
+	var item = hotbar_ui.get_selected_item()
+	if player.has_method("update_held_tool"):
+		player.update_held_tool(item)
 
 func _setup_hud() -> void:
 	if not player:
@@ -295,6 +352,189 @@ func _setup_hud() -> void:
 	# Initialize with player reference
 	if hud.has_method("initialize"):
 		hud.initialize(player)
+
+func _setup_skill_tree_ui() -> void:
+	if not player:
+		return
+	await get_tree().process_frame
+	
+	var ui_container = get_node_or_null("UI")
+	if not ui_container:
+		return
+	
+	skill_tree_ui = SkillTreeUI.new()
+	skill_tree_ui.name = "SkillTreeUI"
+	ui_container.add_child(skill_tree_ui)
+	skill_tree_ui.initialize(player)
+	print("Skill Tree UI initialized")
+
+func _setup_crafting_ui() -> void:
+	if not player:
+		return
+	await get_tree().process_frame
+	
+	var ui_container = get_node_or_null("UI")
+	if not ui_container:
+		return
+	
+	crafting_ui = CraftingUI.new()
+	crafting_ui.name = "CraftingUI"
+	ui_container.add_child(crafting_ui)
+	crafting_ui.initialize(player.get_inventory())
+	
+	# Connect EventBus signal so crafting stations can open the UI
+	var event_bus = get_node_or_null("/root/EventBus")
+	if event_bus:
+		event_bus.open_crafting_station.connect(_on_open_crafting_station)
+	
+	# Spawn starter crafting stations near the player
+	call_deferred("_spawn_crafting_stations")
+	print("Crafting UI initialized")
+
+func _on_open_crafting_station(station_type: int) -> void:
+	if crafting_ui:
+		crafting_ui.show_crafting(station_type)
+		if player:
+			player.release_mouse()
+
+func _spawn_crafting_stations() -> void:
+	if not player:
+		return
+	var spawn_pos = player.global_position
+	
+	# Workbench - 3m in front of player spawn
+	_create_station(spawn_pos + Vector3(3, 0, 0), 1, "Workbench", Color(0.55, 0.35, 0.15))
+	# Forge - 5m to the right
+	_create_station(spawn_pos + Vector3(5, 0, 2), 2, "Forge", Color(0.3, 0.3, 0.3))
+	# Anvil - next to forge
+	_create_station(spawn_pos + Vector3(5, 0, 4), 3, "Anvil", Color(0.25, 0.25, 0.3))
+
+func _create_station(pos: Vector3, station_type: int, station_name: String, color: Color) -> void:
+	# Snap to terrain height
+	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+		pos.y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+	
+	var container = Node3D.new()
+	container.name = station_name
+	container.position = pos
+	
+	# Visual mesh
+	var mesh_inst = MeshInstance3D.new()
+	var box = BoxMesh.new()
+	box.size = Vector3(1.2, 0.8, 0.8)
+	mesh_inst.mesh = box
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = color
+	mesh_inst.material_override = mat
+	mesh_inst.position.y = 0.4
+	container.add_child(mesh_inst)
+	
+	# Label
+	var label = Label3D.new()
+	label.text = station_name
+	label.font_size = 32
+	label.position.y = 1.2
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	container.add_child(label)
+	
+	# Interactable collision (CraftingStationObject)
+	var station = CraftingStationObject.new()
+	station.name = "StationBody"
+	station.station_type = station_type
+	station.station_name = station_name
+	station.collision_layer = 2
+	station.collision_mask = 0
+	var col_shape = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(1.2, 0.8, 0.8)
+	col_shape.shape = shape
+	col_shape.position.y = 0.4
+	station.add_child(col_shape)
+	container.add_child(station)
+	
+	add_child(container)
+
+const SKELETON_MINION = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Minion.glb"
+const SKELETON_WARRIOR = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Warrior.glb"
+const SKELETON_ROGUE = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Rogue.glb"
+const SKELETON_MAGE = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Mage.glb"
+
+func _spawn_enemies() -> void:
+	if not player:
+		return
+	await get_tree().process_frame
+	var spawn_pos = player.global_position
+	
+	# Skeleton Minions - easy, near spawn (3)
+	for i in 3:
+		var offset = Vector3(
+			randf_range(-15, -8) if i % 2 == 0 else randf_range(8, 15),
+			0,
+			randf_range(-12, 12)
+		)
+		_create_enemy(spawn_pos + offset, "Skeleton Minion", 15.0, 1.5, 2.5, 3.0, 1.5, 10.0,
+			Color.WHITE, 10.0, [
+				{"item_id": "string", "min_amount": 1, "max_amount": 2, "chance": 0.5},
+				{"item_id": "stick", "min_amount": 1, "max_amount": 1, "chance": 0.3},
+			], SKELETON_MINION, 1.0)
+	
+	# Skeleton Rogues - fast, medium difficulty (2)
+	for i in 2:
+		var offset = Vector3(
+			randf_range(-22, -14) if i % 2 == 0 else randf_range(14, 22),
+			0,
+			randf_range(-15, 15)
+		)
+		_create_enemy(spawn_pos + offset, "Skeleton Rogue", 20.0, 2.5, 4.5, 5.0, 1.5, 12.0,
+			Color.WHITE, 18.0, [
+				{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.5},
+				{"item_id": "string", "min_amount": 1, "max_amount": 3, "chance": 0.6},
+			], SKELETON_ROGUE, 1.0)
+	
+	# Skeleton Warrior - tough melee (1)
+	_create_enemy(spawn_pos + Vector3(18, 0, 18), "Skeleton Warrior", 40.0, 1.2, 2.5, 8.0, 1.8, 12.0,
+		Color.WHITE, 30.0, [
+			{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.7},
+			{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.4},
+			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15},
+		], SKELETON_WARRIOR, 1.0)
+	
+	# Skeleton Mage - ranged caster, dangerous (1)
+	_create_enemy(spawn_pos + Vector3(-20, 0, 16), "Skeleton Mage", 25.0, 1.0, 2.0, 10.0, 2.5, 14.0,
+		Color.WHITE, 35.0, [
+			{"item_id": "coal", "min_amount": 2, "max_amount": 4, "chance": 0.8},
+			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.25},
+			{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.5},
+		], SKELETON_MAGE, 1.0)
+	
+	print("Enemies spawned")
+
+func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
+		chase_spd: float, dmg: float, atk_range: float, detect: float,
+		color: Color, xp: float, loot: Array,
+		emodel: String = "", escale: float = 1.0) -> void:
+	# Snap to terrain height
+	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+		var terrain_y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		pos.y = terrain_y
+	else:
+		pos.y = 30.0
+	
+	var enemy = BaseEnemy.new()
+	enemy.enemy_name = ename
+	enemy.max_health = health
+	enemy.move_speed = spd
+	enemy.chase_speed = chase_spd
+	enemy.attack_damage = dmg
+	enemy.attack_range = atk_range
+	enemy.detection_range = detect
+	enemy.body_color = color
+	enemy.xp_reward = xp
+	enemy.loot_table = loot
+	enemy.model_path = emodel
+	enemy.model_scale = escale
+	enemy.position = pos
+	add_child(enemy)
 
 func _input(event: InputEvent) -> void:
 	# Handle Tab key to toggle both inventory and character UI
@@ -317,3 +557,25 @@ func _input(event: InputEvent) -> void:
 					character_ui.close()
 			
 			get_viewport().set_input_as_handled()
+		
+		# K key to toggle skill tree
+		elif event.keycode == KEY_K:
+			if skill_tree_ui:
+				if skill_tree_ui.visible:
+					skill_tree_ui.close()
+				else:
+					skill_tree_ui.open()
+				get_viewport().set_input_as_handled()
+		
+		# R key to toggle crafting
+		elif event.keycode == KEY_R:
+			if crafting_ui:
+				if crafting_ui.visible:
+					crafting_ui.visible = false
+					if player:
+						player.capture_mouse()
+				else:
+					crafting_ui.show_crafting()
+					if player:
+						player.release_mouse()
+				get_viewport().set_input_as_handled()

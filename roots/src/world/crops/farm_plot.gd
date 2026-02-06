@@ -215,6 +215,7 @@ func get_save_data() -> Dictionary:
 	}
 
 func load_from_data(data: Dictionary, p_crop_database: Node) -> void:
+	crop_database = p_crop_database
 	crop_id = data.get("crop_id", "")
 	current_stage = data.get("current_stage", 0)
 	stage_progress = data.get("stage_progress", 0.0)

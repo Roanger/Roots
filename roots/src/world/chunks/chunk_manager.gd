@@ -1,6 +1,8 @@
 extends Node
 ## Manages chunk loading/unloading based on player position
 
+const HarvestableResource = preload("res://src/world/harvestable_resource.gd")
+
 signal chunk_loaded(chunk_pos: Vector2i)
 signal chunk_unloaded(chunk_pos: Vector2i)
 signal chunk_mesh_updated(chunk_pos: Vector2i)
@@ -22,11 +24,19 @@ var terrain_container: Node3D = null
 # World object scenes (FBX assets)
 var _tree_scenes: Array[PackedScene] = []      # Live trees (Common, Twisted)
 var _dead_tree_scenes: Array[PackedScene] = [] # Dead trees (biome-based)
+var _pine_scenes: Array[PackedScene] = []      # Pine trees (Taiga, mountain)
 var _rock_scenes: Array[PackedScene] = []
+var _pebble_scenes: Array[PackedScene] = []    # Small pebbles (beach, mountain)
 var _grass_texture: Texture2D = null
 # KayKit Forest Nature Pack (bushes + 3D grass)
 var _forest_grass_scenes: Array[PackedScene] = []
 var _bush_scenes: Array[PackedScene] = []
+# Biome-specific decoration scenes
+var _flower_scenes: Array[PackedScene] = []    # Flowers (meadow, plains)
+var _fern_scenes: Array[PackedScene] = []      # Ferns (forest, jungle)
+var _mushroom_scenes: Array[PackedScene] = []  # Mushrooms (forest floor)
+var _clover_scenes: Array[PackedScene] = []    # Clovers (plains ground cover)
+var _bush_common_scenes: Array[PackedScene] = [] # Common bushes (plains variety)
 # Terrain ground shader (vertex color + procedural detail, no assets)
 var _terrain_ground_shader: Shader = null
 
@@ -81,6 +91,61 @@ func _ready() -> void:
 		var scene = load(path) as PackedScene
 		if scene:
 			_rock_scenes.append(scene)
+	# Pine trees for taiga and mountain biomes
+	var pine_paths := [
+		"res://FBX/Pine_1.fbx", "res://FBX/Pine_2.fbx", "res://FBX/Pine_3.fbx",
+		"res://FBX/Pine_4.fbx", "res://FBX/Pine_5.fbx"
+	]
+	for path in pine_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_pine_scenes.append(scene)
+	# Pebbles for beach and mountain scatter
+	var pebble_paths := [
+		"res://FBX/Pebble_Round_1.fbx", "res://FBX/Pebble_Round_2.fbx",
+		"res://FBX/Pebble_Round_3.fbx", "res://FBX/Pebble_Round_4.fbx",
+		"res://FBX/Pebble_Round_5.fbx", "res://FBX/Pebble_Square_1.fbx",
+		"res://FBX/Pebble_Square_2.fbx", "res://FBX/Pebble_Square_3.fbx",
+		"res://FBX/Pebble_Square_4.fbx", "res://FBX/Pebble_Square_5.fbx",
+		"res://FBX/Pebble_Square_6.fbx"
+	]
+	for path in pebble_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_pebble_scenes.append(scene)
+	# Flowers for meadow and plains
+	var flower_paths := [
+		"res://FBX/Flower_3_Group.fbx", "res://FBX/Flower_3_Single.fbx",
+		"res://FBX/Flower_4_Group.fbx", "res://FBX/Flower_4_Single.fbx"
+	]
+	for path in flower_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_flower_scenes.append(scene)
+	# Ferns for forest and jungle undergrowth
+	var fern_paths := ["res://FBX/Fern_1.fbx"]
+	for path in fern_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_fern_scenes.append(scene)
+	# Mushrooms for forest floor
+	var mushroom_paths := ["res://FBX/Mushroom_Common.fbx", "res://FBX/Mushroom_Laetiporus.fbx"]
+	for path in mushroom_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_mushroom_scenes.append(scene)
+	# Clovers for plains ground cover
+	var clover_paths := ["res://FBX/Clover_1.fbx", "res://FBX/Clover_2.fbx"]
+	for path in clover_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_clover_scenes.append(scene)
+	# Common bushes for plains variety
+	var common_bush_paths := ["res://FBX/Bush_Common.fbx", "res://FBX/Bush_Common_Flowers.fbx"]
+	for path in common_bush_paths:
+		var scene = load(path) as PackedScene
+		if scene:
+			_bush_common_scenes.append(scene)
 	_grass_texture = load("res://Textures/Grass.png") as Texture2D
 	# KayKit Forest Nature Pack: grass and bushes
 	var forest_base = "res://KayKit_Forest_Nature_Pack_1.0_FREE/Assets/fbx(unity)/"
@@ -97,12 +162,12 @@ func _ready() -> void:
 		"Bush_4_A_Color1.fbx", "Bush_4_B_Color1.fbx", "Bush_4_C_Color1.fbx",
 		"Bush_4_D_Color1.fbx", "Bush_4_E_Color1.fbx", "Bush_4_F_Color1.fbx"
 	]
-	for name in grass_paths:
-		var scene = load(forest_base + name) as PackedScene
+	for grass_name in grass_paths:
+		var scene = load(forest_base + grass_name) as PackedScene
 		if scene:
 			_forest_grass_scenes.append(scene)
-	for name in bush_paths:
-		var scene = load(forest_base + name) as PackedScene
+	for bush_name in bush_paths:
+		var scene = load(forest_base + bush_name) as PackedScene
 		if scene:
 			_bush_scenes.append(scene)
 	# Terrain ground shader: preserves vertex (biome) color, adds solid-ground variation
@@ -153,7 +218,7 @@ func _update_visible_chunks() -> void:
 		var dist_z = abs(chunk_pos.y - player_chunk_z)
 		
 		# Unload if outside square view distance + buffer
-		if max(dist_x, dist_z) > view_distance + 2:
+		if max(dist_x, dist_z) > view_distance + 4:
 			chunks_to_unload.append(chunk_pos)
 	
 	# Queue chunks for generation
@@ -165,10 +230,15 @@ func _update_visible_chunks() -> void:
 	# Process generation queue - DONE in _process now
 	# _process_generation_queue()
 	
-	# TEMPORARILY DISABLED: Unload old chunks
-	# This was causing chunks to disappear incorrectly
-	# for chunk_pos in chunks_to_unload:
-	# 	_unload_chunk(chunk_pos)
+	# Unload distant chunks (skip any still pending generation)
+	var unloaded_count: int = 0
+	var max_unloads_per_update: int = 8
+	for chunk_pos in chunks_to_unload:
+		if unloaded_count >= max_unloads_per_update:
+			break
+		if not pending_chunks.has(chunk_pos):
+			_unload_chunk(chunk_pos)
+			unloaded_count += 1
 	
 	is_updating = false
 
@@ -222,14 +292,14 @@ func _generate_chunk_objects(chunk: ChunkData) -> void:
 	
 	for z in range(chunk.size):
 		for x in range(chunk.size):
-			if randf() > object_density:
+			if rng.randf() > object_density:
 				continue
 			
 			var world_x = chunk.world_position.x + x + 0.5
 			var world_z = chunk.world_position.z + z + 0.5
 			var height = chunk.get_height(x, z)
 			
-			var biome = chunk.get_biome(x, z)
+			var _biome = chunk.get_biome(x, z)
 			var tree_density = noise_util.get_tree_density(world_x, world_z)
 			var rock_density = noise_util.get_rock_density(world_x, world_z)
 			
@@ -352,21 +422,23 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 	# Store reference to chunk data
 	mesh_instance.set_meta("chunk_data", chunk)
 	
-	# Create object instances
-	_create_chunk_objects(chunk, mesh_instance)
+	# Create object instances (pass seeded RNG for deterministic placement)
+	var obj_rng = RandomNumberGenerator.new()
+	obj_rng.seed = hash(chunk.chunk_position) + 7919
+	_create_chunk_objects(chunk, mesh_instance, obj_rng)
 
-func _create_chunk_objects(chunk: ChunkData, parent: Node) -> void:
+func _create_chunk_objects(chunk: ChunkData, parent: Node, rng: RandomNumberGenerator) -> void:
 	# Create tree instances (biome-aware, scale/rotation variation)
 	for tree_pos in chunk.tree_positions:
 		var local_pos = tree_pos - chunk.world_position
-		var tree = _create_tree_mesh(chunk, local_pos)
+		var tree = _create_tree_mesh(chunk, local_pos, rng)
 		if tree:
 			parent.add_child(tree)
 	
 	# Create rock instances (scale and tilt variation)
 	for rock_pos in chunk.rock_positions:
 		var local_pos = rock_pos - chunk.world_position
-		var rock = _create_rock_mesh(local_pos)
+		var rock = _create_rock_mesh(local_pos, rng)
 		if rock:
 			parent.add_child(rock)
 	
@@ -374,44 +446,77 @@ func _create_chunk_objects(chunk: ChunkData, parent: Node) -> void:
 	_create_grass_patches(chunk, parent)
 	# Bushes (KayKit Forest Nature Pack)
 	_create_bush_patches(chunk, parent)
+	# Biome-specific decorations
+	_create_biome_decorations(chunk, parent)
 
-func _create_tree_mesh(chunk: ChunkData, pos: Vector3) -> Node3D:
-	var use_dead := false
-	if not _dead_tree_scenes.is_empty() and not _tree_scenes.is_empty():
-		var lx = clampi(int(pos.x), 0, chunk.size)
-		var lz = clampi(int(pos.z), 0, chunk.size)
-		var biome = chunk.get_biome(lx, lz)
-		# Dead trees more likely in plains (2), mountains (6), snow (7)
-		var dead_chance := 0.0
-		if biome == 2: dead_chance = 0.35
-		elif biome == 6: dead_chance = 0.55
-		elif biome == 7: dead_chance = 0.75
-		use_dead = randf() < dead_chance
-	var scenes: Array[PackedScene] = _dead_tree_scenes if use_dead and not _dead_tree_scenes.is_empty() else _tree_scenes
+func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
+	var lx = clampi(int(pos.x), 0, chunk.size)
+	var lz = clampi(int(pos.z), 0, chunk.size)
+	var biome = chunk.get_biome(lx, lz)
+	
+	# Select tree type based on biome
+	var scenes: Array[PackedScene] = []
+	match biome:
+		5:  # Taiga - pine trees
+			scenes = _pine_scenes
+		6:  # Mountains - mix of pine and dead trees
+			if rng.randf() < 0.6 and not _pine_scenes.is_empty():
+				scenes = _pine_scenes
+			elif not _dead_tree_scenes.is_empty():
+				scenes = _dead_tree_scenes
+			else:
+				scenes = _tree_scenes
+		7:  # Snow - mostly dead, occasional pine
+			if rng.randf() < 0.3 and not _pine_scenes.is_empty():
+				scenes = _pine_scenes
+			elif not _dead_tree_scenes.is_empty():
+				scenes = _dead_tree_scenes
+		9:  # Highland - dead trees and sparse common
+			if rng.randf() < 0.5 and not _dead_tree_scenes.is_empty():
+				scenes = _dead_tree_scenes
+			else:
+				scenes = _tree_scenes
+		2:  # Plains - occasional lone tree, sometimes dead
+			if rng.randf() < 0.2 and not _dead_tree_scenes.is_empty():
+				scenes = _dead_tree_scenes
+			else:
+				scenes = _tree_scenes
+		_:  # Forest (3), Jungle (4), Meadow (8) - common/twisted trees
+			scenes = _tree_scenes
+	
 	if scenes.is_empty():
 		return _create_tree_mesh_procedural(pos)
-	var scene: PackedScene = scenes[randi() % scenes.size()]
+	var scene: PackedScene = scenes[rng.randi() % scenes.size()]
 	var tree_container: Node3D = scene.instantiate() as Node3D
 	if not tree_container:
 		return _create_tree_mesh_procedural(pos)
 	tree_container.name = "Tree"
 	tree_container.position = pos
-	tree_container.rotation.y = randf_range(0.0, TAU)
-	var scale_factor := randf_range(0.88, 1.15)
+	tree_container.rotation.y = rng.randf_range(0.0, TAU)
+	var scale_factor := rng.randf_range(0.88, 1.15)
+	# Mountain/snow trees are smaller (stunted)
+	if biome == 6 or biome == 7:
+		scale_factor *= 0.7
 	tree_container.scale = Vector3(scale_factor, scale_factor, scale_factor)
-	# Add collision for player/world interaction
-	var static_body = StaticBody3D.new()
-	static_body.name = "Collision"
-	static_body.collision_layer = 2
-	static_body.collision_mask = 0
+	# Add harvestable collision for player/world interaction
+	var harvestable = HarvestableResource.new()
+	harvestable.name = "Collision"
+	harvestable.collision_layer = 2
+	harvestable.collision_mask = 0
+	harvestable.resource_type = ToolAffinity.TargetType.TREE
+	harvestable.max_health = 15.0
+	harvestable.loot_table = [
+		{"item_id": "wood_log", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+		{"item_id": "stick", "min_amount": 1, "max_amount": 3, "chance": 0.7},
+	]
 	var collision_shape = CollisionShape3D.new()
 	var trunk_shape = CylinderShape3D.new()
 	trunk_shape.radius = 0.5 * scale_factor
 	trunk_shape.height = 3.0 * scale_factor
 	collision_shape.shape = trunk_shape
 	collision_shape.position.y = 1.5 * scale_factor
-	static_body.add_child(collision_shape)
-	tree_container.add_child(static_body)
+	harvestable.add_child(collision_shape)
+	tree_container.add_child(harvestable)
 	return tree_container
 
 func _create_tree_mesh_procedural(pos: Vector3) -> Node3D:
@@ -441,45 +546,59 @@ func _create_tree_mesh_procedural(pos: Vector3) -> Node3D:
 	leaves.material_override = leaves_mat
 	leaves.position.y = 2.5
 	tree_container.add_child(leaves)
-	var static_body = StaticBody3D.new()
-	static_body.name = "Collision"
-	static_body.collision_layer = 2
-	static_body.collision_mask = 0
+	var harvestable = HarvestableResource.new()
+	harvestable.name = "Collision"
+	harvestable.collision_layer = 2
+	harvestable.collision_mask = 0
+	harvestable.resource_type = ToolAffinity.TargetType.TREE
+	harvestable.max_health = 10.0
+	harvestable.loot_table = [
+		{"item_id": "wood_log", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+		{"item_id": "stick", "min_amount": 1, "max_amount": 2, "chance": 0.6},
+	]
 	var collision_shape = CollisionShape3D.new()
 	var trunk_shape = CylinderShape3D.new()
 	trunk_shape.radius = 0.3
 	trunk_shape.height = 2.0
 	collision_shape.shape = trunk_shape
 	collision_shape.position.y = 1.0
-	static_body.add_child(collision_shape)
-	tree_container.add_child(static_body)
+	harvestable.add_child(collision_shape)
+	tree_container.add_child(harvestable)
 	return tree_container
 
-func _create_rock_mesh(pos: Vector3) -> Node3D:
+func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
 	if _rock_scenes.is_empty():
 		return _create_rock_mesh_procedural(pos)
-	var scene: PackedScene = _rock_scenes[randi() % _rock_scenes.size()]
+	var scene: PackedScene = _rock_scenes[rng.randi() % _rock_scenes.size()]
 	var rock_container: Node3D = scene.instantiate() as Node3D
 	if not rock_container:
 		return _create_rock_mesh_procedural(pos)
 	rock_container.name = "Rock"
 	rock_container.position = pos
-	rock_container.rotation.y = randf_range(0.0, TAU)
-	rock_container.rotation.x = randf_range(-0.12, 0.12)
-	rock_container.rotation.z = randf_range(-0.12, 0.12)
-	var scale_factor := randf_range(0.82, 1.18)
+	rock_container.rotation.y = rng.randf_range(0.0, TAU)
+	rock_container.rotation.x = rng.randf_range(-0.12, 0.12)
+	rock_container.rotation.z = rng.randf_range(-0.12, 0.12)
+	var scale_factor := rng.randf_range(0.82, 1.18)
 	rock_container.scale = Vector3(scale_factor, scale_factor, scale_factor)
 	var radius := 0.5 * scale_factor
-	var static_body = StaticBody3D.new()
-	static_body.name = "Collision"
-	static_body.collision_layer = 2
-	static_body.collision_mask = 0
+	var harvestable = HarvestableResource.new()
+	harvestable.name = "Collision"
+	harvestable.collision_layer = 2
+	harvestable.collision_mask = 0
+	harvestable.resource_type = ToolAffinity.TargetType.ROCK
+	harvestable.max_health = 20.0
+	harvestable.loot_table = [
+		{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+		{"item_id": "coal", "min_amount": 1, "max_amount": 2, "chance": 0.3},
+		{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.2},
+		{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.15},
+	]
 	var collision_shape = CollisionShape3D.new()
 	var sphere_shape = SphereShape3D.new()
 	sphere_shape.radius = radius
 	collision_shape.shape = sphere_shape
-	static_body.add_child(collision_shape)
-	rock_container.add_child(static_body)
+	harvestable.add_child(collision_shape)
+	rock_container.add_child(harvestable)
 	return rock_container
 
 func _create_rock_mesh_procedural(pos: Vector3) -> Node3D:
@@ -497,16 +616,22 @@ func _create_rock_mesh_procedural(pos: Vector3) -> Node3D:
 	rock_mat.albedo_color = Color(0.5, 0.5, 0.5)
 	rock.material_override = rock_mat
 	rock_container.add_child(rock)
-	var static_body = StaticBody3D.new()
-	static_body.name = "Collision"
-	static_body.collision_layer = 2
-	static_body.collision_mask = 0
+	var harvestable = HarvestableResource.new()
+	harvestable.name = "Collision"
+	harvestable.collision_layer = 2
+	harvestable.collision_mask = 0
+	harvestable.resource_type = ToolAffinity.TargetType.ROCK
+	harvestable.max_health = 12.0
+	harvestable.loot_table = [
+		{"item_id": "stone", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+		{"item_id": "coal", "min_amount": 1, "max_amount": 1, "chance": 0.25},
+	]
 	var collision_shape = CollisionShape3D.new()
 	var sphere_shape = SphereShape3D.new()
 	sphere_shape.radius = radius
 	collision_shape.shape = sphere_shape
-	static_body.add_child(collision_shape)
-	rock_container.add_child(static_body)
+	harvestable.add_child(collision_shape)
+	rock_container.add_child(harvestable)
 	return rock_container
 
 func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
@@ -514,7 +639,7 @@ func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
 		return
 	var rng = RandomNumberGenerator.new()
 	rng.seed = chunk.chunk_position.x * 73856093 + chunk.chunk_position.y * 19349663
-	var num_patches = chunk.size * chunk.size / 8
+	var num_patches: int = int(chunk.size * chunk.size) / 8
 	num_patches = mini(num_patches, 28)
 	for i in num_patches:
 		var lx = rng.randf_range(1.0, float(chunk.size) - 1.0)
@@ -522,7 +647,8 @@ func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
 		var gx = clampi(int(lx), 0, chunk.size)
 		var gz = clampi(int(lz), 0, chunk.size)
 		var biome = chunk.get_biome(gx, gz)
-		if biome != 2 and biome != 3 and biome != 4:
+		# Grass grows in plains, forest, jungle, meadow, highland, taiga
+		if biome not in [2, 3, 4, 5, 8, 9]:
 			continue
 		var world_x = chunk.world_position.x + lx
 		var world_z = chunk.world_position.z + lz
@@ -571,12 +697,21 @@ func _create_bush_patches(chunk: ChunkData, parent: Node) -> void:
 		var gx = clampi(int(lx), 0, chunk.size)
 		var gz = clampi(int(lz), 0, chunk.size)
 		var biome = chunk.get_biome(gx, gz)
-		if biome != 2 and biome != 3 and biome != 4:
+		# Bushes grow in plains, forest, jungle, meadow, highland
+		if biome not in [2, 3, 4, 8, 9]:
 			continue
 		var world_x = chunk.world_position.x + lx
 		var world_z = chunk.world_position.z + lz
 		var height = chunk.get_world_height(world_x, world_z)
-		var scene: PackedScene = _bush_scenes[rng.randi() % _bush_scenes.size()]
+		# Use common bushes for plains/meadow, forest pack bushes for forest/jungle
+		var bush_pool: Array[PackedScene] = []
+		if biome in [2, 8] and not _bush_common_scenes.is_empty():
+			bush_pool = _bush_common_scenes
+		else:
+			bush_pool = _bush_scenes
+		if bush_pool.is_empty():
+			continue
+		var scene: PackedScene = bush_pool[rng.randi() % bush_pool.size()]
 		var bush_node: Node3D = scene.instantiate() as Node3D
 		if not bush_node:
 			continue
@@ -587,16 +722,121 @@ func _create_bush_patches(chunk: ChunkData, parent: Node) -> void:
 		bush_node.scale = Vector3(scale_factor, scale_factor, scale_factor)
 		parent.add_child(bush_node)
 
+func _create_biome_decorations(chunk: ChunkData, parent: Node) -> void:
+	if chunk.size <= 0:
+		return
+	var rng = RandomNumberGenerator.new()
+	rng.seed = chunk.chunk_position.x * 83492791 + chunk.chunk_position.y * 47165893
+	var num_decorations: int = mini(chunk.size * 3, 40)
+	
+	for i in num_decorations:
+		var lx = rng.randf_range(1.0, float(chunk.size) - 1.0)
+		var lz = rng.randf_range(1.0, float(chunk.size) - 1.0)
+		var gx = clampi(int(lx), 0, chunk.size)
+		var gz = clampi(int(lz), 0, chunk.size)
+		var biome = chunk.get_biome(gx, gz)
+		var world_x = chunk.world_position.x + lx
+		var world_z = chunk.world_position.z + lz
+		var height = chunk.get_world_height(world_x, world_z)
+		
+		var scene_pool: Array[PackedScene] = []
+		var node_name := "Decoration"
+		var scale_min := 0.8
+		var scale_max := 1.2
+		
+		match biome:
+			8:  # Meadow - flowers
+				if not _flower_scenes.is_empty():
+					scene_pool = _flower_scenes
+					node_name = "Flower"
+					scale_min = 0.7
+					scale_max = 1.3
+			2:  # Plains - clovers and occasional flowers
+				if rng.randf() < 0.6 and not _clover_scenes.is_empty():
+					scene_pool = _clover_scenes
+					node_name = "Clover"
+					scale_min = 0.8
+					scale_max = 1.1
+				elif not _flower_scenes.is_empty():
+					scene_pool = _flower_scenes
+					node_name = "Flower"
+			3:  # Forest - ferns and mushrooms
+				if rng.randf() < 0.6 and not _fern_scenes.is_empty():
+					scene_pool = _fern_scenes
+					node_name = "Fern"
+					scale_min = 0.7
+					scale_max = 1.4
+				elif not _mushroom_scenes.is_empty():
+					scene_pool = _mushroom_scenes
+					node_name = "Mushroom"
+					scale_min = 0.6
+					scale_max = 1.0
+			4:  # Jungle/Swamp - dense ferns
+				if not _fern_scenes.is_empty():
+					scene_pool = _fern_scenes
+					node_name = "Fern"
+					scale_min = 0.9
+					scale_max = 1.6
+			1:  # Beach - pebbles
+				if not _pebble_scenes.is_empty():
+					scene_pool = _pebble_scenes
+					node_name = "Pebble"
+					scale_min = 0.5
+					scale_max = 1.0
+			6:  # Mountains - pebbles and rocks
+				if not _pebble_scenes.is_empty():
+					scene_pool = _pebble_scenes
+					node_name = "Pebble"
+					scale_min = 0.6
+					scale_max = 1.5
+			7:  # Snow - sparse pebbles
+				if rng.randf() < 0.4 and not _pebble_scenes.is_empty():
+					scene_pool = _pebble_scenes
+					node_name = "Pebble"
+					scale_min = 0.5
+					scale_max = 1.2
+			9:  # Highland - pebbles and clovers
+				if rng.randf() < 0.5 and not _pebble_scenes.is_empty():
+					scene_pool = _pebble_scenes
+					node_name = "Pebble"
+					scale_min = 0.5
+					scale_max = 1.0
+				elif not _clover_scenes.is_empty():
+					scene_pool = _clover_scenes
+					node_name = "Clover"
+			5:  # Taiga - mushrooms (sparse)
+				if rng.randf() < 0.3 and not _mushroom_scenes.is_empty():
+					scene_pool = _mushroom_scenes
+					node_name = "Mushroom"
+					scale_min = 0.5
+					scale_max = 0.9
+		
+		if scene_pool.is_empty():
+			continue
+		
+		var scene: PackedScene = scene_pool[rng.randi() % scene_pool.size()]
+		var node: Node3D = scene.instantiate() as Node3D
+		if not node:
+			continue
+		node.name = node_name
+		node.position = Vector3(lx, height + 0.02, lz)
+		node.rotation.y = rng.randf_range(0.0, TAU)
+		var scale_factor := rng.randf_range(scale_min, scale_max)
+		node.scale = Vector3(scale_factor, scale_factor, scale_factor)
+		parent.add_child(node)
+
 func _get_biome_color(biome: int) -> Color:
 	match biome:
-		0: return Color(0.2, 0.3, 0.7)  # Water
-		1: return Color(0.76, 0.7, 0.5)  # Beach
-		2: return Color(0.5, 0.7, 0.2)  # Plains (dry)
-		3: return Color(0.25, 0.55, 0.2)  # Forest
-		4: return Color(0.15, 0.45, 0.15)  # Jungle
-		5: return Color(0.35, 0.45, 0.35)  # Taiga
-		6: return Color(0.5, 0.45, 0.4)  # Mountains
-		7: return Color(0.9, 0.9, 1.0)  # Snow
+		0: return Color(0.18, 0.28, 0.65)  # Water (deeper blue)
+		1: return Color(0.82, 0.75, 0.55)  # Beach (warm sand)
+		2: return Color(0.5, 0.68, 0.22)   # Plains (dry grassland)
+		3: return Color(0.2, 0.5, 0.18)    # Forest (rich green)
+		4: return Color(0.12, 0.42, 0.14)  # Jungle/Swamp (dark lush)
+		5: return Color(0.3, 0.42, 0.32)   # Taiga (muted cold green)
+		6: return Color(0.52, 0.48, 0.42)  # Mountains (grey-brown rock)
+		7: return Color(0.92, 0.92, 0.98)  # Snow (bright white-blue)
+		8: return Color(0.45, 0.65, 0.25)  # Meadow (lush warm green)
+		9: return Color(0.55, 0.52, 0.38)  # Highland (dry rocky grass)
 		_: return Color(0.3, 0.5, 0.2)
 
 func _get_terrain_vertex_color(biome: int, world_x: float, world_z: float) -> Color:
@@ -631,7 +871,7 @@ func _unload_chunk(chunk_pos: Vector2i) -> void:
 
 func _save_chunk(chunk: ChunkData) -> void:
 	# Save chunk data to disk or cloud
-	var chunk_data = chunk.serialize()
+	var _chunk_data = chunk.serialize()
 	# TODO: Implement actual saving
 	print("Saving chunk: ", chunk.chunk_position)
 

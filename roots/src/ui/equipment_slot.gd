@@ -24,7 +24,7 @@ func _ready() -> void:
 	
 	# Enable mouse input for drag-and-drop; children should not block
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_set_children_mouse_filter_ignore(self)
+	SlotUtils.set_children_mouse_filter_ignore(self)
 	
 	# Ensure slot processes input even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -56,12 +56,6 @@ func _ready() -> void:
 	
 	# Hide durability bar initially
 	durability_bar.visible = false
-
-func _set_children_mouse_filter_ignore(node: Node) -> void:
-	for child in node.get_children():
-		if child is Control:
-			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_set_children_mouse_filter_ignore(child)
 
 func update_slot(p_item: InventoryItem) -> void:
 	print("[EquipmentSlot %d] update_slot called with item: %s" % [slot_type, p_item.get_item_name() if p_item else "null"])
@@ -102,19 +96,7 @@ func update_slot(p_item: InventoryItem) -> void:
 		label.modulate = Color(0.6, 0.6, 0.6)
 
 func _get_placeholder_color() -> Color:
-	# Return different colors based on item type for placeholder
-	if not item or not item.item_data:
-		return Color.WHITE
-	
-	match item.item_data.item_type:
-		ItemData.ItemType.TOOL:
-			return Color(0.8, 0.6, 0.4)  # Brown
-		ItemData.ItemType.WEAPON:
-			return Color(0.8, 0.2, 0.2)  # Dark red
-		ItemData.ItemType.EQUIPMENT:
-			return Color(0.4, 0.6, 0.8)  # Blue
-		_:
-			return Color.WHITE
+	return SlotUtils.get_placeholder_color(item)
 
 var _is_dragging: bool = false
 var _drag_start_pos: Vector2 = Vector2.ZERO
@@ -123,40 +105,21 @@ const DRAG_THRESHOLD: float = 5.0
 var _last_drag_data: DragData = null
 var _last_can_drop: bool = false
 
-# Use Engine meta to share state across all slot types (shared with InventorySlot)
-const DROP_COUNTER_KEY = "_global_drop_counter"
-const LAST_DROP_SLOT_KEY = "_last_drop_slot_id"
-
-func _get_drop_counter() -> int:
-	if Engine.has_meta(DROP_COUNTER_KEY):
-		return Engine.get_meta(DROP_COUNTER_KEY)
-	return 0
-
-func _set_drop_counter(value: int) -> void:
-	Engine.set_meta(DROP_COUNTER_KEY, value)
-
-func _get_last_drop_slot() -> int:
-	if Engine.has_meta(LAST_DROP_SLOT_KEY):
-		return Engine.get_meta(LAST_DROP_SLOT_KEY)
-	return -1
-
-func _set_last_drop_slot(slot_id: int) -> void:
-	Engine.set_meta(LAST_DROP_SLOT_KEY, slot_id)
 
 var _my_drop_counter: int = 0
 var _slot_id: int = 0
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
-		var global_counter = _get_drop_counter()
+		var global_counter = SlotUtils.get_drop_counter()
 		print("[DragDebug] EquipmentSlot NOTIFICATION_DRAG_END received on slot %d (my_counter=%d, global=%d)" % [slot_type, _my_drop_counter, global_counter])
 		
 		# Only process if this slot was the LAST one to have can_drop_data called
-		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and _get_last_drop_slot() == _slot_id:
+		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and SlotUtils.get_last_drop_slot() == _slot_id:
 			print("[DragDebug] Executing manual drop on equipment slot %d" % slot_type)
 			# Increment counter to prevent other slots from processing
-			_set_drop_counter(global_counter + 1)
-			_set_last_drop_slot(-1)
+			SlotUtils.set_drop_counter(global_counter + 1)
+			SlotUtils.set_last_drop_slot(-1)
 			# Execute drop logic directly
 			if _last_drag_data.source_type == DragData.DragSource.INVENTORY or _last_drag_data.source_type == DragData.DragSource.HOTBAR:
 				_handle_inventory_to_equipment_drop(_last_drag_data)
@@ -317,10 +280,10 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 		_last_drag_data = drag_data
 		_last_can_drop = true
 		# Tag this slot with current global counter and unique slot ID
-		var global_counter = _get_drop_counter()
+		var global_counter = SlotUtils.get_drop_counter()
 		_my_drop_counter = global_counter
 		_slot_id = 2000 + slot_type  # Equipment slots start at 2000 to avoid collision with inventory
-		_set_last_drop_slot(_slot_id)
+		SlotUtils.set_last_drop_slot(_slot_id)
 		print("[DragDebug]   -> slot tagged with counter=%d, slot_id=%d" % [_my_drop_counter, _slot_id])
 	
 	return valid
@@ -415,40 +378,7 @@ func drop_data(position: Vector2, data: Variant) -> void:
 						equipment.item_unequipped.emit(equipment.get_slot_name(slot_type))
 
 func _create_drag_preview() -> Control:
-	# Create visual preview for dragging
-	var preview = PanelContainer.new()
-	preview.custom_minimum_size = Vector2(slot_size, slot_size)
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.3, 0.3, 0.4, 0.8)
-	style.border_color = Color(0.6, 0.6, 0.8)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	preview.add_theme_stylebox_override("panel", style)
-	
-	var margin = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 4)
-	margin.add_theme_constant_override("margin_top", 4)
-	margin.add_theme_constant_override("margin_right", 4)
-	margin.add_theme_constant_override("margin_bottom", 4)
-	preview.add_child(margin)
-	
-	if item and not item.is_empty():
-		# Show item icon or placeholder
-		if item.get_icon():
-			var icon = TextureRect.new()
-			icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.texture = item.get_icon()
-			margin.add_child(icon)
-		else:
-			var color_rect = ColorRect.new()
-			color_rect.color = _get_placeholder_color()
-			margin.add_child(color_rect)
-	
-	return preview
+	return SlotUtils.create_drag_preview(item, slot_size)
 
 func _on_mouse_entered() -> void:
 	slot_hovered.emit(slot_type)

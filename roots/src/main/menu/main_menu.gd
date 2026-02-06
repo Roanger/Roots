@@ -115,9 +115,10 @@ func _refresh_save_slots() -> void:
 		
 		if i < saves.size():
 			var save = saves[i]
-			btn.text = save_manager.get_save_slot_name(save.slot)
+			btn.text = save_manager.get_save_slot_name(save.get("slot", i + 1))
 			btn.disabled = false
-			btn.pressed.connect(func(): _load_save(save.filepath))
+			var save_path = save.get("filepath", "")
+			btn.pressed.connect(func(): _load_save(save_path))
 		else:
 			btn.text = "Empty Slot " + str(i + 1)
 			btn.disabled = true

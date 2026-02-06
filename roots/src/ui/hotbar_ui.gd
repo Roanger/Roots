@@ -169,7 +169,22 @@ func get_selected_item() -> InventoryItem:
 		return null
 	return inventory.get_hotbar_slot(selected_slot)
 
+func _is_menu_open() -> bool:
+	# Check if any UI menu is open that should block hotbar input
+	var ui = get_parent()
+	if not ui:
+		return false
+	for name_check in ["CraftingUI", "InventoryUI", "CharacterUI", "SkillTreeUI"]:
+		var node = ui.get_node_or_null(name_check)
+		if node and node is Control and node.visible:
+			return true
+	return false
+
 func _input(event: InputEvent) -> void:
+	# Don't process hotbar input when a menu is open
+	if _is_menu_open():
+		return
+	
 	# Handle number keys 1-8 for hotbar selection
 	if event is InputEventKey and event.pressed:
 		var key = event.keycode

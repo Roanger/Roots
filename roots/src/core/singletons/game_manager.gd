@@ -49,7 +49,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if current_state == GameState.PLAYING:
-		_process_time(delta * TIME_SCALE)
+		_process_time(delta)
 
 func _process_time(delta: float) -> void:
 	# Add time (1 game hour = 60 real seconds at scale 1.0)
@@ -80,7 +80,7 @@ func change_season() -> void:
 	print("Season changed to: ", Season.keys()[current_season])
 
 func set_game_state(new_state: GameState) -> void:
-	var old_state = current_state
+	var _old_state = current_state
 	current_state = new_state
 	emit_signal("game_state_changed", new_state)
 	

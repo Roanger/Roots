@@ -24,7 +24,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(slot_size, slot_size)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# Let this slot receive all mouse input; children would otherwise eat hover/click/drag
-	_set_children_mouse_filter_ignore(self)
+	SlotUtils.set_children_mouse_filter_ignore(self)
 	# Ensure slot processes input even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var existing = get_theme_stylebox("panel")
@@ -39,12 +39,6 @@ func _ready() -> void:
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 	update_slot(null)
-
-func _set_children_mouse_filter_ignore(node: Node) -> void:
-	for child in node.get_children():
-		if child is Control:
-			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_set_children_mouse_filter_ignore(child)
 
 func update_slot(p_item: InventoryItem) -> void:
 	item = p_item
@@ -79,21 +73,7 @@ func update_slot(p_item: InventoryItem) -> void:
 		empty_label.visible = true
 
 func _get_placeholder_color() -> Color:
-	# Return different colors based on item type for placeholder
-	if not item or not item.item_data:
-		return Color.WHITE
-	
-	match item.item_data.item_type:
-		ItemData.ItemType.TOOL:
-			return Color(0.8, 0.6, 0.4)  # Brown
-		ItemData.ItemType.SEED:
-			return Color(0.4, 0.8, 0.4)  # Green
-		ItemData.ItemType.MATERIAL:
-			return Color(0.6, 0.6, 0.6)  # Gray
-		ItemData.ItemType.FOOD:
-			return Color(0.8, 0.4, 0.4)  # Red
-		_:
-			return Color.WHITE
+	return SlotUtils.get_placeholder_color(item)
 
 func set_inventory(p_inventory: Inventory) -> void:
 	inventory = p_inventory
@@ -148,10 +128,10 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 	_last_drag_data = drag_data
 	_last_can_drop = true
 	# Tag this slot with current global counter and unique slot ID
-	var global_counter = _get_drop_counter()
+	var global_counter = SlotUtils.get_drop_counter()
 	_my_drop_counter = global_counter
 	_slot_id = slot_index + (1000 if is_hotbar_slot else 0)  # Unique ID
-	_set_last_drop_slot(_slot_id)
+	SlotUtils.set_last_drop_slot(_slot_id)
 	
 	print("[DragDebug]   -> true: accepting drop (counter=%d, slot_id=%d)" % [_my_drop_counter, _slot_id])
 	return true
@@ -159,25 +139,6 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 var _last_drag_data: DragData = null
 var _last_can_drop: bool = false
 
-# Use Engine meta to share state across all slot types
-const DROP_COUNTER_KEY = "_global_drop_counter"
-const LAST_DROP_SLOT_KEY = "_last_drop_slot_id"
-
-func _get_drop_counter() -> int:
-	if Engine.has_meta(DROP_COUNTER_KEY):
-		return Engine.get_meta(DROP_COUNTER_KEY)
-	return 0
-
-func _set_drop_counter(value: int) -> void:
-	Engine.set_meta(DROP_COUNTER_KEY, value)
-
-func _get_last_drop_slot() -> int:
-	if Engine.has_meta(LAST_DROP_SLOT_KEY):
-		return Engine.get_meta(LAST_DROP_SLOT_KEY)
-	return -1
-
-func _set_last_drop_slot(slot_id: int) -> void:
-	Engine.set_meta(LAST_DROP_SLOT_KEY, slot_id)
 
 var _my_drop_counter: int = 0
 var _slot_id: int = 0
@@ -186,16 +147,16 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
 		modulate = Color.WHITE
 		_clear_hover_style()
-		var global_counter = _get_drop_counter()
+		var global_counter = SlotUtils.get_drop_counter()
 		print("[DragDebug] NOTIFICATION_DRAG_END received on slot %d (my_counter=%d, global=%d)" % [slot_index, _my_drop_counter, global_counter])
 		
 		# Only process if this slot was the LAST one to have can_drop_data called
 		# and it was called in this drag operation
-		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and _get_last_drop_slot() == _slot_id:
+		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and SlotUtils.get_last_drop_slot() == _slot_id:
 			print("[DragDebug] Executing manual drop on slot %d" % slot_index)
 			# Increment counter to prevent other slots from processing
-			_set_drop_counter(global_counter + 1)
-			_set_last_drop_slot(-1)
+			SlotUtils.set_drop_counter(global_counter + 1)
+			SlotUtils.set_last_drop_slot(-1)
 			# Execute the drop logic directly
 			if is_hotbar_slot:
 				_handle_hotbar_drop(_last_drag_data)
@@ -318,54 +279,7 @@ func _handle_inventory_drop(drag_data: DragData) -> void:
 									break
 
 func _create_drag_preview() -> Control:
-	# Create visual preview for dragging
-	var preview = PanelContainer.new()
-	preview.custom_minimum_size = Vector2(slot_size, slot_size)
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.3, 0.3, 0.4, 0.8)
-	style.border_color = Color(0.6, 0.6, 0.8)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	preview.add_theme_stylebox_override("panel", style)
-	
-	var margin = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 4)
-	margin.add_theme_constant_override("margin_top", 4)
-	margin.add_theme_constant_override("margin_right", 4)
-	margin.add_theme_constant_override("margin_bottom", 4)
-	preview.add_child(margin)
-	
-	if item and not item.is_empty():
-		# Show item icon or placeholder
-		if item.get_icon():
-			var icon = TextureRect.new()
-			icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.texture = item.get_icon()
-			margin.add_child(icon)
-		else:
-			var color_rect = ColorRect.new()
-			color_rect.color = _get_placeholder_color()
-			margin.add_child(color_rect)
-		
-		# Show quantity if > 1
-		if item.quantity > 1:
-			var qty_label = Label.new()
-			qty_label.text = str(item.quantity)
-			qty_label.add_theme_color_override("font_color", Color.WHITE)
-			qty_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-			qty_label.add_theme_constant_override("shadow_offset_x", 1)
-			qty_label.add_theme_constant_override("shadow_offset_y", 1)
-			qty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			qty_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-			qty_label.position = Vector2(slot_size - 24, slot_size - 20)
-			qty_label.size = Vector2(20, 20)
-			preview.add_child(qty_label)
-	
-	return preview
+	return SlotUtils.create_drag_preview(item, slot_size)
 
 var _is_dragging: bool = false
 var _drag_start_pos: Vector2 = Vector2.ZERO

@@ -147,7 +147,9 @@ graph TD
 - [x] Define item types (materials, tools, food, seeds, etc.)
 - [x] Implement item durability system
 - [x] Add item quality/rarity system
-- [ ] Create tool tier system
+- [x] 3D tool/weapon models (KayKit RPGToolsBits + Adventurers packs)
+- [x] First-person tool holder with walking bob animation
+- [x] Create tool tier system (Wood → Bronze → Iron → Steel → Mythril)
 
 #### 2.3 Farming Core
 - [x] Design farm plot tiles
@@ -158,25 +160,33 @@ graph TD
 - [x] Create crop drops and seed recovery
 
 #### 2.4 Tool System
-- [x] Design tool types (hoe, watering can, sickle, axe, pickaxe)
-- [ ] Implement tool swing/use animations
+- [x] Design tool types (hoe, watering can, sickle, axe, pickaxe, hammer, saw, chisel)
+- [x] Implement tool swing/use animations (swing on farm plot interaction)
 - [x] Create tool effectiveness calculations (basic - tool_power exists)
 - [x] Add tool durability and repair
-- [ ] Implement tool progression tiers
+- [x] 3D weapon items (sword, battle axe, dagger) with icons and models
+- [x] Left-click swing for general tool/weapon use (trees, rocks, combat)
+- [x] Tool affinity system (tool_affinity.gd - effectiveness multipliers per tool/target type)
+- [x] Implement tool progression tiers (5 tiers with scaling power/durability/affinity multipliers)
 
 #### 2.5 Skill System Architecture
-- [ ] Design skill tree structure
-- [ ] Create experience gain system
-- [ ] Implement skill point allocation
-- [ ] Add skill modifier application
-- [ ] Design perk system for bonuses
+- [x] Design skill tree structure
+- [x] Create experience gain system (SkillManager autoload singleton)
+- [x] Implement skill point allocation
+- [x] Add skill modifier application
+- [x] Design perk system for bonuses (synergy perks for dual/triple disciplines)
+- [x] Skill Tree UI (K key toggle, category grouping, XP bars)
+- [x] Skill data serialization in save system
+- [x] XP wired to farming actions (till, water, plant, harvest)
 
 #### 2.6 Basic Crafting
-- [ ] Implement crafting menu UI
-- [ ] Create recipe database
-- [ ] Add ingredient verification
-- [ ] Implement crafting process (time, inputs, outputs)
-- [ ] Create basic recipes (planks, fences, simple tools)
+- [x] Implement crafting menu UI (R key toggle, category tabs, ingredient display)
+- [x] Create recipe database (RecipeDatabase autoload singleton)
+- [x] Add ingredient verification (has_ingredients / consume_ingredients)
+- [x] Implement crafting process (time, progress bar, inputs, outputs)
+- [x] Create basic recipes (planks, fences, tools, ingots, tiered tools)
+- [x] Register 22+ crafting materials (wood, stone, ores, fiber, cloth, etc.)
+- [x] 40+ recipes across all tiers and categories
 
 ---
 
@@ -205,11 +215,11 @@ graph TD
 - [ ] Create meal buffs and effects
 
 #### 3.4 Blacksmithing
-- [ ] Implement forge and anvil stations
-- [ ] Create ore spawning and mining
-- [ ] Design smelting process
-- [ ] Implement smithing recipes
-- [ ] Create weapon/armor crafting
+- [x] Implement forge and anvil stations (CraftingStationObject world objects)
+- [x] Create ore spawning and mining (rocks drop stone/coal/iron/copper via HarvestableResource)
+- [x] Design smelting process (forge recipes: ore→ingot, steel alloy, mythril)
+- [x] Implement smithing recipes (40+ recipes across all tiers)
+- [ ] Create weapon/armor crafting (tiered weapons, armor sets)
 
 #### 3.5 Husbandry & Animals
 - [ ] Design animal AI behaviors
@@ -219,10 +229,13 @@ graph TD
 - [ ] Design animal housing and pastures
 
 #### 3.6 Militia/Combat
-- [ ] Design combat system (if desired)
-- [ ] Create weapon types
-- [ ] Implement enemy AI
-- [ ] Add combat skill progression
+- [x] Design combat system (left-click swing, tool affinity damage, tier scaling)
+- [x] Create weapon types (sword, battle_axe, dagger with affinity vs ENEMY)
+- [x] Implement enemy AI (BaseEnemy: idle/wander/chase/attack/hurt/dead states)
+- [x] Player damage + death/respawn system
+- [x] Enemy loot drops (WorldItem auto-pickup)
+- [x] Enemy types: Skeleton Minion, Skeleton Rogue, Skeleton Warrior, Skeleton Mage (KayKit 3D models)
+- [ ] Add combat skill progression (XP wiring exists, needs balancing)
 - [ ] Design defensive structures
 
 ---
@@ -231,9 +244,9 @@ graph TD
 **Goal:** Living world with multiple biomes
 
 #### 4.1 Biome System
-- [ ] Design biome types (plains, forest, desert, mountain, swamp, coastal)
-- [ ] Implement biome-specific terrain generation
-- [ ] Create biome transitions
+- [x] Design biome types (plains, forest, desert, mountain, swamp, coastal)
+- [x] Implement biome-specific terrain generation
+- [x] Create biome transitions
 - [ ] Design biome-specific resources
 - [ ] Add biome climate effects
 
@@ -556,11 +569,21 @@ For solo development, prioritize these skills:
 1. ~~Review and approve this plan~~ ✓
 2. ~~Phase 1.4: Basic World Generation (terrain, assets)~~ ✓
 3. ~~Phase 2.1: Drag-and-drop (inventory, hotbar, equipment)~~ ✓
-4. Phase 2.2–2.6: Item tiers, tool animations, crafting menu, skill architecture
-5. Phase 3+: Professions, content, world expansion
+4. ~~Phase 2.5: Skill system architecture~~ ✓
+5. ~~Phase 2.4: 3D tool models, swing animations, tool affinity, tool tiers~~ ✓
+6. ~~Phase 2.6: Crafting system (menu UI, recipes, 40+ recipes, 5 tool tiers)~~ ✓
+7. ~~Phase 3.4: Blacksmithing — Forge/anvil crafting stations, ore mining, smelting~~ ✓
+8. ~~Phase 3.6: Militia/Combat — Enemy AI, combat system, loot drops~~ ✓
+9. ~~Harvestable world objects — Trees drop wood, rocks drop stone/ore~~ ✓
+10. **Phase 3.2: Herb Gathering & Alchemy** ← NEXT — Wild plant spawning, identification, potion brewing
+11. **Phase 3.3: Cooking** — Cooking stations, food buffs
+12. **Phase 4.5: Environmental** — Day/night cycle, weather system
+13. **Phase 3.5: Husbandry** — Animal AI, feeding, breeding, products
+14. **Phase 4.2: NPC System** — Villagers, merchants, quests
+15. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Jan 2026 – Phase 2.1 drag-and-drop complete; world assets and terrain improvements in place.*
+*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 partial.** Harvestable trees/rocks (HarvestableResource), crafting stations (Workbench/Forge/Anvil as world objects), enemy system (BaseEnemy with KayKit Skeleton 3D models, 4 enemy types, terrain height snapping, loot drops), player combat (take_damage, death/respawn). Full gameplay loop: chop trees → gather ore → smelt → craft tools → fight skeletons. Next: Herb Gathering & Alchemy (Phase 3.2).*

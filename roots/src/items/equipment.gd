@@ -59,8 +59,10 @@ func equip_item(item: InventoryItem, slot: int) -> bool:
 	if old_item:
 		unequip_item(slot)
 	
-	# Equip new item
-	equipped_items[slot] = item
+	# Equip new item (duplicate to avoid shared-reference with inventory)
+	var equipped_copy = item.duplicate()
+	equipped_copy.quantity = 1
+	equipped_items[slot] = equipped_copy
 	equipment_changed.emit(get_slot_name(slot))
 	item_equipped.emit(item, get_slot_name(slot))
 	return true
@@ -108,13 +110,15 @@ func serialize() -> Dictionary:
 			data[get_slot_name(slot)] = item.serialize()
 	return data
 
-func deserialize(data: Dictionary) -> void:
+func deserialize(data: Dictionary, database: ItemDatabase = null) -> void:
 	for slot_name in data.keys():
 		var slot = _get_slot_from_name(slot_name)
-		if slot != -1:
-			# Item deserialization would need item database
-			# For now, leave as null
-			pass
+		if slot != -1 and database:
+			var item = InventoryItem.deserialize(data[slot_name], database)
+			if item and not item.is_empty():
+				equipped_items[slot] = item
+				equipment_changed.emit(get_slot_name(slot))
+				item_equipped.emit(item, get_slot_name(slot))
 
 func _get_slot_from_name(name: String) -> int:
 	for slot in EquipmentSlot.values():

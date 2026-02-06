@@ -31,6 +31,14 @@ enum ItemQuality {
 	PERFECT
 }
 
+enum ToolTier {
+	WOOD,       # Starter tier - weakest
+	BRONZE,     # Copper-based
+	IRON,       # Mid-tier
+	STEEL,      # Advanced
+	MYTHRIL     # End-game
+}
+
 # Basic info
 @export var item_id: String = ""
 @export var item_name: String = ""
@@ -41,6 +49,7 @@ enum ItemQuality {
 # Visual
 @export var icon: Texture2D = null
 @export var world_model: PackedScene = null
+@export var world_model_path: String = ""  # Path to 3D model (FBX/GLTF) for first-person display
 
 # Stack info
 @export var max_stack_size: int = 99
@@ -63,6 +72,7 @@ enum ItemQuality {
 
 # Tool properties
 @export var tool_type: String = ""  # "hoe", "axe", "pickaxe", "sickle", "watering_can"
+@export var tool_tier: ToolTier = ToolTier.WOOD
 @export var tool_power: int = 1
 @export var tool_range: float = 2.0
 

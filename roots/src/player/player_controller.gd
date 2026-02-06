@@ -69,14 +69,23 @@ var equipment: Equipment = null
 @onready var item_database: ItemDatabase = get_node_or_null("/root/ItemDatabase")
 @onready var crop_database: CropDatabase = get_node_or_null("/root/CropDatabase")
 
+# Farming component (child node)
+var farming: PlayerFarming = null
+
+# First-person tool display
+var tool_holder: Node3D = null
+var _tool_use_cooldown: float = 0.0
+var _tool_use_cooldown_max: float = 0.5  # Seconds between swings
+
 func _ready() -> void:
 	add_to_group("player")
 	
 	# Camera position is handled by CameraController
 	# Don't set it here to avoid conflicts
 	
-	# Setup raycast
+	# Setup raycast (mask: layer 2 = world objects, layer 4 = enemies)
 	raycast.target_position = Vector3(0, 0, -3)
+	raycast.collision_mask = 6
 	raycast.enabled = true
 	
 	# Find chunk manager
@@ -94,6 +103,18 @@ func _ready() -> void:
 	
 	# Initialize equipment
 	equipment = Equipment.new()
+	
+	# Initialize farming component
+	farming = PlayerFarming.new()
+	farming.name = "PlayerFarming"
+	add_child(farming)
+	farming.initialize(self, inventory, item_database, crop_database)
+	
+	# Initialize first-person tool holder on camera
+	if camera:
+		tool_holder = ToolHolder.new()
+		tool_holder.name = "ToolHolder"
+		camera.add_child(tool_holder)
 
 func _input(event: InputEvent) -> void:
 	# Camera is handled by CameraController
@@ -107,6 +128,10 @@ func _input(event: InputEvent) -> void:
 	
 	if event.is_action_pressed("crouch"):
 		_toggle_crouch()
+	
+	# Left-click to swing tool/weapon (only when mouse is captured = gameplay mode)
+	if event.is_action_pressed("use_tool") and mouse_captured:
+		_swing_tool()
 
 func _physics_process(delta: float) -> void:
 	_handle_movement_input()
@@ -246,26 +271,18 @@ func _interact() -> void:
 			_set_state(PlayerState.INTERACTING)
 
 func _handle_farm_plot_interaction(plot: FarmPlot) -> void:
+	if farming:
+		farming.handle_farm_plot_interaction(plot)
+	# Update player state based on plot state
 	match plot.state:
-		FarmPlot.PlotState.EMPTY:
-			# Use hoe to till
-			use_tool("hoe", plot)
+		FarmPlot.PlotState.EMPTY, FarmPlot.PlotState.GROWING, FarmPlot.PlotState.READY_FOR_HARVEST:
 			_set_state(PlayerState.USING_TOOL)
+			if tool_holder and tool_holder.has_method("play_use_animation"):
+				tool_holder.play_use_animation()
 		FarmPlot.PlotState.TILLED:
-			# Plant seed (use first available)
-			var seeds = get_available_seeds()
-			if seeds.size() > 0:
-				plant_seed(plot, seeds[0])
 			_set_state(PlayerState.INTERACTING)
-		FarmPlot.PlotState.GROWING, FarmPlot.PlotState.PLANTED:
-			# Water if not watered
-			if not plot.is_watered:
-				use_tool("watering_can", plot)
-				_set_state(PlayerState.USING_TOOL)
-		FarmPlot.PlotState.READY_FOR_HARVEST:
-			# Harvest with sickle
-			use_tool("sickle", plot)
-			_set_state(PlayerState.USING_TOOL)
+		_:
+			_set_state(PlayerState.INTERACTING)
 
 func _check_interaction() -> void:
 	if raycast.is_colliding():
@@ -277,17 +294,86 @@ func _check_interaction() -> void:
 		interaction_target = null
 
 func _process_tool_use() -> void:
-	# Check if player is using a tool
+	# Check if player is using a tool via interact key (E)
 	if Input.is_action_pressed("interact"):
 		if current_tool != "":
 			_use_tool()
 			_set_state(PlayerState.USING_TOOL)
 	elif current_state == PlayerState.USING_TOOL:
 		_set_state(PlayerState.IDLE)
+	
+	# Tick down swing cooldown
+	if _tool_use_cooldown > 0:
+		_tool_use_cooldown -= get_physics_process_delta_time()
 
 func _use_tool() -> void:
 	# Tool use logic - will be expanded with farming/crafting
 	pass
+
+func _swing_tool() -> void:
+	# Left-click swing: plays animation and applies tool effect
+	if _tool_use_cooldown > 0:
+		return
+	if current_tool == "" and (not tool_holder or tool_holder.current_tool_id == ""):
+		return
+	
+	_tool_use_cooldown = _tool_use_cooldown_max
+	_set_state(PlayerState.USING_TOOL)
+	
+	# Play swing animation
+	if tool_holder and tool_holder.has_method("play_use_animation"):
+		tool_holder.play_use_animation()
+	
+	# Get the held item's data for affinity checks
+	var held_item_data: ItemData = _get_held_item_data()
+	var tool_type: String = current_tool if current_tool != "" else ""
+	var base_power: int = held_item_data.tool_power if held_item_data else 1
+	var tool_tier: int = held_item_data.tool_tier if held_item_data else 0
+	
+	# Check what we're hitting with the raycast
+	if raycast.is_colliding():
+		var collider = raycast.get_collider()
+		
+		# Farm plot interaction (check affinity)
+		if collider is FarmPlot:
+			if ToolAffinity.can_affect(tool_type, ToolAffinity.TargetType.FARM_PLOT):
+				_handle_farm_plot_interaction(collider)
+			else:
+				_show_tool_feedback(ToolAffinity.get_ineffective_message(tool_type, ToolAffinity.TargetType.FARM_PLOT))
+			return
+		
+		# Objects that declare their target type via get_target_type()
+		if collider.has_method("get_target_type") and collider.has_method("on_hit"):
+			var target_type: int = collider.get_target_type()
+			var effectiveness: float = ToolAffinity.get_effectiveness(tool_type, target_type)
+			if effectiveness > 0.0:
+				var power = ToolAffinity.calculate_power(tool_type, target_type, base_power, tool_tier)
+				collider.on_hit(self, tool_type, power)
+			else:
+				_show_tool_feedback(ToolAffinity.get_ineffective_message(tool_type, target_type))
+			return
+		
+		# Legacy on_hit without target type (pass raw values)
+		if collider.has_method("on_hit"):
+			collider.on_hit(self, tool_type)
+			return
+		
+		# Generic interactable
+		if collider.has_method("on_interact"):
+			collider.on_interact(self)
+
+func _get_held_item_data() -> ItemData:
+	# Get the ItemData for whatever is currently in the selected hotbar slot
+	if tool_holder and tool_holder.current_tool_id != "":
+		if item_database:
+			return item_database.get_item(tool_holder.current_tool_id)
+	return null
+
+func _show_tool_feedback(message: String) -> void:
+	if message == "":
+		return
+	# TODO: Show on-screen feedback text (floating text or HUD message)
+	print("[ToolFeedback] ", message)
 
 func _update_animation() -> void:
 	# Update animation state based on movement
@@ -335,6 +421,18 @@ func equip_tool(tool_name: String) -> void:
 func unequip_tool() -> void:
 	current_tool = ""
 
+func update_held_tool(item: InventoryItem) -> void:
+	if not tool_holder:
+		return
+	if item and not item.is_empty() and item.item_data:
+		var idata = item.item_data
+		if idata.item_type == ItemData.ItemType.TOOL or idata.item_type == ItemData.ItemType.WEAPON:
+			tool_holder.equip_tool(idata)
+			current_tool = idata.tool_type
+			return
+	tool_holder.unequip_tool()
+	current_tool = ""
+
 func get_look_direction() -> Vector3:
 	if camera_controller:
 		return camera_controller.get_look_direction()
@@ -357,7 +455,11 @@ func _give_starting_items() -> void:
 	var hoe = item_database.get_item("basic_hoe")
 	var shovel = item_database.get_item("basic_shovel")
 	var watering_can = item_database.get_item("basic_watering_can")
+	var sickle = item_database.get_item("basic_sickle")
+	var axe = item_database.get_item("basic_axe")
+	var pickaxe = item_database.get_item("basic_pickaxe")
 	var seeds = item_database.get_item("wheat_seeds")
+	var sword = item_database.get_item("basic_sword")
 	
 	if hoe:
 		inventory.add_item(hoe, 1)
@@ -365,8 +467,34 @@ func _give_starting_items() -> void:
 		inventory.add_item(shovel, 1)
 	if watering_can:
 		inventory.add_item(watering_can, 1)
+	if sickle:
+		inventory.add_item(sickle, 1)
+	if axe:
+		inventory.add_item(axe, 1)
+	if pickaxe:
+		inventory.add_item(pickaxe, 1)
+	if sword:
+		inventory.add_item(sword, 1)
 	if seeds:
 		inventory.add_item(seeds, 10)
+	
+	# Give starting crafting materials for testing
+	var wood_log = item_database.get_item("wood_log")
+	var stone_item = item_database.get_item("stone")
+	var string_item = item_database.get_item("string")
+	var coal_item = item_database.get_item("coal")
+	var iron_nugget = item_database.get_item("iron_nugget")
+	
+	if wood_log:
+		inventory.add_item(wood_log, 10)
+	if stone_item:
+		inventory.add_item(stone_item, 10)
+	if string_item:
+		inventory.add_item(string_item, 10)
+	if coal_item:
+		inventory.add_item(coal_item, 5)
+	if iron_nugget:
+		inventory.add_item(iron_nugget, 9)
 
 func get_inventory() -> Inventory:
 	return inventory
@@ -384,76 +512,30 @@ func add_item_to_inventory(item_id: String, quantity: int = 1) -> int:
 	
 	return inventory.add_item(item_data, quantity)
 
-# Farming methods
+# Farming methods - delegated to PlayerFarming component
 func use_tool(tool_type: String, target: Node) -> bool:
-	match tool_type:
-		"hoe":
-			if target is FarmPlot:
-				return target.till_soil()
-		"watering_can":
-			if target is FarmPlot:
-				return target.water()
-		"sickle":
-			if target is FarmPlot and target.state == FarmPlot.PlotState.READY_FOR_HARVEST:
-				var result = target.harvest()
-				add_harvest(result)
-				return true
+	if farming:
+		return farming.use_tool(tool_type, target)
 	return false
 
 func plant_seed(plot: FarmPlot, seed_id: String) -> bool:
-	if not crop_database or not inventory:
-		return false
-	
-	# Check if player has seeds
-	if not inventory.has_item(seed_id, 1):
-		return false
-	
-	# Get crop data from seed
-	var crop_data = crop_database.get_crop_from_seed(seed_id)
-	if not crop_data:
-		return false
-	
-	# Try to plant
-	if plot.plant_seed(seed_id, crop_data):
-		# Remove one seed from inventory
-		inventory.remove_item(seed_id, 1)
-		return true
-	
+	if farming:
+		return farming.plant_seed(plot, seed_id)
 	return false
 
 func add_harvest(result: Dictionary) -> void:
-	if result.is_empty():
-		return
-	
-	var produce_id = result.get("produce_id", "")
-	var produce_amount = result.get("produce_amount", 0)
-	var seed_returned = result.get("seed_returned", false)
-	var seed_id = result.get("seed_id", "")
-	
-	# Add produce
-	if produce_id and produce_amount > 0:
-		var overflow = add_item_to_inventory(produce_id, produce_amount)
-		if overflow > 0:
-			print("Inventory full! Dropped ", overflow, " ", produce_id)
-	
-	# Return seed
-	if seed_returned and seed_id:
-		add_item_to_inventory(seed_id, 1)
+	if farming:
+		farming.add_harvest(result)
 
 func can_plant_seed(plot: FarmPlot) -> bool:
-	return plot.state == FarmPlot.PlotState.TILLED or plot.state == FarmPlot.PlotState.EMPTY
+	if farming:
+		return farming.can_plant_seed(plot)
+	return false
 
 func get_available_seeds() -> Array[String]:
-	var seeds: Array[String] = []
-	if not inventory:
-		return seeds
-	
-	for i in range(inventory.max_slots):
-		var item = inventory.get_slot(i)
-		if item and item.item_data and item.item_data.item_type == ItemData.ItemType.SEED:
-			seeds.append(item.item_data.item_id)
-	
-	return seeds
+	if farming:
+		return farming.get_available_seeds()
+	return []
 
 # =====================
 # STAMINA & HEALTH SYSTEM
@@ -489,12 +571,13 @@ func use_stamina(amount: float) -> bool:
 		return true
 	return false
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, _attacker: Node3D = null) -> void:
 	var old_health = current_health
 	current_health = max(0.0, current_health - amount)
 	
 	if current_health != old_health:
 		health_changed.emit(current_health, max_health)
+		print("Player took %.1f damage (%.1f/%.1f HP)" % [amount, current_health, max_health])
 	
 	if current_health <= 0:
 		_on_death()
@@ -518,3 +601,44 @@ func get_health_percent() -> float:
 
 func get_stamina_percent() -> float:
 	return current_stamina / max_stamina
+
+# =====================
+# SAVE / LOAD
+# =====================
+
+func serialize() -> Dictionary:
+	var data: Dictionary = {
+		"position": {"x": global_position.x, "y": global_position.y, "z": global_position.z},
+		"health": current_health,
+		"stamina": current_stamina,
+	}
+	if inventory:
+		data["inventory"] = inventory.serialize()
+	if equipment:
+		data["equipment"] = equipment.serialize()
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("serialize"):
+		data["skills"] = sm.serialize()
+	return data
+
+func deserialize(data: Dictionary) -> void:
+	# Position
+	if data.has("position"):
+		var pos = data["position"]
+		global_position = Vector3(pos.get("x", 0), pos.get("y", 20), pos.get("z", 0))
+	# Stats
+	current_health = data.get("health", max_health)
+	current_stamina = data.get("stamina", max_stamina)
+	health_changed.emit(current_health, max_health)
+	stamina_changed.emit(current_stamina, max_stamina)
+	# Inventory
+	if data.has("inventory") and inventory and item_database:
+		inventory.deserialize(data["inventory"])
+	# Equipment
+	if data.has("equipment") and equipment and item_database:
+		equipment.deserialize(data["equipment"], item_database)
+	# Skills
+	if data.has("skills"):
+		var sm = get_node_or_null("/root/SkillManager")
+		if sm and sm.has_method("deserialize"):
+			sm.deserialize(data["skills"])
