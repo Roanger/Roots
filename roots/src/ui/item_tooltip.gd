@@ -120,7 +120,7 @@ func hide_tooltip() -> void:
 	visible = false
 
 func update_position(mouse_pos: Vector2) -> void:
-	if not visible:
+	if not visible or not is_inside_tree():
 		return
 	var viewport_size = get_viewport_rect().size
 	var tip_size = size

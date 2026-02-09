@@ -6,7 +6,7 @@ class_name BaseAnimal
 
 const WorldItemScene = preload("res://src/items/world_item.tscn")
 const AnimalDataScript = preload("res://src/entities/animals/animal_data.gd")
-const AnimalModelCacheScript = preload("res://src/entities/animals/animal_model_cache.gd")
+
 
 enum AIState { IDLE, WANDER, FLEE, FOLLOW, FEEDING, HURT, DEAD }
 
@@ -47,7 +47,7 @@ signal animal_died(animal: BaseAnimal)
 func _ready() -> void:
 	add_to_group("animals")
 	collision_layer = 4
-	collision_mask = 1
+	collision_mask = 3  # 1 (terrain) + 2 (world objects/fences)
 	_rng.randomize()
 	_spawn_position = global_position
 	_idle_timer = _rng.randf_range(1.0, 3.0)

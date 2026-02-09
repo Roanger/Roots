@@ -79,14 +79,9 @@ func set_inventory(p_inventory: Inventory) -> void:
 	inventory = p_inventory
 
 func get_drag_data(position: Vector2) -> Variant:
-	print("[DragDebug] get_drag_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
-	print("[DragDebug]   item=%s, empty=%s, inventory=%s" % [item, item.is_empty() if item else "N/A", inventory])
-	
 	if not item or item.is_empty():
-		print("[DragDebug]   -> returning null: no item")
 		return null
 	if not inventory:
-		print("[DragDebug]   -> returning null: no inventory")
 		return null
 	
 	var source = DragData.DragSource.HOTBAR if is_hotbar_slot else DragData.DragSource.INVENTORY
@@ -94,34 +89,23 @@ func get_drag_data(position: Vector2) -> Variant:
 	var preview = _create_drag_preview()
 	if preview:
 		set_drag_preview(preview)
-		print("[DragDebug]   -> drag preview set")
-	else:
-		print("[DragDebug]   -> WARNING: preview is null")
-	print("[DragDebug]   -> drag started successfully with data: source=%d, slot=%d" % [source, slot_index])
 	return drag_data
 
 func can_drop_data(position: Vector2, data: Variant) -> bool:
-	print("[DragDebug] can_drop_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
 	# Clear previous state
 	_last_drag_data = null
 	_last_can_drop = false
 	
 	if data == null:
-		print("[DragDebug]   -> false: data is null")
 		return false
 	var drag_data = data as DragData
 	if drag_data == null:
-		print("[DragDebug]   -> false: data is not DragData (type=%s)" % [typeof(data)])
 		return false
-	
-	print("[DragDebug]   drag_data: source_type=%d, source_slot=%d" % [drag_data.source_type, drag_data.source_slot_index])
 	
 	# Prevent dropping on same slot
 	if drag_data.source_type == DragData.DragSource.INVENTORY and drag_data.source_slot_index == slot_index and not is_hotbar_slot:
-		print("[DragDebug]   -> false: same inventory slot")
 		return false
 	if drag_data.source_type == DragData.DragSource.HOTBAR and drag_data.source_slot_index == slot_index and is_hotbar_slot:
-		print("[DragDebug]   -> false: same hotbar slot")
 		return false
 	
 	# Store for potential manual drop handling
@@ -133,7 +117,6 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 	_slot_id = slot_index + (1000 if is_hotbar_slot else 0)  # Unique ID
 	SlotUtils.set_last_drop_slot(_slot_id)
 	
-	print("[DragDebug]   -> true: accepting drop (counter=%d, slot_id=%d)" % [_my_drop_counter, _slot_id])
 	return true
 
 var _last_drag_data: DragData = null
@@ -148,12 +131,10 @@ func _notification(what: int) -> void:
 		modulate = Color.WHITE
 		_clear_hover_style()
 		var global_counter = SlotUtils.get_drop_counter()
-		print("[DragDebug] NOTIFICATION_DRAG_END received on slot %d (my_counter=%d, global=%d)" % [slot_index, _my_drop_counter, global_counter])
 		
 		# Only process if this slot was the LAST one to have can_drop_data called
 		# and it was called in this drag operation
 		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and SlotUtils.get_last_drop_slot() == _slot_id:
-			print("[DragDebug] Executing manual drop on slot %d" % slot_index)
 			# Increment counter to prevent other slots from processing
 			SlotUtils.set_drop_counter(global_counter + 1)
 			SlotUtils.set_last_drop_slot(-1)
@@ -170,25 +151,18 @@ func _notification(what: int) -> void:
 		_slot_id = 0
 
 func drop_data(position: Vector2, data: Variant) -> void:
-	print("[DragDebug] drop_data called on slot %d (hotbar=%s)" % [slot_index, is_hotbar_slot])
 	if data == null:
-		print("[DragDebug]   -> data is null, returning")
 		return
 	var drag_data = data as DragData
 	if drag_data == null:
-		print("[DragDebug]   -> data is not DragData, returning")
 		return
-	
-	print("[DragDebug]   processing drop from source_type=%d, slot=%d" % [drag_data.source_type, drag_data.source_slot_index])
 	
 	# Handle hotbar slot drops
 	if is_hotbar_slot:
-		print("[DragDebug]   -> handling as hotbar drop")
 		_handle_hotbar_drop(drag_data)
 		return
 	
 	# Handle inventory slot drops
-	print("[DragDebug]   -> handling as inventory drop")
 	_handle_inventory_drop(drag_data)
 
 func _handle_hotbar_drop(drag_data: DragData) -> void:
@@ -251,9 +225,7 @@ func _handle_inventory_drop(drag_data: DragData) -> void:
 				var src_item = inventory.get_hotbar_slot(drag_data.source_slot_index)
 				if src_item and not src_item.is_empty():
 					amount = maxi(src_item.quantity / 2, 1)
-			var ok = inventory.move_to_bag(drag_data.source_slot_index, slot_index, amount)
-			if ok:
-				print("[Inventory] Moved from hotbar %d to bag slot %d" % [drag_data.source_slot_index, slot_index])
+			inventory.move_to_bag(drag_data.source_slot_index, slot_index, amount)
 		
 		DragData.DragSource.EQUIPMENT:
 			# Unequip to specific inventory slot
@@ -307,10 +279,8 @@ func _on_gui_input(event: InputEvent) -> void:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_drag_start_pos = get_global_mouse_position()
 			_is_dragging = true
-			print("[DragDebug] Mouse pressed on slot %d" % slot_index)
 		elif not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_is_dragging = false
-			print("[DragDebug] Mouse released on slot %d" % slot_index)
 			# Note: click event is emitted regardless; drag operation handles itself via force_drag
 			slot_clicked.emit(slot_index, event.button_index)
 
@@ -320,7 +290,6 @@ func _process(delta: float) -> void:
 		var distance = _drag_start_pos.distance_to(current_pos)
 		if distance > DRAG_THRESHOLD:
 			_is_dragging = false
-			print("[DragDebug] Drag threshold reached on slot %d" % slot_index)
 			SlotUtils.hide_tooltip()
 			_start_drag()
 	if _is_hovered and not _is_dragging:
@@ -328,10 +297,8 @@ func _process(delta: float) -> void:
 
 func _start_drag() -> void:
 	if not item or item.is_empty():
-		print("[DragDebug] Cannot drag: no item in slot %d" % slot_index)
 		return
 	if not inventory:
-		print("[DragDebug] Cannot drag: no inventory reference in slot %d" % slot_index)
 		return
 	
 	var source = DragData.DragSource.HOTBAR if is_hotbar_slot else DragData.DragSource.INVENTORY
@@ -339,8 +306,6 @@ func _start_drag() -> void:
 	var preview = _create_drag_preview()
 	if preview:
 		set_drag_preview(preview)
-		print("[DragDebug] Drag preview created for slot %d" % slot_index)
-	print("[DragDebug] Starting force_drag from slot %d" % slot_index)
 	force_drag(drag_data, preview)
 
 func _on_mouse_entered() -> void:

@@ -41,7 +41,7 @@ func _process(_delta: float) -> void:
 	if camera and is_instance_valid(camera):
 		# Get camera yaw (rotation around Y axis) in degrees
 		var forward = -camera.global_transform.basis.z
-		var yaw_rad = atan2(-forward.x, -forward.z)
+		var yaw_rad = atan2(forward.x, -forward.z)
 		current_yaw = fmod(rad_to_deg(yaw_rad) + 360.0, 360.0)
 	queue_redraw()
 

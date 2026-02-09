@@ -86,6 +86,15 @@ var _tool_use_cooldown_max: float = 0.5  # Seconds between swings
 var _terrain_highlight: MeshInstance3D = null
 var _highlight_visible: bool = false
 
+# Currently selected hotbar item (set by main_world when hotbar selection changes)
+var _selected_hotbar_item: InventoryItem = null
+
+# Placement system (fences, gates, decorations)
+var _placement_ghost: Node3D = null
+var _placement_rotation: float = 0.0  # Current rotation in radians (0, PI/2, PI, 3PI/2)
+var _placement_valid: bool = false
+var _placement_item_data: ItemData = null
+
 func _ready() -> void:
 	add_to_group("player")
 	
@@ -152,9 +161,16 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("crouch"):
 		_toggle_crouch()
 	
-	# Left-click to swing tool/weapon (only when mouse is captured = gameplay mode)
+	# R key to rotate placement preview
+	if event.is_action_pressed("rotate_placement") and _placement_ghost:
+		_placement_rotation = fmod(_placement_rotation + PI / 2.0, TAU)
+	
+	# Left-click to swing tool/weapon OR place item (only when mouse is captured = gameplay mode)
 	if event.is_action_pressed("use_tool") and mouse_captured:
-		_swing_tool()
+		if _placement_ghost and _placement_valid:
+			_place_object()
+		else:
+			_swing_tool()
 
 func _physics_process(delta: float) -> void:
 	_handle_movement_input()
@@ -167,6 +183,7 @@ func _physics_process(delta: float) -> void:
 	_check_interaction()
 	_process_tool_use()
 	_update_terrain_highlight()
+	_update_placement_preview()
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_ground:
@@ -492,6 +509,10 @@ func _update_terrain_highlight() -> void:
 
 func _get_held_item_data() -> ItemData:
 	# Get the ItemData for whatever is currently in the selected hotbar slot
+	# First check the direct hotbar reference (works for ALL item types including placeables)
+	if _selected_hotbar_item and not _selected_hotbar_item.is_empty() and _selected_hotbar_item.item_data:
+		return _selected_hotbar_item.item_data
+	# Fallback to tool holder (for tools/weapons)
 	if tool_holder and tool_holder.current_tool_id != "":
 		if item_database:
 			return item_database.get_item(tool_holder.current_tool_id)
@@ -550,6 +571,9 @@ func unequip_tool() -> void:
 	current_tool = ""
 
 func update_held_tool(item: InventoryItem) -> void:
+	# Store the raw hotbar item so _get_held_item_data works for all types
+	_selected_hotbar_item = item
+	
 	if not tool_holder:
 		return
 	if item and not item.is_empty() and item.item_data:
@@ -637,6 +661,17 @@ func _give_starting_items() -> void:
 		inventory.add_item(empty_bottle_item, 3)
 	if health_pot:
 		inventory.add_item(health_pot, 2)
+	
+	# Give starting fences for testing placement
+	var fence_item = item_database.get_item("fence_wood")
+	var gate_item = item_database.get_item("fence_gate")
+	var post_item = item_database.get_item("fence_post")
+	if fence_item:
+		inventory.add_item(fence_item, 10)
+	if gate_item:
+		inventory.add_item(gate_item, 2)
+	if post_item:
+		inventory.add_item(post_item, 6)
 
 func get_inventory() -> Inventory:
 	return inventory
@@ -830,6 +865,182 @@ func get_health_percent() -> float:
 
 func get_stamina_percent() -> float:
 	return current_stamina / max_stamina
+
+# =====================
+# PLACEMENT SYSTEM
+# =====================
+
+func _update_placement_preview() -> void:
+	# Check if the held item is placeable
+	var held = _get_held_item_data()
+	var is_placeable = held and held.item_type == ItemData.ItemType.PLACEABLE and held.placeable_model_path != ""
+	
+	if not is_placeable:
+		_destroy_placement_ghost()
+		return
+	
+	# Create ghost if needed or if item changed
+	if not _placement_ghost or _placement_item_data != held:
+		_create_placement_ghost(held)
+	
+	# Get placement position from terrain look
+	var target_pos = _get_placement_position(held)
+	if target_pos == Vector3.ZERO:
+		_placement_ghost.visible = false
+		_placement_valid = false
+		return
+	
+	# Position and rotate the ghost
+	_placement_ghost.global_position = target_pos
+	_placement_ghost.rotation.y = _placement_rotation
+	_placement_ghost.visible = true
+	_placement_valid = true
+	
+	# Tint ghost green (valid) or red (invalid)
+	_tint_ghost(Color(0.3, 1.0, 0.3, 0.5) if _placement_valid else Color(1.0, 0.3, 0.3, 0.5))
+
+func _get_placement_position(item_data: ItemData) -> Vector3:
+	if not camera or not chunk_manager:
+		return Vector3.ZERO
+	
+	var cam_pos = camera.global_position
+	var cam_dir = -camera.global_transform.basis.z.normalized()
+	
+	# Step along look direction to find terrain (max 6 units for placement)
+	var max_reach := 6.0
+	var step := 0.25
+	var steps := int(max_reach / step)
+	
+	for i in range(1, steps + 1):
+		var sample_pos = cam_pos + cam_dir * (step * i)
+		var terrain_h = chunk_manager.get_terrain_height(sample_pos)
+		if sample_pos.y <= terrain_h + 0.5:
+			if item_data.placeable_snap_to_grid:
+				# Snap to grid cell edge (fences sit on edges between cells)
+				var cell_x = roundf(sample_pos.x)
+				var cell_z = roundf(sample_pos.z)
+				return Vector3(cell_x, terrain_h, cell_z)
+			else:
+				return Vector3(sample_pos.x, terrain_h, sample_pos.z)
+	
+	return Vector3.ZERO
+
+func _create_placement_ghost(item_data: ItemData) -> void:
+	_destroy_placement_ghost()
+	_placement_item_data = item_data
+	_placement_rotation = 0.0
+	
+	_placement_ghost = Node3D.new()
+	_placement_ghost.name = "PlacementGhost"
+	
+	# Load the model (OBJ files import as ArrayMesh, not PackedScene)
+	var res = load(item_data.placeable_model_path)
+	if res:
+		var model_node: Node3D = null
+		if res is PackedScene:
+			model_node = res.instantiate() as Node3D
+			if model_node:
+				model_node.scale = Vector3.ONE * item_data.placeable_scale
+		elif res is Mesh:
+			var mesh_inst = MeshInstance3D.new()
+			mesh_inst.mesh = res
+			mesh_inst.scale = Vector3.ONE * item_data.placeable_scale
+			model_node = mesh_inst
+		
+		if model_node:
+			if item_data.placeable_is_gate and model_node is MeshInstance3D:
+				# Match the pivot offset used in PlaceableObject so preview aligns with placed object
+				var pivot = Node3D.new()
+				var aabb = (model_node as MeshInstance3D).mesh.get_aabb()
+				var max_x = aabb.position.x + aabb.size.x
+				model_node.position.x = -max_x * item_data.placeable_scale
+				var center_z = aabb.position.z + aabb.size.z * 0.5
+				model_node.position.z = -center_z * item_data.placeable_scale
+				pivot.add_child(model_node)
+				_placement_ghost.add_child(pivot)
+			else:
+				_placement_ghost.add_child(model_node)
+	
+	# Fallback: simple box if model didn't load
+	if _placement_ghost.get_child_count() == 0:
+		var mesh_inst = MeshInstance3D.new()
+		var box = BoxMesh.new()
+		box.size = item_data.placeable_collision_size * item_data.placeable_scale
+		mesh_inst.mesh = box
+		mesh_inst.position.y = item_data.placeable_collision_size.y * item_data.placeable_scale * 0.5
+		_placement_ghost.add_child(mesh_inst)
+	
+	# Make all meshes transparent for ghost effect
+	_tint_ghost(Color(0.3, 1.0, 0.3, 0.5))
+	
+	get_tree().current_scene.add_child(_placement_ghost)
+
+func _destroy_placement_ghost() -> void:
+	if _placement_ghost and is_instance_valid(_placement_ghost):
+		_placement_ghost.queue_free()
+	_placement_ghost = null
+	_placement_item_data = null
+	_placement_valid = false
+
+func _tint_ghost(color: Color) -> void:
+	if not _placement_ghost:
+		return
+	_apply_ghost_material(_placement_ghost, color)
+
+func _apply_ghost_material(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = color
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.no_depth_test = false
+		(node as MeshInstance3D).material_override = mat
+	for child in node.get_children():
+		_apply_ghost_material(child, color)
+
+func _place_object() -> void:
+	if not _placement_ghost or not _placement_valid or not _placement_item_data:
+		return
+	
+	var item_data = _placement_item_data
+	var place_pos = _placement_ghost.global_position
+	var place_rot = _placement_rotation
+	
+	# Consume one item from inventory
+	if inventory:
+		var removed = inventory.remove_item(item_data.item_id, 1)
+		if removed < 1:
+			_show_tool_feedback("No %s in inventory!" % item_data.item_name)
+			return
+	
+	# Create the actual PlaceableObject
+	var obj = PlaceableObject.new()
+	obj.name = "Placed_%s" % item_data.item_id
+	obj.global_position = place_pos
+	obj.rotation.y = place_rot
+	
+	var is_gate = item_data.placeable_is_gate
+	obj.setup(
+		item_data.item_id,
+		item_data.item_name,
+		item_data.placeable_model_path,
+		item_data.placeable_scale,
+		item_data.placeable_collision_size,
+		is_gate
+	)
+	
+	get_tree().current_scene.add_child(obj)
+	_show_tool_feedback("Placed %s" % item_data.item_name)
+	
+	# Check if we still have more of this item; if not, destroy ghost
+	var remaining = inventory.get_item_count(item_data.item_id) if inventory else 0
+	if remaining <= 0:
+		_destroy_placement_ghost()
+	
+	# Grant XP
+	var skill_mgr = get_node_or_null("/root/SkillManager")
+	if skill_mgr and skill_mgr.has_method("grant_action_xp"):
+		skill_mgr.grant_action_xp("build_structure")
 
 # =====================
 # SAVE / LOAD

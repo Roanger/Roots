@@ -80,6 +80,19 @@ func remove_from_slot(slot_index: int, amount: int = 1) -> int:
 func remove_item(item_id: String, amount: int = 1) -> int:
 	var to_remove = amount
 	
+	# Check hotbar first (player likely has active item there)
+	for i in range(hotbar_size):
+		var item = get_hotbar_slot(i)
+		if item and item.item_data and item.item_data.item_id == item_id:
+			var can_remove = mini(to_remove, item.quantity)
+			item.quantity -= can_remove
+			to_remove -= can_remove
+			if item.quantity <= 0:
+				hotbar_slots[i] = null
+			hotbar_changed.emit(i)
+			if to_remove <= 0:
+				return amount
+	
 	for i in range(max_slots):
 		if slots[i] and slots[i].item_data and slots[i].item_data.item_id == item_id:
 			var removed = remove_from_slot(i, to_remove)
@@ -91,20 +104,18 @@ func remove_item(item_id: String, amount: int = 1) -> int:
 
 # Check if inventory has enough of an item
 func has_item(item_id: String, amount: int = 1) -> bool:
-	var count = 0
-	for slot in slots:
-		if slot and slot.item_data and slot.item_data.item_id == item_id:
-			count += slot.quantity
-			if count >= amount:
-				return true
-	return false
+	return get_item_count(item_id) >= amount
 
-# Get total count of an item
+# Get total count of an item (bag + hotbar)
 func get_item_count(item_id: String) -> int:
 	var count = 0
 	for slot in slots:
 		if slot and slot.item_data and slot.item_data.item_id == item_id:
 			count += slot.quantity
+	for i in range(hotbar_size):
+		var item = get_hotbar_slot(i)
+		if item and item.item_data and item.item_data.item_id == item_id:
+			count += item.quantity
 	return count
 
 # Get item at slot

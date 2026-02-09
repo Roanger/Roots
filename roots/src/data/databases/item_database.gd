@@ -282,10 +282,6 @@ func _initialize_items() -> void:
 	var torch_item = _create_material("torch", "Torch", "A simple torch for light.", 5, 20)
 	torch_item.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(torch_item)
-	var wooden_fence = _create_material("wooden_fence", "Wooden Fence", "A simple fence section.", 8, 20)
-	wooden_fence.icon = _load_icon("res://Material/Wooden Plank.png")
-	_register_item(wooden_fence)
-	
 	# Food
 	var carrot_food = _create_food("carrot_raw", "Carrot", "A crunchy carrot.", 15, 10.0, 0.0, 5.0)
 	carrot_food.icon = _load_icon("res://Veggies/icon-carrot.png")
@@ -395,6 +391,27 @@ func _initialize_items() -> void:
 	deer_pelt.icon = _load_icon("res://Material/Leather.png")
 	deer_pelt.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(deer_pelt)
+	
+	# ===== Placeable Items (Fences, Gates) =====
+	
+	var fence_wood = _create_placeable("fence_wood", "Wooden Fence", "A sturdy wooden fence section.", 8,
+		"res://modular_terrain_collection/Hilly_Prop_Fence_Boards_1.obj", 2.0,
+		Vector3(1.0, 0.8, 0.15))
+	fence_wood.icon = _load_icon("res://Material/Wooden Plank.png")
+	_register_item(fence_wood)
+	
+	var fence_post = _create_placeable("fence_post", "Fence Post", "A wooden fence post for corners and ends.", 5,
+		"res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 2.0,
+		Vector3(0.2, 1.0, 0.2))
+	fence_post.icon = _load_icon("res://Material/Wooden Plank.png")
+	_register_item(fence_post)
+	
+	var fence_gate = _create_placeable("fence_gate", "Fence Gate", "A gate that can be opened and closed.", 15,
+		"res://modular_terrain_collection/Hilly_Prop_Fence_Gate_1.obj", 2.0,
+		Vector3(1.0, 0.8, 0.15))
+	fence_gate.icon = _load_icon("res://Material/Wooden Plank.png")
+	fence_gate.placeable_is_gate = true
+	_register_item(fence_gate)
 	
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()
@@ -529,4 +546,18 @@ func _create_food(id: String, name: String, desc: String, value: int, hunger: fl
 	item.hunger_restore = hunger
 	item.health_restore = health
 	item.stamina_restore = stamina
+	return item
+
+func _create_placeable(id: String, name: String, desc: String, value: int, model_path: String, model_scale: float, collision_size: Vector3) -> ItemData:
+	var item = ItemData.new()
+	item.item_id = id
+	item.item_name = name
+	item.description = desc
+	item.item_type = ItemData.ItemType.PLACEABLE
+	item.base_value = value
+	item.max_stack_size = 50
+	item.is_stackable = true
+	item.placeable_model_path = model_path
+	item.placeable_scale = model_scale
+	item.placeable_collision_size = collision_size
 	return item

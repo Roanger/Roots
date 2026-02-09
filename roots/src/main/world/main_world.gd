@@ -330,6 +330,7 @@ func _setup_hotbar_ui() -> void:
 		if player_inventory:
 			hotbar_ui.initialize(player_inventory)
 			hotbar_ui.hotbar_slot_selected.connect(_on_hotbar_slot_selected)
+			player_inventory.hotbar_changed.connect(_on_hotbar_contents_changed)
 			print("Hotbar UI initialized")
 		else:
 			print("Warning: Player inventory not found for hotbar")
@@ -342,6 +343,15 @@ func _on_hotbar_slot_selected(_slot_index: int) -> void:
 	var item = hotbar_ui.get_selected_item()
 	if player.has_method("update_held_tool"):
 		player.update_held_tool(item)
+
+func _on_hotbar_contents_changed(slot_index: int) -> void:
+	# When the currently selected hotbar slot's contents change, refresh the player's held item
+	if not player or not hotbar_ui:
+		return
+	if slot_index == hotbar_ui.selected_slot:
+		var item = hotbar_ui.get_selected_item()
+		if player.has_method("update_held_tool"):
+			player.update_held_tool(item)
 
 func _setup_hud() -> void:
 	if not player:

@@ -12,6 +12,7 @@ enum ItemType {
 	POTION,      # Alchemy potions
 	EQUIPMENT,   # Armor, accessories
 	QUEST,       # Quest items
+	PLACEABLE,   # Fences, gates, decorations — placed in world
 	MISC         # Miscellaneous items
 }
 
@@ -79,6 +80,14 @@ enum ToolTier {
 # Seed properties
 @export var crop_id: String = ""  # What crop this seed grows
 @export var growth_time: float = 60.0  # Seconds to grow
+
+# Placeable properties
+@export var placeable_model_path: String = ""  # OBJ/FBX path for world placement
+@export var placeable_scale: float = 1.0
+@export var placeable_snap_to_grid: bool = true  # Snap to 1-unit grid
+@export var placeable_can_rotate: bool = true  # R key to rotate 90°
+@export var placeable_collision_size: Vector3 = Vector3(1.0, 1.0, 0.2)  # Collision box size
+@export var placeable_is_gate: bool = false  # Gates pivot from hinge edge
 
 # Crafting
 @export var crafting_recipes: Array[String] = []  # IDs of recipes this item is used in

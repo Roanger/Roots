@@ -49,6 +49,7 @@ const BASE_XP_ACTIONS: Dictionary = {
 	"extract_herb": {"skill": "alchemy", "xp": 8},
 	"defeat_enemy": {"skill": "militia", "xp": 25},
 	"craft_item": {"skill": "crafting", "xp": 5},
+	"build_structure": {"skill": "crafting", "xp": 8},
 }
 
 # Mastery threshold for perk bonuses

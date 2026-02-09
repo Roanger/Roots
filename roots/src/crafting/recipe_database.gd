@@ -304,7 +304,7 @@ func _init_recipes() -> void:
 		"craft_fence", "Wooden Fence", "A simple wooden fence section.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.HAND,
 		[{"item_id": "stick", "amount": 4}, {"item_id": "rope", "amount": 1}],
-		"wooden_fence", 2, 2.0, "crafting", 3.0
+		"fence_wood", 2, 2.0, "crafting", 3.0
 	))
 	
 	# Torch
@@ -371,4 +371,30 @@ func _init_recipes() -> void:
 		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
 		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "wild_clover", "amount": 2}, {"item_id": "chamomile", "amount": 1}, {"item_id": "fern_frond", "amount": 1}],
 		"antidote", 1, 5.0, "alchemy", 15.0
+	))
+	
+	# ===== BUILDING (Workbench) =====
+	
+	# Wooden Fence - 2 planks + 1 string
+	_register_recipe(_make_recipe(
+		"craft_fence_wood", "Wooden Fence", "Craft a wooden fence section.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 2}, {"item_id": "string", "amount": 1}],
+		"fence_wood", 2, 2.0, "construction", 5.0
+	))
+	
+	# Fence Post - 1 log
+	_register_recipe(_make_recipe(
+		"craft_fence_post", "Fence Post", "Craft a fence post for corners and ends.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 1}],
+		"fence_post", 2, 1.5, "construction", 3.0
+	))
+	
+	# Fence Gate - 3 planks + 2 string + 1 iron ingot (hinge)
+	_register_recipe(_make_recipe(
+		"craft_fence_gate", "Fence Gate", "Craft a gate that can be opened and closed.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "string", "amount": 2}, {"item_id": "iron_ingot", "amount": 1}],
+		"fence_gate", 1, 3.0, "construction", 10.0
 	))

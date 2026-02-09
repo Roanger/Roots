@@ -58,11 +58,9 @@ func _ready() -> void:
 	durability_bar.visible = false
 
 func update_slot(p_item: InventoryItem) -> void:
-	print("[EquipmentSlot %d] update_slot called with item: %s" % [slot_type, p_item.get_item_name() if p_item else "null"])
 	item = p_item
 	
 	if item and not item.is_empty():
-		print("[EquipmentSlot %d] Showing item: %s" % [slot_type, item.get_item_name()])
 		# Show item
 		item_icon.visible = true
 		placeholder_rect.visible = false
@@ -71,11 +69,9 @@ func update_slot(p_item: InventoryItem) -> void:
 		# Set icon (use placeholder for now)
 		var icon = item.get_icon()
 		if icon:
-			print("[EquipmentSlot %d] Setting icon texture" % slot_type)
 			item_icon.texture = icon
 			placeholder_rect.visible = false
 		else:
-			print("[EquipmentSlot %d] No icon, showing placeholder" % slot_type)
 			# Use placeholder color based on item type
 			item_icon.texture = null
 			placeholder_rect.color = _get_placeholder_color()
@@ -88,7 +84,6 @@ func update_slot(p_item: InventoryItem) -> void:
 		else:
 			durability_bar.visible = false
 	else:
-		print("[EquipmentSlot %d] Showing empty slot" % slot_type)
 		# Show empty slot
 		item_icon.visible = false
 		placeholder_rect.visible = false
@@ -113,11 +108,9 @@ var _slot_id: int = 0
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
 		var global_counter = SlotUtils.get_drop_counter()
-		print("[DragDebug] EquipmentSlot NOTIFICATION_DRAG_END received on slot %d (my_counter=%d, global=%d)" % [slot_type, _my_drop_counter, global_counter])
 		
 		# Only process if this slot was the LAST one to have can_drop_data called
 		if _last_drag_data != null and _last_can_drop and _my_drop_counter == global_counter and SlotUtils.get_last_drop_slot() == _slot_id:
-			print("[DragDebug] Executing manual drop on equipment slot %d" % slot_type)
 			# Increment counter to prevent other slots from processing
 			SlotUtils.set_drop_counter(global_counter + 1)
 			SlotUtils.set_last_drop_slot(-1)
@@ -173,10 +166,8 @@ func _on_gui_input(event: InputEvent) -> void:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_drag_start_pos = get_global_mouse_position()
 			_is_dragging = true
-			print("[DragDebug] Equipment slot %d: Mouse pressed, starting drag watch" % slot_type)
 		elif not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_is_dragging = false
-			print("[DragDebug] Equipment slot %d: Mouse released" % slot_type)
 			slot_clicked.emit(slot_type, event.button_index)
 
 func _process(delta: float) -> void:
@@ -185,7 +176,6 @@ func _process(delta: float) -> void:
 		var distance = _drag_start_pos.distance_to(current_pos)
 		if distance > DRAG_THRESHOLD:
 			_is_dragging = false
-			print("[DragDebug] Equipment slot %d: Drag threshold reached, starting drag" % slot_type)
 			SlotUtils.hide_tooltip()
 			_start_drag()
 	if _is_hovered and not _is_dragging:
@@ -193,18 +183,14 @@ func _process(delta: float) -> void:
 
 func _start_drag() -> void:
 	if not item or item.is_empty():
-		print("[DragDebug] Equipment slot %d: Cannot drag - no item" % slot_type)
 		return
 	if not equipment:
-		print("[DragDebug] Equipment slot %d: Cannot drag - no equipment reference" % slot_type)
 		return
 	
 	var drag_data = DragData.new(DragData.DragSource.EQUIPMENT, slot_type, item, inventory, equipment)
 	var preview = _create_drag_preview()
 	if preview:
 		set_drag_preview(preview)
-		print("[DragDebug] Equipment slot %d: Drag preview created" % slot_type)
-	print("[DragDebug] Equipment slot %d: Starting force_drag" % slot_type)
 	force_drag(drag_data, preview)
 
 func set_equipment(p_equipment: Equipment) -> void:
@@ -231,53 +217,39 @@ func get_drag_data(position: Vector2) -> Variant:
 	return drag_data
 
 func can_drop_data(position: Vector2, data: Variant) -> bool:
-	print("[DragDebug] EquipmentSlot.can_drop_data called on slot_type=%d" % slot_type)
 	# Clear previous state
 	_last_drag_data = null
 	_last_can_drop = false
 	
 	if data == null:
-		print("[DragDebug]   -> false: data is null")
 		return false
 	var drag_data = data as DragData
 	if drag_data == null:
-		print("[DragDebug]   -> false: data is not DragData (type=%s)" % typeof(data))
 		return false
-	
-	print("[DragDebug]   drag_data: source_type=%d, source_slot=%d, item=%s" % [drag_data.source_type, drag_data.source_slot_index, drag_data.item.get_item_name() if drag_data.item else "null"])
 	
 	# Can't drop on itself
 	if drag_data.source_type == DragData.DragSource.EQUIPMENT and drag_data.source_slot_index == slot_type:
-		print("[DragDebug]   -> false: same slot")
 		return false
 	
 	# Can only drop items from inventory (or hotbar for tools)
 	if drag_data.source_type != DragData.DragSource.INVENTORY and drag_data.source_type != DragData.DragSource.HOTBAR:
-		print("[DragDebug]   -> false: source type not allowed (%d)" % drag_data.source_type)
 		return false
 	
 	# Check if item type matches slot type
 	if not drag_data.item or not drag_data.item.item_data:
-		print("[DragDebug]   -> false: no item data")
 		return false
 	
 	var item_data = drag_data.item.item_data
-	print("[DragDebug]   item_type=%d, slot_type=%d" % [item_data.item_type, slot_type])
 	
 	# Validate item type matches slot
 	var valid = false
 	match slot_type:
 		Equipment.EquipmentSlot.GEAR_HEAD, Equipment.EquipmentSlot.GEAR_CHEST, Equipment.EquipmentSlot.GEAR_LEGS, Equipment.EquipmentSlot.GEAR_FEET:
 			valid = item_data.item_type == ItemData.ItemType.EQUIPMENT
-			print("[DragDebug]   -> equipment slot valid=%s" % valid)
 		Equipment.EquipmentSlot.TOOL_1, Equipment.EquipmentSlot.TOOL_2, Equipment.EquipmentSlot.TOOL_3:
 			valid = item_data.item_type == ItemData.ItemType.TOOL
-			print("[DragDebug]   -> tool slot valid=%s" % valid)
 		Equipment.EquipmentSlot.WEAPON:
 			valid = item_data.item_type == ItemData.ItemType.WEAPON
-			print("[DragDebug]   -> weapon slot valid=%s" % valid)
-		_:
-			print("[DragDebug]   -> false: unknown slot type")
 	
 	# Store for potential manual drop handling
 	if valid:
@@ -288,40 +260,31 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 		_my_drop_counter = global_counter
 		_slot_id = 2000 + slot_type  # Equipment slots start at 2000 to avoid collision with inventory
 		SlotUtils.set_last_drop_slot(_slot_id)
-		print("[DragDebug]   -> slot tagged with counter=%d, slot_id=%d" % [_my_drop_counter, _slot_id])
 	
 	return valid
 
 func drop_data(position: Vector2, data: Variant) -> void:
-	print("[DragDebug] EquipmentSlot.drop_data called on slot_type=%d" % slot_type)
 	if data == null:
-		print("[DragDebug]   -> data is null, returning")
 		return
 	var drag_data = data as DragData
 	if drag_data == null:
-		print("[DragDebug]   -> data is not DragData, returning")
 		return
-	
-	print("[DragDebug]   source_type=%d, source_slot=%d" % [drag_data.source_type, drag_data.source_slot_index])
 	
 	if drag_data.source_type == DragData.DragSource.INVENTORY or drag_data.source_type == DragData.DragSource.HOTBAR:
 		# Equipping item from inventory
 		if equipment and drag_data.inventory:
 			var item_to_equip = drag_data.inventory.get_slot(drag_data.source_slot_index)
 			if item_to_equip and not item_to_equip.is_empty():
-				print("[DragDebug]   Equipping %s to slot %d" % [item_to_equip.get_item_name(), slot_type])
 				# Check if there's already an item equipped
 				var currently_equipped = equipment.get_equipped_item(slot_type)
 				
 				# Try to equip the new item
 				if equipment.equip_item(item_to_equip, slot_type):
-					print("[DragDebug]   -> Equip successful")
 					# Remove from inventory
 					drag_data.inventory.remove_from_slot(drag_data.source_slot_index, 1)
 					
 					# If there was an equipped item, return it to inventory
 					if currently_equipped and not currently_equipped.is_empty():
-						print("[DragDebug]   -> Returning equipped item to inventory: %s" % currently_equipped.get_item_name())
 						# Try to add back to the source slot first (swap)
 						var source_slot_item = drag_data.inventory.get_slot(drag_data.source_slot_index)
 						if not source_slot_item or source_slot_item.is_empty():
@@ -336,12 +299,6 @@ func drop_data(position: Vector2, data: Variant) -> void:
 									drag_data.inventory.slots[i] = currently_equipped
 									drag_data.inventory.inventory_changed.emit(i)
 									break
-				else:
-					print("[DragDebug]   -> Equip FAILED")
-			else:
-				print("[DragDebug]   -> No item to equip or item is empty")
-		else:
-			print("[DragDebug]   -> Missing equipment or inventory reference")
 	
 	elif drag_data.source_type == DragData.DragSource.EQUIPMENT:
 		# Swapping between equipment slots

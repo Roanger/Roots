@@ -232,9 +232,13 @@ graph TD
 - [x] Wire QiwiiPack 3D models (Chicken, Cow, Sheep White, Pig, Chick) with FBX offset/rotation fixes
 - [x] Animals produce items on timers (eggs, milk, wool) and drop loot on death
 - [x] Terrain snapping and smooth wander/flee movement
+- [x] Fence/gate placement system (PLACEABLE item type, ghost preview, Q to rotate, left-click to place)
+- [x] PlaceableObject world script (collision blocks animals, gates open/close, hammer to pick up)
+- [x] Fence crafting recipes at Workbench (fence=2 planks+string, post=1 log, gate=3 planks+2 string+iron)
+- [x] Modular terrain collection integrated (Hilly_Prop_Fence OBJ models for fences/gates/posts)
 - [ ] Implement animal feeding and care (player interaction)
 - [ ] Create breeding system
-- [ ] Design animal housing and pastures (fences, coops, barns — QiwiiPack has Barn, Fence, Hut models)
+- [ ] Add more building placeables (QiwiiPack Barn/Hut, modular_terrain_collection camp/bridge pieces)
 - [ ] Find/add models for goat, deer, rabbit (currently placeholder capsules)
 
 #### 3.6 Militia/Combat

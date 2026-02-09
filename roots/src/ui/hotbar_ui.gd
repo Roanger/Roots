@@ -85,7 +85,7 @@ func _create_slots() -> void:
 func _on_item_dropped(from_slot: int, to_slot: int) -> void:
 	# Item was moved via drag-and-drop to hotbar
 	# Slots will update automatically via hotbar_changed signal
-	print("[Hotbar] Item dropped from slot %d to slot %d" % [from_slot, to_slot])
+	pass
 
 func _update_all_slots() -> void:
 	if not inventory:
@@ -106,12 +106,6 @@ func _on_hotbar_changed(slot_index: int) -> void:
 func _on_slot_clicked(slot_index: int, button_index: int) -> void:
 	if slot_index < 0 or slot_index >= slots.size():
 		return
-	# Debug: log what's in this hotbar slot when clicked
-	var hotbar_item = inventory.get_hotbar_slot(slot_index) if inventory else null
-	if hotbar_item and not hotbar_item.is_empty():
-		print("[Hotbar] Slot %d clicked: \"%s\" (qty %d)" % [slot_index + 1, hotbar_item.get_item_name(), hotbar_item.quantity])
-	else:
-		print("[Hotbar] Slot %d clicked: (empty)" % [slot_index + 1])
 	match button_index:
 		MOUSE_BUTTON_LEFT:
 			select_slot(slot_index)
