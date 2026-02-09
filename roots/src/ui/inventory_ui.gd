@@ -134,9 +134,10 @@ func close() -> void:
 	visible = false
 	
 	# Only recapture mouse and unpause if no other UI is open
-	# Check if character UI is still open
 	var character_ui = get_tree().get_first_node_in_group("character_ui")
-	var other_ui_open = character_ui and character_ui.visible
+	var crafting_ui_node = get_tree().get_first_node_in_group("crafting_ui")
+	var skill_tree_node = get_tree().get_first_node_in_group("skill_tree_ui")
+	var other_ui_open = (character_ui and character_ui.visible) or (crafting_ui_node and crafting_ui_node.visible) or (skill_tree_node and skill_tree_node.visible)
 	
 	if not other_ui_open:
 		# Recapture mouse for first-person camera

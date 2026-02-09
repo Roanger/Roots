@@ -2,6 +2,8 @@ extends Control
 class_name HUD
 ## HUD - Displays player health, stamina, and mini-map
 
+const CompassUIScript = preload("res://src/ui/hud/compass_ui.gd")
+
 @onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthBar
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/StaminaBar
 @onready var mini_map: SubViewportContainer = $MiniMapContainer
@@ -10,6 +12,7 @@ class_name HUD
 @export var mini_map_height: float = 40.0  # Height above player
 
 var player: Node = null
+var compass: Control = null
 
 func _ready() -> void:
 	# Initially hidden until initialized
@@ -31,6 +34,23 @@ func initialize(p_player: Node) -> void:
 	# Initialize bars with current values
 	_update_health_bar(player.current_health, player.max_health)
 	_update_stamina_bar(player.current_stamina, player.max_stamina)
+	
+	# Create compass UI at top-center
+	compass = CompassUIScript.new()
+	compass.name = "CompassUI"
+	compass.anchor_left = 0.0
+	compass.anchor_right = 1.0
+	compass.anchor_top = 0.0
+	compass.anchor_bottom = 0.0
+	compass.offset_top = 8.0
+	compass.offset_bottom = 44.0
+	compass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(compass)
+	
+	# Pass camera reference to compass
+	var cam = player.get_node_or_null("CameraPivot/Camera3D")
+	if cam:
+		compass.set_camera(cam)
 	
 	visible = true
 	print("HUD initialized")

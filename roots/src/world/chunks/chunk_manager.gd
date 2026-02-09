@@ -260,6 +260,8 @@ func _process_generation_queue() -> void:
 			
 			# Create mesh for chunk
 			_create_chunk_mesh(chunk_data)
+			# Restore any tilled farm plots from saved modifications
+			restore_tilled_plots_for_chunk(chunk_data)
 			emit_signal("chunk_loaded", chunk_pos)
 
 func _generate_chunk_data(chunk_pos: Vector2i) -> ChunkData:
@@ -352,16 +354,29 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 			var h01 = chunk.get_height(x, z + 1)
 			var h11 = chunk.get_height(x + 1, z + 1)
 			
-			var biome00 = chunk.get_biome(x, z)
-			var biome10 = chunk.get_biome(x + 1, z)
-			var biome01 = chunk.get_biome(x, z + 1)
-			var biome11 = chunk.get_biome(x + 1, z + 1)
+			# Check for tile modifications (tilled/dug cells)
+			var tile_mod = chunk.get_tile_mod(x, z)
+			var c00: Color
+			var c10: Color
+			var c01: Color
+			var c11: Color
 			
-			# Blend biome base color with grass/moisture variation (non-water biomes)
-			var c00 = _get_terrain_vertex_color(biome00, world_ox + x, world_oz + z)
-			var c10 = _get_terrain_vertex_color(biome10, world_ox + x + 1, world_oz + z)
-			var c01 = _get_terrain_vertex_color(biome01, world_ox + x, world_oz + z + 1)
-			var c11 = _get_terrain_vertex_color(biome11, world_ox + x + 1, world_oz + z + 1)
+			if tile_mod != ChunkData.TileMod.NONE:
+				var mod_color = _get_tile_mod_color(tile_mod)
+				c00 = mod_color
+				c10 = mod_color
+				c01 = mod_color
+				c11 = mod_color
+			else:
+				var biome00 = chunk.get_biome(x, z)
+				var biome10 = chunk.get_biome(x + 1, z)
+				var biome01 = chunk.get_biome(x, z + 1)
+				var biome11 = chunk.get_biome(x + 1, z + 1)
+				# Blend biome base color with grass/moisture variation (non-water biomes)
+				c00 = _get_terrain_vertex_color(biome00, world_ox + x, world_oz + z)
+				c10 = _get_terrain_vertex_color(biome10, world_ox + x + 1, world_oz + z)
+				c01 = _get_terrain_vertex_color(biome01, world_ox + x, world_oz + z + 1)
+				c11 = _get_terrain_vertex_color(biome11, world_ox + x + 1, world_oz + z + 1)
 			
 			# Quad: v0=bl, v1=br, v2=tl, v3=tr. Normals point UP (top face).
 			# Uses standard CCW winding and cull_back for opaque terrain rendering.
@@ -823,7 +838,68 @@ func _create_biome_decorations(chunk: ChunkData, parent: Node) -> void:
 		node.rotation.y = rng.randf_range(0.0, TAU)
 		var scale_factor := rng.randf_range(scale_min, scale_max)
 		node.scale = Vector3(scale_factor, scale_factor, scale_factor)
+		
+		# Add harvestable collision to herbs (not pebbles)
+		if node_name in ["Mushroom", "Flower", "Fern", "Clover"]:
+			_add_herb_harvestable(node, node_name, scale_factor, rng)
+		
 		parent.add_child(node)
+
+func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float, rng: RandomNumberGenerator) -> void:
+	var harvestable = HarvestableResource.new()
+	harvestable.name = "Collision"
+	harvestable.collision_layer = 2
+	harvestable.collision_mask = 0
+	harvestable.resource_type = ToolAffinity.TargetType.HERB
+	harvestable.max_health = 1.0  # Herbs are one-hit with proper tool
+	
+	match herb_type:
+		"Mushroom":
+			harvestable.xp_action_id = "pick_mushroom"
+			if rng.randf() < 0.15:
+				harvestable.loot_table = [
+					{"item_id": "golden_mushroom", "min_amount": 1, "max_amount": 1, "chance": 1.0},
+				]
+			else:
+				harvestable.loot_table = [
+					{"item_id": "common_mushroom", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+				]
+		"Flower":
+			harvestable.xp_action_id = "forage_item"
+			var flower_roll = rng.randf()
+			if flower_roll < 0.4:
+				harvestable.loot_table = [
+					{"item_id": "lavender", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+				]
+			elif flower_roll < 0.7:
+				harvestable.loot_table = [
+					{"item_id": "chamomile", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+				]
+			else:
+				harvestable.loot_table = [
+					{"item_id": "nightshade", "min_amount": 1, "max_amount": 1, "chance": 0.5},
+					{"item_id": "lavender", "min_amount": 1, "max_amount": 1, "chance": 0.5},
+				]
+		"Fern":
+			harvestable.xp_action_id = "forage_item"
+			harvestable.loot_table = [
+				{"item_id": "fern_frond", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+				{"item_id": "mint_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.3},
+			]
+		"Clover":
+			harvestable.xp_action_id = "forage_item"
+			harvestable.loot_table = [
+				{"item_id": "wild_clover", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+				{"item_id": "sage_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.2},
+			]
+	
+	var collision_shape = CollisionShape3D.new()
+	var shape = SphereShape3D.new()
+	shape.radius = 0.4 * scale_factor
+	collision_shape.shape = shape
+	collision_shape.position.y = 0.2 * scale_factor
+	harvestable.add_child(collision_shape)
+	node.add_child(harvestable)
 
 func _get_biome_color(biome: int) -> Color:
 	match biome:
@@ -858,6 +934,9 @@ func _unload_chunk(chunk_pos: Vector2i) -> void:
 	# Save chunk if modified
 	if save_chunks and chunk.is_modified:
 		_save_chunk(chunk)
+	
+	# Remove dynamic farm plots in this chunk
+	_remove_farm_plots_for_chunk(chunk)
 	
 	# Remove chunk mesh
 	var mesh_name = "Chunk_%d_%d" % [chunk_pos.x, chunk_pos.y]
@@ -908,6 +987,8 @@ func force_update() -> void:
 			
 			# Create mesh for chunk
 			_create_chunk_mesh(chunk_data)
+			# Restore any tilled farm plots from saved modifications
+			restore_tilled_plots_for_chunk(chunk_data)
 			emit_signal("chunk_loaded", chunk_pos)
 	
 	print("Force update complete: ", loaded_chunks.size(), " chunks loaded")
@@ -919,6 +1000,247 @@ func clear_all_chunks() -> void:
 	loaded_chunks.clear()
 	pending_chunks.clear()
 	generation_queue.clear()
+
+# =====================
+# TERRAIN MODIFICATION
+# =====================
+
+const FarmPlotScene = preload("res://src/world/crops/farm_plot.tscn")
+
+# Active dynamic farm plots: { "wx,wz" -> FarmPlot node }
+var dynamic_farm_plots: Dictionary = {}
+
+func world_to_chunk_local(world_pos: Vector3) -> Dictionary:
+	var chunk_x = int(floor(world_pos.x / chunk_size))
+	var chunk_z = int(floor(world_pos.z / chunk_size))
+	var chunk_pos = Vector2i(chunk_x, chunk_z)
+	var local_x = int(floor(world_pos.x)) - chunk_x * chunk_size
+	var local_z = int(floor(world_pos.z)) - chunk_z * chunk_size
+	return {"chunk_pos": chunk_pos, "local_x": local_x, "local_z": local_z}
+
+func modify_terrain_at(world_pos: Vector3, mod_type: int) -> bool:
+	var info = world_to_chunk_local(world_pos)
+	var chunk = loaded_chunks.get(info.chunk_pos, null) as ChunkData
+	if not chunk:
+		return false
+	
+	var lx: int = info.local_x
+	var lz: int = info.local_z
+	
+	# Don't modify if already modified with same type
+	if chunk.get_tile_mod(lx, lz) == mod_type:
+		return false
+	
+	# Don't till/dig on water
+	var biome = chunk.get_biome(lx, lz)
+	if biome == 0 or biome == 1:  # Water or Beach
+		return false
+	
+	# Don't till if there's an object here
+	var cell_world = Vector3(
+		chunk.world_position.x + lx + 0.5,
+		chunk.get_height(lx, lz),
+		chunk.world_position.z + lz + 0.5
+	)
+	if chunk.has_object_at(cell_world, 0.8):
+		return false
+	
+	# Apply modification
+	chunk.set_tile_mod(lx, lz, mod_type)
+	
+	# Rebuild chunk mesh to show visual change
+	_rebuild_chunk_mesh(chunk)
+	
+	# Spawn farm plot for tilled cells
+	if mod_type == ChunkData.TileMod.TILLED:
+		_spawn_farm_plot_at(cell_world)
+	
+	return true
+
+func _rebuild_chunk_mesh(chunk: ChunkData) -> void:
+	var mesh_name = "Chunk_%d_%d" % [chunk.chunk_position.x, chunk.chunk_position.y]
+	if not terrain_container:
+		return
+	
+	var old_mesh = terrain_container.get_node_or_null(mesh_name)
+	if not old_mesh:
+		return
+	
+	# Preserve child objects (trees, rocks, etc.) by reparenting them
+	var children_to_keep: Array[Node] = []
+	for child in old_mesh.get_children():
+		children_to_keep.append(child)
+		old_mesh.remove_child(child)
+	
+	old_mesh.queue_free()
+	
+	# Rebuild mesh with updated vertex colors
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.name = mesh_name
+	mesh_instance.position = chunk.world_position
+	
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	var world_ox = chunk.world_position.x
+	var world_oz = chunk.world_position.z
+	
+	for z in range(chunk.size):
+		for x in range(chunk.size):
+			var h00 = chunk.get_height(x, z)
+			var h10 = chunk.get_height(x + 1, z)
+			var h01 = chunk.get_height(x, z + 1)
+			var h11 = chunk.get_height(x + 1, z + 1)
+			
+			var tile_mod = chunk.get_tile_mod(x, z)
+			
+			var c00: Color
+			var c10: Color
+			var c01: Color
+			var c11: Color
+			
+			if tile_mod != ChunkData.TileMod.NONE:
+				var mod_color = _get_tile_mod_color(tile_mod)
+				c00 = mod_color
+				c10 = mod_color
+				c01 = mod_color
+				c11 = mod_color
+			else:
+				var biome00 = chunk.get_biome(x, z)
+				var biome10 = chunk.get_biome(x + 1, z)
+				var biome01 = chunk.get_biome(x, z + 1)
+				var biome11 = chunk.get_biome(x + 1, z + 1)
+				c00 = _get_terrain_vertex_color(biome00, world_ox + x, world_oz + z)
+				c10 = _get_terrain_vertex_color(biome10, world_ox + x + 1, world_oz + z)
+				c01 = _get_terrain_vertex_color(biome01, world_ox + x, world_oz + z + 1)
+				c11 = _get_terrain_vertex_color(biome11, world_ox + x + 1, world_oz + z + 1)
+			
+			var v0 = Vector3(x, h00, z)
+			var v1 = Vector3(x + 1, h10, z)
+			var v2 = Vector3(x, h01, z + 1)
+			var v3 = Vector3(x + 1, h11, z + 1)
+			
+			var n1 = (v2 - v0).cross(v1 - v0).normalized()
+			st.set_normal(n1)
+			st.set_uv(Vector2(x, z) / float(chunk.size))
+			st.set_color(c00)
+			st.add_vertex(v0)
+			st.set_normal(n1)
+			st.set_uv(Vector2(x + 1, z) / float(chunk.size))
+			st.set_color(c10)
+			st.add_vertex(v1)
+			st.set_normal(n1)
+			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
+			st.set_color(c01)
+			st.add_vertex(v2)
+			
+			var n2 = (v2 - v1).cross(v3 - v1).normalized()
+			st.set_normal(n2)
+			st.set_uv(Vector2(x + 1, z) / float(chunk.size))
+			st.set_color(c10)
+			st.add_vertex(v1)
+			st.set_normal(n2)
+			st.set_uv(Vector2(x + 1, z + 1) / float(chunk.size))
+			st.set_color(c11)
+			st.add_vertex(v3)
+			st.set_normal(n2)
+			st.set_uv(Vector2(x, z + 1) / float(chunk.size))
+			st.set_color(c01)
+			st.add_vertex(v2)
+	
+	var mesh = st.commit()
+	mesh_instance.mesh = mesh
+	
+	if _terrain_ground_shader:
+		var material = ShaderMaterial.new()
+		material.shader = _terrain_ground_shader
+		mesh_instance.material_override = material
+	else:
+		var material = StandardMaterial3D.new()
+		material.vertex_color_use_as_albedo = true
+		material.roughness = 0.9
+		mesh_instance.material_override = material
+	
+	terrain_container.add_child(mesh_instance)
+	mesh_instance.set_meta("chunk_data", chunk)
+	
+	# Re-attach preserved children
+	for child in children_to_keep:
+		mesh_instance.add_child(child)
+
+func _get_tile_mod_color(mod_type: int) -> Color:
+	match mod_type:
+		ChunkData.TileMod.TILLED:
+			return Color(0.30, 0.20, 0.12)  # Dark tilled soil
+		ChunkData.TileMod.DUG:
+			return Color(0.35, 0.28, 0.18)  # Dug earth
+		ChunkData.TileMod.PATH:
+			return Color(0.50, 0.42, 0.30)  # Packed dirt path
+		ChunkData.TileMod.FOUNDATION:
+			return Color(0.40, 0.38, 0.35)  # Stone-ish foundation
+	return Color(0.3, 0.5, 0.2)
+
+func _spawn_farm_plot_at(world_pos: Vector3) -> void:
+	var key = "%d,%d" % [int(floor(world_pos.x)), int(floor(world_pos.z))]
+	if dynamic_farm_plots.has(key):
+		return  # Already has a plot here
+	
+	var plot = FarmPlotScene.instantiate() as FarmPlot
+	plot.global_position = Vector3(world_pos.x, world_pos.y + 0.05, world_pos.z)
+	
+	# Start as tilled (terrain is already tilled visually)
+	plot.state = FarmPlot.PlotState.TILLED
+	
+	# Set up references
+	var crop_db = get_node_or_null("/root/CropDatabase")
+	var item_db = get_node_or_null("/root/ItemDatabase")
+	if crop_db:
+		plot.crop_database = crop_db
+	if item_db:
+		plot.item_database = item_db
+	
+	# Add to scene
+	var scene_root = get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(plot)
+		dynamic_farm_plots[key] = plot
+		print("[Terrain] Spawned farm plot at ", world_pos)
+
+func _remove_farm_plots_for_chunk(chunk: ChunkData) -> void:
+	var keys_to_remove := []
+	for key in dynamic_farm_plots:
+		var parts = key.split(",")
+		var wx = int(parts[0])
+		var wz = int(parts[1])
+		var cx = int(floor(float(wx) / chunk_size))
+		var cz = int(floor(float(wz) / chunk_size))
+		if cx == chunk.chunk_position.x and cz == chunk.chunk_position.y:
+			keys_to_remove.append(key)
+	for key in keys_to_remove:
+		var plot = dynamic_farm_plots[key]
+		if is_instance_valid(plot):
+			plot.queue_free()
+		dynamic_farm_plots.erase(key)
+
+func remove_farm_plot_at(world_pos: Vector3) -> void:
+	var key = "%d,%d" % [int(floor(world_pos.x)), int(floor(world_pos.z))]
+	if dynamic_farm_plots.has(key):
+		var plot = dynamic_farm_plots[key]
+		if is_instance_valid(plot):
+			plot.queue_free()
+		dynamic_farm_plots.erase(key)
+
+func get_tile_mod_at(world_pos: Vector3) -> int:
+	var info = world_to_chunk_local(world_pos)
+	var chunk = loaded_chunks.get(info.chunk_pos, null) as ChunkData
+	if not chunk:
+		return ChunkData.TileMod.NONE
+	return chunk.get_tile_mod(info.local_x, info.local_z)
+
+func restore_tilled_plots_for_chunk(chunk: ChunkData) -> void:
+	var tilled = chunk.get_all_tilled_positions()
+	for pos in tilled:
+		_spawn_farm_plot_at(pos)
 
 func _exit_tree() -> void:
 	# Save all modified chunks on exit

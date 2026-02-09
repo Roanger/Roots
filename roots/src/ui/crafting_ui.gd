@@ -34,6 +34,8 @@ var _category_buttons: Dictionary = {}
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("crafting_ui")
 	_build_ui()
 	_center_panel()
 
@@ -210,6 +212,16 @@ func show_crafting(station: int = CraftingRecipe.CraftingStation.HAND) -> void:
 	visible = true
 	_center_panel()
 	_refresh_recipes()
+	
+	# Release mouse so player can interact with UI
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("release_mouse"):
+		player.release_mouse()
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
+	if not get_tree().paused:
+		get_tree().paused = true
 
 func _refresh_recipes(category_filter: int = -1) -> void:
 	# Clear old entries
@@ -337,11 +349,21 @@ func _finish_crafting() -> void:
 	if not selected_recipe:
 		return
 	
-	# Consume ingredients
-	if not selected_recipe.consume_ingredients(inventory):
-		print("[Crafting] Failed to consume ingredients!")
-		_update_detail_panel()
-		return
+	# Check resource saving perk (chance to not consume materials)
+	var saved_resources := false
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("get_total_perk_bonus"):
+		var save_chance = sm.get_total_perk_bonus(6)  # PerkData.PerkEffect.RESOURCE_SAVING
+		if save_chance > 0.0 and randf() < save_chance:
+			saved_resources = true
+			print("[Crafting] Resource saving perk triggered! Materials preserved.")
+	
+	# Consume ingredients (unless saved by perk)
+	if not saved_resources:
+		if not selected_recipe.consume_ingredients(inventory):
+			print("[Crafting] Failed to consume ingredients!")
+			_update_detail_panel()
+			return
 	
 	# Give output item
 	if item_database:
@@ -371,8 +393,34 @@ func _on_category_pressed(category_index: int) -> void:
 	var filter = -1 if category_index == 0 else category_index
 	_refresh_recipes(filter)
 
-func _on_close_pressed() -> void:
+func close() -> void:
 	visible = false
+	_is_crafting = false
+	_progress_bar.visible = false
+	
+	# Check if other UIs are open before recapturing mouse
+	var inventory_ui = get_tree().get_first_node_in_group("inventory_ui")
+	var character_ui = get_tree().get_first_node_in_group("character_ui")
+	var skill_tree_ui = get_tree().get_first_node_in_group("skill_tree_ui")
+	var other_ui_open = (inventory_ui and inventory_ui.visible) or (character_ui and character_ui.visible) or (skill_tree_ui and skill_tree_ui.visible)
+	
+	if not other_ui_open:
+		var player = get_tree().get_first_node_in_group("player")
+		if player and player.has_method("capture_mouse"):
+			player.capture_mouse()
+		else:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		get_tree().paused = false
+
+func _on_close_pressed() -> void:
+	close()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		close()
+		get_viewport().set_input_as_handled()
 
 func _center_panel() -> void:
 	if not _panel:

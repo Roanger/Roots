@@ -14,6 +14,8 @@ var hud_scene = preload("res://src/ui/hud/hud.tscn")
 const CraftingUIScript = preload("res://src/ui/crafting_ui.gd")
 const BaseEnemy = preload("res://src/entities/base_enemy.gd")
 const CraftingStationObject = preload("res://src/world/crafting_station_object.gd")
+const BaseAnimalScript = preload("res://src/entities/animals/base_animal.gd")
+const AnimalDataScript = preload("res://src/entities/animals/animal_data.gd")
 var hud: Control = null
 var water_plane: MeshInstance3D = null
 var skill_tree_ui: Control = null
@@ -61,6 +63,9 @@ func _ready() -> void:
 	
 	# Spawn enemies
 	call_deferred("_spawn_enemies")
+	
+	# Spawn animals
+	call_deferred("_spawn_animals")
 	
 	# Restore saved data (player inventory/equipment/stats, farm plots)
 	call_deferred("_load_player_data")
@@ -394,8 +399,6 @@ func _setup_crafting_ui() -> void:
 func _on_open_crafting_station(station_type: int) -> void:
 	if crafting_ui:
 		crafting_ui.show_crafting(station_type)
-		if player:
-			player.release_mouse()
 
 func _spawn_crafting_stations() -> void:
 	if not player:
@@ -408,6 +411,8 @@ func _spawn_crafting_stations() -> void:
 	_create_station(spawn_pos + Vector3(5, 0, 2), 2, "Forge", Color(0.3, 0.3, 0.3))
 	# Anvil - next to forge
 	_create_station(spawn_pos + Vector3(5, 0, 4), 3, "Anvil", Color(0.25, 0.25, 0.3))
+	# Alchemy Table - near the other stations
+	_create_station(spawn_pos + Vector3(3, 0, 4), 5, "Alchemy Table", Color(0.4, 0.2, 0.5))
 
 func _create_station(pos: Vector3, station_type: int, station_name: String, color: Color) -> void:
 	# Snap to terrain height
@@ -509,6 +514,264 @@ func _spawn_enemies() -> void:
 	
 	print("Enemies spawned")
 
+# ── Animal Spawning ──────────────────────────────────────────────────────────
+
+var _animal_species: Dictionary = {}  # species_id -> AnimalData
+
+func _spawn_animals() -> void:
+	if not player:
+		return
+	await get_tree().process_frame
+	var spawn_pos = player.global_position
+	
+	_register_animal_species()
+	
+	# Farm animals near spawn
+	_create_animal("chicken", spawn_pos + Vector3(6, 0, 4))
+	_create_animal("chicken", spawn_pos + Vector3(7, 0, 5))
+	_create_animal("chicken", spawn_pos + Vector3(5, 0, 6))
+	_create_animal("cow", spawn_pos + Vector3(10, 0, -5))
+	_create_animal("cow", spawn_pos + Vector3(12, 0, -3))
+	_create_animal("sheep", spawn_pos + Vector3(-8, 0, 6))
+	_create_animal("sheep", spawn_pos + Vector3(-6, 0, 8))
+	_create_animal("goat", spawn_pos + Vector3(-10, 0, -4))
+	_create_animal("duck", spawn_pos + Vector3(4, 0, 8))
+	_create_animal("duck", spawn_pos + Vector3(3, 0, 10))
+	_create_animal("boar", spawn_pos + Vector3(14, 0, 10))
+	
+	# Wild/huntable animals further out
+	_create_animal("deer", spawn_pos + Vector3(25, 0, 20))
+	_create_animal("deer", spawn_pos + Vector3(-22, 0, 25))
+	_create_animal("rabbit", spawn_pos + Vector3(18, 0, -15))
+	_create_animal("rabbit", spawn_pos + Vector3(-16, 0, -18))
+	_create_animal("rabbit", spawn_pos + Vector3(20, 0, 12))
+	
+	print("Animals spawned")
+
+func _register_animal_species() -> void:
+	# Chicken
+	var chicken = AnimalDataScript.new()
+	chicken.species_id = "chicken"
+	chicken.display_name = "Chicken"
+	chicken.animal_type = AnimalDataScript.AnimalType.FARM
+	chicken.max_health = 8.0
+	chicken.move_speed = 1.2
+	chicken.flee_speed = 3.0
+	chicken.wander_radius = 5.0
+	chicken.detection_range = 4.0
+	chicken.collision_radius = 0.25
+	chicken.collision_height = 0.5
+	chicken.model_path = "res://Animal QiwiiPack/Animal Models/Chicken.fbx"
+	chicken.model_scale = 0.4
+	chicken.body_color = Color(0.95, 0.9, 0.8)
+	chicken.product_type = AnimalDataScript.ProductType.EGG
+	chicken.product_item_id = "egg"
+	chicken.product_interval = 90.0
+	chicken.product_amount = 1
+	chicken.feed_item_ids = ["animal_feed", "wheat"]
+	chicken.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 1, "chance": 0.8},
+		{"item_id": "feathers", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+	]
+	chicken.xp_reward = 5.0
+	_animal_species["chicken"] = chicken
+	
+	# Cow (Holstein)
+	var cow = AnimalDataScript.new()
+	cow.species_id = "cow"
+	cow.display_name = "Cow"
+	cow.animal_type = AnimalDataScript.AnimalType.FARM
+	cow.max_health = 40.0
+	cow.move_speed = 1.0
+	cow.flee_speed = 2.5
+	cow.wander_radius = 8.0
+	cow.detection_range = 5.0
+	cow.collision_radius = 0.5
+	cow.collision_height = 1.4
+	cow.model_path = "res://Animal QiwiiPack/Animal Models/Cow.fbx"
+	cow.model_scale = 0.6
+	cow.body_color = Color(0.9, 0.85, 0.8)
+	cow.product_type = AnimalDataScript.ProductType.MILK
+	cow.product_item_id = "milk"
+	cow.product_interval = 120.0
+	cow.product_amount = 1
+	cow.feed_item_ids = ["animal_feed", "wheat", "carrot_raw"]
+	cow.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.8},
+	]
+	cow.xp_reward = 8.0
+	_animal_species["cow"] = cow
+	
+	# Sheep
+	var sheep = AnimalDataScript.new()
+	sheep.species_id = "sheep"
+	sheep.display_name = "Sheep"
+	sheep.animal_type = AnimalDataScript.AnimalType.FARM
+	sheep.max_health = 20.0
+	sheep.move_speed = 1.2
+	sheep.flee_speed = 3.0
+	sheep.wander_radius = 7.0
+	sheep.detection_range = 5.0
+	sheep.collision_radius = 0.4
+	sheep.collision_height = 1.0
+	sheep.model_path = "res://Animal QiwiiPack/Animal Models/Sheep White.fbx"
+	sheep.model_scale = 0.5
+	sheep.body_color = Color(0.95, 0.95, 0.9)
+	sheep.product_type = AnimalDataScript.ProductType.WOOL
+	sheep.product_item_id = "wool"
+	sheep.product_interval = 150.0
+	sheep.product_amount = 1
+	sheep.feed_item_ids = ["animal_feed", "wheat"]
+	sheep.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+		{"item_id": "wool", "min_amount": 1, "max_amount": 3, "chance": 0.9},
+	]
+	sheep.xp_reward = 6.0
+	_animal_species["sheep"] = sheep
+	
+	# Goat
+	var goat = AnimalDataScript.new()
+	goat.species_id = "goat"
+	goat.display_name = "Goat"
+	goat.animal_type = AnimalDataScript.AnimalType.FARM
+	goat.max_health = 25.0
+	goat.move_speed = 1.5
+	goat.flee_speed = 3.5
+	goat.wander_radius = 8.0
+	goat.detection_range = 6.0
+	goat.collision_radius = 0.35
+	goat.collision_height = 0.9
+	goat.model_scale = 1.0
+	goat.body_color = Color(0.75, 0.7, 0.6)
+	goat.product_type = AnimalDataScript.ProductType.MILK
+	goat.product_item_id = "milk"
+	goat.product_interval = 140.0
+	goat.product_amount = 1
+	goat.feed_item_ids = ["animal_feed", "wheat", "carrot_raw"]
+	goat.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+		{"item_id": "leather", "min_amount": 1, "max_amount": 1, "chance": 0.6},
+	]
+	goat.xp_reward = 6.0
+	_animal_species["goat"] = goat
+	
+	# Duck (Pekin)
+	var duck = AnimalDataScript.new()
+	duck.species_id = "duck"
+	duck.display_name = "Duck"
+	duck.animal_type = AnimalDataScript.AnimalType.FARM
+	duck.max_health = 8.0
+	duck.move_speed = 1.3
+	duck.flee_speed = 3.0
+	duck.wander_radius = 6.0
+	duck.detection_range = 4.0
+	duck.collision_radius = 0.25
+	duck.collision_height = 0.5
+	duck.model_path = "res://Animal QiwiiPack/Animal Models/Chick.fbx"
+	duck.model_scale = 0.5
+	duck.body_color = Color(0.95, 0.92, 0.75)
+	duck.product_type = AnimalDataScript.ProductType.EGG
+	duck.product_item_id = "egg"
+	duck.product_interval = 100.0
+	duck.product_amount = 1
+	duck.feed_item_ids = ["animal_feed", "wheat"]
+	duck.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 1, "chance": 0.8},
+		{"item_id": "feathers", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+	]
+	duck.xp_reward = 5.0
+	_animal_species["duck"] = duck
+	
+	# Boar (wild pig, tameable)
+	var boar = AnimalDataScript.new()
+	boar.species_id = "boar"
+	boar.display_name = "Boar"
+	boar.animal_type = AnimalDataScript.AnimalType.FARM
+	boar.max_health = 30.0
+	boar.move_speed = 1.4
+	boar.flee_speed = 4.0
+	boar.wander_radius = 10.0
+	boar.detection_range = 6.0
+	boar.collision_radius = 0.45
+	boar.collision_height = 0.9
+	boar.model_path = "res://Animal QiwiiPack/Animal Models/Pig.fbx"
+	boar.model_scale = 0.5
+	boar.body_color = Color(0.5, 0.35, 0.25)
+	boar.product_type = AnimalDataScript.ProductType.NONE
+	boar.feed_item_ids = ["animal_feed", "carrot_raw", "potato"]
+	boar.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.7},
+	]
+	boar.xp_reward = 10.0
+	_animal_species["boar"] = boar
+	
+	# Deer (wild, huntable)
+	var deer = AnimalDataScript.new()
+	deer.species_id = "deer"
+	deer.display_name = "Deer"
+	deer.animal_type = AnimalDataScript.AnimalType.HUNTABLE
+	deer.max_health = 25.0
+	deer.move_speed = 2.0
+	deer.flee_speed = 5.5
+	deer.wander_radius = 12.0
+	deer.detection_range = 10.0
+	deer.collision_radius = 0.4
+	deer.collision_height = 1.3
+	deer.model_scale = 1.0
+	deer.body_color = Color(0.6, 0.45, 0.3)
+	deer.product_type = AnimalDataScript.ProductType.NONE
+	deer.loot_table = [
+		{"item_id": "venison", "min_amount": 2, "max_amount": 3, "chance": 1.0},
+		{"item_id": "deer_pelt", "min_amount": 1, "max_amount": 1, "chance": 0.8},
+		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.5},
+	]
+	deer.xp_reward = 15.0
+	deer.xp_skill = "combat"
+	_animal_species["deer"] = deer
+	
+	# Rabbit (wild, huntable)
+	var rabbit = AnimalDataScript.new()
+	rabbit.species_id = "rabbit"
+	rabbit.display_name = "Rabbit"
+	rabbit.animal_type = AnimalDataScript.AnimalType.HUNTABLE
+	rabbit.max_health = 6.0
+	rabbit.move_speed = 2.5
+	rabbit.flee_speed = 6.0
+	rabbit.wander_radius = 8.0
+	rabbit.detection_range = 8.0
+	rabbit.collision_radius = 0.2
+	rabbit.collision_height = 0.4
+	rabbit.model_scale = 1.0
+	rabbit.body_color = Color(0.7, 0.6, 0.5)
+	rabbit.product_type = AnimalDataScript.ProductType.NONE
+	rabbit.loot_table = [
+		{"item_id": "rabbit_meat", "min_amount": 1, "max_amount": 1, "chance": 1.0},
+		{"item_id": "rabbit_fur", "min_amount": 1, "max_amount": 1, "chance": 0.7},
+	]
+	rabbit.xp_reward = 8.0
+	rabbit.xp_skill = "combat"
+	_animal_species["rabbit"] = rabbit
+
+func _create_animal(species_id: String, pos: Vector3, tamed: bool = false, baby: bool = false) -> void:
+	var data = _animal_species.get(species_id)
+	if not data:
+		push_warning("Unknown animal species: %s" % species_id)
+		return
+	
+	# Snap to terrain height
+	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+		var terrain_y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		pos.y = terrain_y
+	else:
+		pos.y = 30.0
+	
+	var animal = BaseAnimalScript.new()
+	animal.setup(data, tamed, baby)
+	animal.position = pos
+	add_child(animal)
+
 func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
 		chase_spd: float, dmg: float, atk_range: float, detect: float,
 		color: Color, xp: float, loot: Array,
@@ -571,11 +834,7 @@ func _input(event: InputEvent) -> void:
 		elif event.keycode == KEY_R:
 			if crafting_ui:
 				if crafting_ui.visible:
-					crafting_ui.visible = false
-					if player:
-						player.capture_mouse()
+					crafting_ui.close()
 				else:
 					crafting_ui.show_crafting()
-					if player:
-						player.release_mouse()
 				get_viewport().set_input_as_handled()

@@ -7,6 +7,7 @@ signal skill_tree_closed()
 var skill_manager: Node = null
 var player: Node = null
 var skill_rows: Dictionary = {}  # skill_id -> row container
+var perk_panels: Dictionary = {} # skill_id -> perk VBoxContainer (expandable)
 
 # UI references (built in code)
 var panel: PanelContainer = null
@@ -134,6 +135,7 @@ func _build_skill_rows() -> void:
 	for child in skill_list.get_children():
 		child.queue_free()
 	skill_rows.clear()
+	perk_panels.clear()
 	
 	if not skill_manager:
 		skill_manager = get_node_or_null("/root/SkillManager")
@@ -193,9 +195,18 @@ func _build_skill_rows() -> void:
 		
 		# Skill rows in this category
 		for skill_id in categories[cat]:
+			var wrapper = VBoxContainer.new()
+			wrapper.add_theme_constant_override("separation", 2)
+			skill_list.add_child(wrapper)
+			
 			var row = _create_skill_row(skill_id, cat_colors.get(cat, Color.WHITE))
-			skill_list.add_child(row)
+			wrapper.add_child(row)
 			skill_rows[skill_id] = row
+			
+			# Add perk panel (starts collapsed)
+			var perk_panel = _create_perk_panel(skill_id, cat_colors.get(cat, Color.WHITE))
+			wrapper.add_child(perk_panel)
+			perk_panels[skill_id] = perk_panel
 
 func _create_skill_row(skill_id: String, accent_color: Color) -> HBoxContainer:
 	var definition = skill_manager.get_skill_definition(skill_id)
@@ -259,6 +270,17 @@ func _create_skill_row(skill_id: String, accent_color: Color) -> HBoxContainer:
 	xp_label.name = "XPLabel"
 	row.add_child(xp_label)
 	
+	# Perks expand/collapse button
+	var perks_count = skill_manager.get_perks_for_skill(skill_id).size()
+	if perks_count > 0:
+		var toggle_btn = Button.new()
+		toggle_btn.text = "Perks"
+		toggle_btn.custom_minimum_size = Vector2(50, 20)
+		toggle_btn.add_theme_font_size_override("font_size", 11)
+		toggle_btn.name = "PerkToggle"
+		toggle_btn.pressed.connect(_on_perk_toggle.bind(skill_id))
+		row.add_child(toggle_btn)
+	
 	return row
 
 func _update_skill_row(skill_id: String) -> void:
@@ -288,6 +310,134 @@ func _update_skill_row(skill_id: String) -> void:
 			xp_label.text = "%d / %d" % [xp, xp_needed]
 		else:
 			xp_label.text = "MAX"
+
+func _create_perk_panel(skill_id: String, accent_color: Color) -> VBoxContainer:
+	var panel_vbox = VBoxContainer.new()
+	panel_vbox.visible = false
+	panel_vbox.add_theme_constant_override("separation", 4)
+	panel_vbox.set_meta("skill_id", skill_id)
+	
+	# Background style
+	var bg_panel = PanelContainer.new()
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.08, 0.08, 0.1, 0.9)
+	bg_style.border_color = accent_color * 0.5
+	bg_style.set_border_width_all(1)
+	bg_style.set_corner_radius_all(4)
+	bg_style.set_content_margin_all(8)
+	bg_panel.add_theme_stylebox_override("panel", bg_style)
+	panel_vbox.add_child(bg_panel)
+	
+	var inner_vbox = VBoxContainer.new()
+	inner_vbox.add_theme_constant_override("separation", 6)
+	inner_vbox.name = "PerkList"
+	bg_panel.add_child(inner_vbox)
+	
+	_populate_perk_nodes(inner_vbox, skill_id, accent_color)
+	return panel_vbox
+
+func _populate_perk_nodes(container: VBoxContainer, skill_id: String, accent_color: Color) -> void:
+	for child in container.get_children():
+		child.queue_free()
+	
+	var perks = skill_manager.get_perks_for_skill(skill_id)
+	if perks.is_empty():
+		return
+	
+	# Horizontal perk chain
+	var chain = HBoxContainer.new()
+	chain.add_theme_constant_override("separation", 4)
+	container.add_child(chain)
+	
+	for i in range(perks.size()):
+		var perk = perks[i]
+		var is_unlocked = skill_manager.has_unlocked_perk(perk.perk_id)
+		var can_unlock = skill_manager.can_unlock_perk(perk.perk_id)
+		
+		# Perk node button
+		var btn = Button.new()
+		btn.custom_minimum_size = Vector2(110, 60)
+		btn.name = "Perk_" + perk.perk_id
+		
+		var btn_text = perk.display_name + "\n"
+		if is_unlocked:
+			btn_text += "[Unlocked]"
+		else:
+			btn_text += "Lv %d | %d pt" % [perk.required_skill_level, perk.point_cost]
+		btn.text = btn_text
+		btn.add_theme_font_size_override("font_size", 10)
+		
+		# Style based on state
+		var btn_style = StyleBoxFlat.new()
+		btn_style.set_corner_radius_all(4)
+		btn_style.set_content_margin_all(4)
+		if is_unlocked:
+			btn_style.bg_color = accent_color * 0.4
+			btn_style.border_color = accent_color
+		elif can_unlock:
+			btn_style.bg_color = Color(0.2, 0.25, 0.15)
+			btn_style.border_color = Color(0.5, 0.7, 0.3)
+		else:
+			btn_style.bg_color = Color(0.12, 0.12, 0.14)
+			btn_style.border_color = Color(0.3, 0.3, 0.3)
+		btn_style.set_border_width_all(2)
+		btn.add_theme_stylebox_override("normal", btn_style)
+		
+		# Hover style
+		var hover_style = btn_style.duplicate()
+		hover_style.bg_color = btn_style.bg_color * 1.3
+		btn.add_theme_stylebox_override("hover", hover_style)
+		
+		if not is_unlocked:
+			btn.pressed.connect(_on_perk_unlock.bind(perk.perk_id, skill_id))
+		btn.tooltip_text = perk.description
+		
+		chain.add_child(btn)
+		
+		# Arrow between perks
+		if i < perks.size() - 1:
+			var arrow = Label.new()
+			arrow.text = ">"
+			arrow.add_theme_font_size_override("font_size", 16)
+			arrow.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
+			arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			chain.add_child(arrow)
+
+func _on_perk_toggle(skill_id: String) -> void:
+	if not perk_panels.has(skill_id):
+		return
+	var p = perk_panels[skill_id]
+	p.visible = not p.visible
+	# Refresh perk states when opening
+	if p.visible:
+		_refresh_perk_panel(skill_id)
+
+func _on_perk_unlock(perk_id: String, skill_id: String) -> void:
+	if not skill_manager:
+		return
+	if skill_manager.unlock_perk(perk_id):
+		_refresh_perk_panel(skill_id)
+		_update_header()
+
+func _refresh_perk_panel(skill_id: String) -> void:
+	if not perk_panels.has(skill_id):
+		return
+	var p = perk_panels[skill_id]
+	# Find the PerkList container inside the PanelContainer
+	var bg_panel = p.get_child(0) as PanelContainer
+	if not bg_panel:
+		return
+	var inner = bg_panel.get_node_or_null("PerkList") as VBoxContainer
+	if not inner:
+		return
+	# Get accent color from the skill row
+	var accent = Color.WHITE
+	if skill_rows.has(skill_id):
+		var row = skill_rows[skill_id]
+		var lvl = row.get_node_or_null("LevelLabel") as Label
+		if lvl:
+			accent = lvl.get_theme_color("font_color")
+	_populate_perk_nodes(inner, skill_id, accent)
 
 func _update_header() -> void:
 	if not skill_manager:
@@ -340,7 +490,8 @@ func close() -> void:
 	# Check if other UIs are open before unpausing
 	var inventory_ui = get_tree().get_first_node_in_group("inventory_ui")
 	var character_ui = get_tree().get_first_node_in_group("character_ui")
-	var other_ui_open = (inventory_ui and inventory_ui.visible) or (character_ui and character_ui.visible)
+	var crafting_ui_node = get_tree().get_first_node_in_group("crafting_ui")
+	var other_ui_open = (inventory_ui and inventory_ui.visible) or (character_ui and character_ui.visible) or (crafting_ui_node and crafting_ui_node.visible)
 	
 	if not other_ui_open:
 		if player and player.has_method("capture_mouse"):

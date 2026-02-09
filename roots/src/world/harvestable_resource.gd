@@ -12,6 +12,9 @@ const WorldItemScene = preload("res://src/items/world_item.tscn")
 # Loot table: array of { "item_id": String, "min_amount": int, "max_amount": int, "chance": float }
 @export var loot_table: Array = []
 
+# XP action to grant on each hit (e.g. "pick_mushroom", "forage_item")
+@export var xp_action_id: String = ""
+
 var current_health: float = 10.0
 var _is_destroyed: bool = false
 var _shake_tween: Tween = null
@@ -60,8 +63,11 @@ func _play_hit_effect() -> void:
 		original_pos, 0.05)
 
 func _grant_xp(_player: Node3D, _power: float) -> void:
-	# Override in subclasses for specific XP grants
-	pass
+	if xp_action_id.is_empty():
+		return
+	var skill_manager = get_node_or_null("/root/SkillManager")
+	if skill_manager and skill_manager.has_method("grant_action_xp"):
+		skill_manager.grant_action_xp(xp_action_id)
 
 func _destroy(player: Node3D) -> void:
 	if _is_destroyed:
@@ -82,6 +88,16 @@ func _spawn_drops(_player: Node3D) -> void:
 	rng.randomize()
 	var world_pos = _parent_object.global_position
 	
+	# Look up perk bonuses for yield and double harvest
+	var yield_bonus := 0.0
+	var double_chance := 0.0
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("get_perk_bonus"):
+		var skill_id = _get_skill_for_resource()
+		if skill_id != "":
+			yield_bonus = sm.get_perk_bonus(skill_id, 0)   # PerkData.PerkEffect.YIELD_BONUS
+			double_chance = sm.get_perk_bonus(skill_id, 7)  # PerkData.PerkEffect.DOUBLE_HARVEST
+	
 	for loot in loot_table:
 		var chance: float = loot.get("chance", 1.0)
 		if rng.randf() > chance:
@@ -91,6 +107,14 @@ func _spawn_drops(_player: Node3D) -> void:
 		var min_amt: int = loot.get("min_amount", 1)
 		var max_amt: int = loot.get("max_amount", 1)
 		var amount: int = rng.randi_range(min_amt, max_amt)
+		
+		# Apply yield bonus (round up any fractional bonus)
+		if yield_bonus > 0.0:
+			amount = int(ceil(amount * (1.0 + yield_bonus)))
+		
+		# Double harvest chance
+		if double_chance > 0.0 and rng.randf() < double_chance:
+			amount *= 2
 		
 		if item_id == "" or amount <= 0:
 			continue
@@ -102,6 +126,18 @@ func _spawn_drops(_player: Node3D) -> void:
 			rng.randf_range(-0.8, 0.8)
 		)
 		_spawn_world_item(item_id, amount, drop_pos)
+
+func _get_skill_for_resource() -> String:
+	match resource_type:
+		ToolAffinity.TargetType.TREE:
+			return "lumberjack"
+		ToolAffinity.TargetType.ROCK, ToolAffinity.TargetType.ORE_NODE:
+			return "mining"
+		ToolAffinity.TargetType.HERB:
+			return "herb_gathering"
+		ToolAffinity.TargetType.TALL_GRASS:
+			return "foraging"
+	return ""
 
 func _spawn_world_item(item_id: String, amount: int, world_pos: Vector3) -> void:
 	var world_item = WorldItemScene.instantiate() as WorldItem

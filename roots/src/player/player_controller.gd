@@ -28,6 +28,11 @@ var current_health: float = 100.0
 var current_stamina: float = 100.0
 var stamina_regen_timer: float = 0.0
 
+# Buff system: { buff_type: { "value": float, "remaining": float, "duration": float } }
+var active_buffs: Dictionary = {}
+var base_move_speed: float = 5.0
+var base_run_speed: float = 8.0
+
 @export var move_speed: float = 5.0
 @export var run_speed: float = 8.0
 @export var crouch_speed: float = 3.0
@@ -77,6 +82,10 @@ var tool_holder: Node3D = null
 var _tool_use_cooldown: float = 0.0
 var _tool_use_cooldown_max: float = 0.5  # Seconds between swings
 
+# Terrain modification highlight
+var _terrain_highlight: MeshInstance3D = null
+var _highlight_visible: bool = false
+
 func _ready() -> void:
 	add_to_group("player")
 	
@@ -115,6 +124,20 @@ func _ready() -> void:
 		tool_holder = ToolHolder.new()
 		tool_holder.name = "ToolHolder"
 		camera.add_child(tool_holder)
+	
+	# Create terrain highlight indicator (wireframe quad for hoe/shovel aiming)
+	_terrain_highlight = MeshInstance3D.new()
+	_terrain_highlight.name = "TerrainHighlight"
+	var im = ImmediateMesh.new()
+	_terrain_highlight.mesh = im
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.9, 0.8, 0.3, 0.6)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	_terrain_highlight.material_override = mat
+	_terrain_highlight.visible = false
+	get_tree().current_scene.call_deferred("add_child", _terrain_highlight)
 
 func _input(event: InputEvent) -> void:
 	# Camera is handled by CameraController
@@ -138,10 +161,12 @@ func _physics_process(delta: float) -> void:
 	_apply_gravity(delta)
 	_update_terrain_height()
 	_update_stamina(delta)
+	_update_buffs(delta)
 	_move_character(delta)
 	_update_animation()
 	_check_interaction()
 	_process_tool_use()
+	_update_terrain_highlight()
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_ground:
@@ -348,6 +373,12 @@ func _swing_tool() -> void:
 			var effectiveness: float = ToolAffinity.get_effectiveness(tool_type, target_type)
 			if effectiveness > 0.0:
 				var power = ToolAffinity.calculate_power(tool_type, target_type, base_power, tool_tier)
+				if has_buff("strength"):
+					power *= get_buff_value("strength")
+				# Apply perk damage bonuses
+				var sm = get_node_or_null("/root/SkillManager")
+				if sm and sm.has_method("get_perk_bonus"):
+					power *= (1.0 + sm.get_total_perk_bonus(3))  # PerkData.PerkEffect.DAMAGE_BONUS
 				collider.on_hit(self, tool_type, power)
 			else:
 				_show_tool_feedback(ToolAffinity.get_ineffective_message(tool_type, target_type))
@@ -361,6 +392,103 @@ func _swing_tool() -> void:
 		# Generic interactable
 		if collider.has_method("on_interact"):
 			collider.on_interact(self)
+			return
+	
+	# No collider hit — try terrain modification (hoe/shovel on ground)
+	if tool_type in ["hoe", "shovel"] and chunk_manager and chunk_manager.has_method("modify_terrain_at"):
+		var terrain_pos = _get_terrain_look_position()
+		if terrain_pos != Vector3.ZERO:
+			var mod_type: int = 1 if tool_type == "hoe" else 2  # TILLED=1, DUG=2
+			if chunk_manager.modify_terrain_at(terrain_pos, mod_type):
+				if tool_type == "hoe":
+					var skill_mgr = get_node_or_null("/root/SkillManager")
+					if skill_mgr:
+						skill_mgr.grant_action_xp("till_soil")
+					_show_tool_feedback("Tilled soil!")
+				else:
+					_show_tool_feedback("Dug ground!")
+			else:
+				_show_tool_feedback("Can't modify terrain here.")
+
+func _get_terrain_look_position() -> Vector3:
+	if not camera or not chunk_manager:
+		return Vector3.ZERO
+	
+	var cam_pos = camera.global_position
+	var cam_dir = -camera.global_transform.basis.z.normalized()
+	
+	# Only allow looking downward (must aim at ground)
+	if cam_dir.y >= 0:
+		return Vector3.ZERO
+	
+	# Step along the look direction to find terrain intersection
+	# Max reach of 4 units for terrain modification
+	var max_reach := 4.0
+	var step := 0.25
+	var steps := int(max_reach / step)
+	
+	for i in range(1, steps + 1):
+		var sample_pos = cam_pos + cam_dir * (step * i)
+		var terrain_h = chunk_manager.get_terrain_height(sample_pos)
+		if sample_pos.y <= terrain_h + 0.3:
+			# Found terrain intersection — snap to grid cell center
+			var cell_x = floor(sample_pos.x) + 0.5
+			var cell_z = floor(sample_pos.z) + 0.5
+			return Vector3(cell_x, terrain_h, cell_z)
+	
+	return Vector3.ZERO
+
+func _update_terrain_highlight() -> void:
+	if not _terrain_highlight or not is_instance_valid(_terrain_highlight):
+		return
+	
+	# Only show when holding hoe or shovel
+	var held = _get_held_item_data()
+	var tool_type = ""
+	if held:
+		tool_type = held.tool_type if held.tool_type else ""
+	
+	if tool_type not in ["hoe", "shovel"]:
+		if _highlight_visible:
+			_terrain_highlight.visible = false
+			_highlight_visible = false
+		return
+	
+	var target_pos = _get_terrain_look_position()
+	if target_pos == Vector3.ZERO:
+		if _highlight_visible:
+			_terrain_highlight.visible = false
+			_highlight_visible = false
+		return
+	
+	# Position highlight at the target cell
+	var cell_x = floor(target_pos.x)
+	var cell_z = floor(target_pos.z)
+	var h = target_pos.y + 0.08  # Slightly above terrain to avoid z-fighting
+	
+	# Rebuild the ImmediateMesh quad
+	var im = _terrain_highlight.mesh as ImmediateMesh
+	im.clear_surfaces()
+	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	im.surface_add_vertex(Vector3(cell_x, h, cell_z))
+	im.surface_add_vertex(Vector3(cell_x + 1, h, cell_z))
+	im.surface_add_vertex(Vector3(cell_x + 1, h, cell_z + 1))
+	im.surface_add_vertex(Vector3(cell_x, h, cell_z + 1))
+	im.surface_add_vertex(Vector3(cell_x, h, cell_z))
+	im.surface_end()
+	
+	# Color based on whether we can modify here
+	var mat = _terrain_highlight.material_override as StandardMaterial3D
+	if mat:
+		if chunk_manager and chunk_manager.has_method("get_tile_mod_at"):
+			var existing_mod = chunk_manager.get_tile_mod_at(target_pos)
+			if existing_mod != 0:  # Already modified
+				mat.albedo_color = Color(0.8, 0.3, 0.3, 0.6)  # Red = can't
+			else:
+				mat.albedo_color = Color(0.3, 0.9, 0.4, 0.6)  # Green = can
+	
+	_terrain_highlight.visible = true
+	_highlight_visible = true
 
 func _get_held_item_data() -> ItemData:
 	# Get the ItemData for whatever is currently in the selected hotbar slot
@@ -495,6 +623,20 @@ func _give_starting_items() -> void:
 		inventory.add_item(coal_item, 5)
 	if iron_nugget:
 		inventory.add_item(iron_nugget, 9)
+	
+	# Give starting alchemy materials for testing
+	var chamomile_item = item_database.get_item("chamomile")
+	var mushroom_item = item_database.get_item("common_mushroom")
+	var empty_bottle_item = item_database.get_item("empty_bottle")
+	var health_pot = item_database.get_item("health_potion")
+	if chamomile_item:
+		inventory.add_item(chamomile_item, 5)
+	if mushroom_item:
+		inventory.add_item(mushroom_item, 5)
+	if empty_bottle_item:
+		inventory.add_item(empty_bottle_item, 3)
+	if health_pot:
+		inventory.add_item(health_pot, 2)
 
 func get_inventory() -> Inventory:
 	return inventory
@@ -572,6 +714,11 @@ func use_stamina(amount: float) -> bool:
 	return false
 
 func take_damage(amount: float, _attacker: Node3D = null) -> void:
+	# Apply perk defense bonus
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("get_total_perk_bonus"):
+		var defense = sm.get_total_perk_bonus(4)  # PerkData.PerkEffect.DEFENSE_BONUS
+		amount *= (1.0 - defense)
 	var old_health = current_health
 	current_health = max(0.0, current_health - amount)
 	
@@ -588,6 +735,88 @@ func heal(amount: float) -> void:
 	
 	if current_health != old_health:
 		health_changed.emit(current_health, max_health)
+
+func restore_stamina(amount: float) -> void:
+	var old_stamina = current_stamina
+	current_stamina = min(max_stamina, current_stamina + amount)
+	if current_stamina != old_stamina:
+		stamina_changed.emit(current_stamina, max_stamina)
+
+# =====================
+# CONSUMABLE & BUFF SYSTEM
+# =====================
+
+func consume_item(item_data: ItemData) -> void:
+	if item_data.health_restore > 0:
+		heal(item_data.health_restore)
+	if item_data.stamina_restore > 0:
+		restore_stamina(item_data.stamina_restore)
+	# Apply buff effects from potions
+	var buff_dur_bonus := 0.0
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("get_total_perk_bonus"):
+		buff_dur_bonus = sm.get_total_perk_bonus(9)  # PerkData.PerkEffect.BUFF_DURATION
+	for buff in item_data.buff_effects:
+		var buff_type: String = buff.get("type", "")
+		var buff_value: float = buff.get("value", 0.0)
+		var buff_duration: float = buff.get("duration", 0.0)
+		if buff_type != "" and buff_duration > 0:
+			buff_duration *= (1.0 + buff_dur_bonus)
+			_apply_buff(buff_type, buff_value, buff_duration)
+	# Grant alchemy XP for potions
+	if item_data.item_type == ItemData.ItemType.POTION:
+		var skill_manager = get_node_or_null("/root/SkillManager")
+		if skill_manager and skill_manager.has_method("grant_action_xp"):
+			skill_manager.grant_action_xp("brew_potion")
+
+func _apply_buff(buff_type: String, value: float, duration: float) -> void:
+	active_buffs[buff_type] = {"value": value, "remaining": duration, "duration": duration}
+	print("Buff applied: %s (x%.1f for %.0fs)" % [buff_type, value, duration])
+	# Apply immediate effects
+	match buff_type:
+		"speed":
+			move_speed = base_move_speed * value
+			run_speed = base_run_speed * value
+		"heal":
+			# Heal-over-time: value is total heal, applied per tick in _update_buffs
+			pass
+
+func _update_buffs(delta: float) -> void:
+	var expired: Array = []
+	for buff_type in active_buffs:
+		var buff = active_buffs[buff_type]
+		buff["remaining"] -= delta
+		# Tick effects
+		match buff_type:
+			"heal":
+				var heal_per_sec = buff["value"] / buff["duration"]
+				heal(heal_per_sec * delta)
+			"stamina":
+				var stam_per_sec = buff["value"] / buff["duration"]
+				restore_stamina(stam_per_sec * delta)
+		if buff["remaining"] <= 0:
+			expired.append(buff_type)
+	for buff_type in expired:
+		_remove_buff(buff_type)
+
+func _remove_buff(buff_type: String) -> void:
+	if not active_buffs.has(buff_type):
+		return
+	print("Buff expired: %s" % buff_type)
+	active_buffs.erase(buff_type)
+	# Revert effects
+	match buff_type:
+		"speed":
+			move_speed = base_move_speed
+			run_speed = base_run_speed
+
+func has_buff(buff_type: String) -> bool:
+	return active_buffs.has(buff_type)
+
+func get_buff_value(buff_type: String) -> float:
+	if active_buffs.has(buff_type):
+		return active_buffs[buff_type]["value"]
+	return 0.0
 
 func _on_death() -> void:
 	# For now, just respawn at origin

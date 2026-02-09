@@ -101,6 +101,7 @@ func _get_placeholder_color() -> Color:
 var _is_dragging: bool = false
 var _drag_start_pos: Vector2 = Vector2.ZERO
 const DRAG_THRESHOLD: float = 5.0
+var _is_hovered: bool = false
 
 var _last_drag_data: DragData = null
 var _last_can_drop: bool = false
@@ -185,7 +186,10 @@ func _process(delta: float) -> void:
 		if distance > DRAG_THRESHOLD:
 			_is_dragging = false
 			print("[DragDebug] Equipment slot %d: Drag threshold reached, starting drag" % slot_type)
+			SlotUtils.hide_tooltip()
 			_start_drag()
+	if _is_hovered and not _is_dragging:
+		SlotUtils.move_tooltip(self)
 
 func _start_drag() -> void:
 	if not item or item.is_empty():
@@ -382,6 +386,7 @@ func _create_drag_preview() -> Control:
 
 func _on_mouse_entered() -> void:
 	slot_hovered.emit(slot_type)
+	_is_hovered = true
 	var drag_data = get_viewport().gui_get_drag_data()
 	if drag_data:
 		# Show valid drop highlight
@@ -389,10 +394,16 @@ func _on_mouse_entered() -> void:
 			modulate = Color(0.8, 1.0, 0.8)  # Greenish tint for valid drop
 		else:
 			modulate = Color(1.0, 0.8, 0.8)  # Reddish tint for invalid drop
+		SlotUtils.hide_tooltip()
 	else:
 		modulate = Color(1.2, 1.2, 1.2)  # Highlight on hover
+		# Show tooltip
+		if item and not item.is_empty():
+			SlotUtils.show_tooltip(self, item)
 
 func _on_mouse_exited() -> void:
+	_is_hovered = false
+	SlotUtils.hide_tooltip()
 	var drag_data = get_viewport().gui_get_drag_data()
 	if not drag_data:
 		modulate = Color.WHITE  # Reset color

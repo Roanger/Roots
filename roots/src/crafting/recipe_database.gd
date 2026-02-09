@@ -314,3 +314,61 @@ func _init_recipes() -> void:
 		[{"item_id": "stick", "amount": 1}, {"item_id": "coal", "amount": 1}],
 		"torch", 2, 1.0, "crafting", 2.0
 	))
+	
+	# Empty Bottle (hand-craftable from stone)
+	_register_recipe(_make_recipe(
+		"craft_empty_bottle", "Empty Bottle", "A glass bottle for brewing potions.",
+		CraftingRecipe.RecipeCategory.MATERIALS, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "stone", "amount": 2}],
+		"empty_bottle", 2, 2.0, "crafting", 3.0
+	))
+	
+	# ===== POTIONS (Alchemy Table) =====
+	
+	# Health Potion - chamomile + mushroom
+	_register_recipe(_make_recipe(
+		"brew_health_potion", "Health Potion", "Brew a potion that restores health.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "chamomile", "amount": 2}, {"item_id": "common_mushroom", "amount": 1}],
+		"health_potion", 1, 5.0, "alchemy", 15.0
+	))
+	
+	# Greater Health Potion - chamomile + golden mushroom + nightshade
+	_register_recipe(_make_recipe(
+		"brew_greater_health_potion", "Greater Health Potion", "Brew a potent healing potion.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "chamomile", "amount": 3}, {"item_id": "golden_mushroom", "amount": 1}, {"item_id": "nightshade", "amount": 1}],
+		"greater_health_potion", 1, 8.0, "alchemy", 25.0
+	))
+	
+	# Stamina Potion - mint + clover
+	_register_recipe(_make_recipe(
+		"brew_stamina_potion", "Stamina Potion", "Brew a potion that restores stamina.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "mint_leaf", "amount": 2}, {"item_id": "wild_clover", "amount": 2}],
+		"stamina_potion", 1, 5.0, "alchemy", 15.0
+	))
+	
+	# Speed Potion - mint + fern + sage
+	_register_recipe(_make_recipe(
+		"brew_speed_potion", "Speed Potion", "Brew a potion that increases movement speed.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "mint_leaf", "amount": 2}, {"item_id": "fern_frond", "amount": 1}, {"item_id": "sage_leaf", "amount": 1}],
+		"speed_potion", 1, 6.0, "alchemy", 20.0
+	))
+	
+	# Strength Potion - nightshade + golden mushroom + sage
+	_register_recipe(_make_recipe(
+		"brew_strength_potion", "Strength Potion", "Brew a potion that increases attack damage.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "nightshade", "amount": 2}, {"item_id": "golden_mushroom", "amount": 1}, {"item_id": "sage_leaf", "amount": 1}],
+		"strength_potion", 1, 8.0, "alchemy", 25.0
+	))
+	
+	# Antidote - wild clover + chamomile + fern
+	_register_recipe(_make_recipe(
+		"brew_antidote", "Antidote", "Brew a potion that cures poison.",
+		CraftingRecipe.RecipeCategory.POTIONS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "empty_bottle", "amount": 1}, {"item_id": "wild_clover", "amount": 2}, {"item_id": "chamomile", "amount": 1}, {"item_id": "fern_frond", "amount": 1}],
+		"antidote", 1, 5.0, "alchemy", 15.0
+	))

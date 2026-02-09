@@ -294,6 +294,108 @@ func _initialize_items() -> void:
 	bread_food.icon = _load_icon("res://Food/Bread.png")
 	_register_item(bread_food)
 	
+	# ===== Herbs & Alchemy =====
+	
+	# Gatherable herbs
+	var common_mushroom = _create_material("common_mushroom", "Common Mushroom", "An edible forest mushroom.", 3, 99)
+	common_mushroom.icon = _load_icon("res://Food/Mushroom.png")
+	_register_item(common_mushroom)
+	var golden_mushroom = _create_material("golden_mushroom", "Golden Mushroom", "A rare golden mushroom with potent properties.", 15, 50)
+	golden_mushroom.icon = _load_icon("res://Food/Mushroom.png")
+	golden_mushroom.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(golden_mushroom)
+	var lavender = _create_material("lavender", "Lavender", "A fragrant purple flower used in alchemy.", 5, 99)
+	lavender.icon = _load_icon("res://Potion/Blue Potion.png")
+	_register_item(lavender)
+	var chamomile = _create_material("chamomile", "Chamomile", "A calming herb with healing properties.", 5, 99)
+	chamomile.icon = _load_icon("res://Potion/Green Potion.png")
+	_register_item(chamomile)
+	var mint_leaf = _create_material("mint_leaf", "Mint Leaf", "A refreshing herb that invigorates the body.", 4, 99)
+	mint_leaf.icon = _load_icon("res://Potion/Green Potion 2.png")
+	_register_item(mint_leaf)
+	var sage_leaf = _create_material("sage_leaf", "Sage Leaf", "A wise herb used in potent brews.", 6, 99)
+	sage_leaf.icon = _load_icon("res://Potion/Blue Potion 2.png")
+	_register_item(sage_leaf)
+	var nightshade = _create_material("nightshade", "Nightshade", "A dangerous but useful poisonous plant.", 12, 50)
+	nightshade.icon = _load_icon("res://Potion/Red Potion.png")
+	nightshade.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(nightshade)
+	var wild_clover = _create_material("wild_clover", "Wild Clover", "A lucky little plant with mild restorative properties.", 2, 99)
+	wild_clover.icon = _load_icon("res://Potion/Green Potion.png")
+	_register_item(wild_clover)
+	var fern_frond = _create_material("fern_frond", "Fern Frond", "A curled fern frond used in herbal remedies.", 3, 99)
+	fern_frond.icon = _load_icon("res://Potion/Green Potion 3.png")
+	_register_item(fern_frond)
+	
+	# Alchemy supplies
+	var empty_bottle = _create_material("empty_bottle", "Empty Bottle", "A glass bottle for brewing potions.", 5, 50)
+	empty_bottle.icon = _load_icon("res://Potion/Empty Bottle.png")
+	_register_item(empty_bottle)
+	
+	# Potions
+	var health_potion = _create_potion("health_potion", "Health Potion", "Restores health over time.", 25, 30.0, 0.0, 0.0, [{"type": "heal", "value": 30.0, "duration": 5.0}])
+	health_potion.icon = _load_icon("res://Potion/Red Potion.png")
+	_register_item(health_potion)
+	var greater_health_potion = _create_potion("greater_health_potion", "Greater Health Potion", "Greatly restores health.", 60, 60.0, 0.0, 0.0, [{"type": "heal", "value": 60.0, "duration": 5.0}])
+	greater_health_potion.icon = _load_icon("res://Potion/Red Potion 2.png")
+	greater_health_potion.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(greater_health_potion)
+	var stamina_potion = _create_potion("stamina_potion", "Stamina Potion", "Restores stamina.", 25, 0.0, 0.0, 40.0, [{"type": "stamina", "value": 40.0, "duration": 5.0}])
+	stamina_potion.icon = _load_icon("res://Potion/Green Potion.png")
+	_register_item(stamina_potion)
+	var speed_potion = _create_potion("speed_potion", "Speed Potion", "Increases movement speed temporarily.", 35, 0.0, 0.0, 0.0, [{"type": "speed", "value": 1.5, "duration": 30.0}])
+	speed_potion.icon = _load_icon("res://Potion/Blue Potion.png")
+	speed_potion.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(speed_potion)
+	var strength_potion = _create_potion("strength_potion", "Strength Potion", "Increases attack damage temporarily.", 40, 0.0, 0.0, 0.0, [{"type": "strength", "value": 1.5, "duration": 30.0}])
+	strength_potion.icon = _load_icon("res://Potion/Red Potion 3.png")
+	strength_potion.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(strength_potion)
+	var antidote = _create_potion("antidote", "Antidote", "Cures poison and grants brief immunity.", 30, 0.0, 0.0, 0.0, [{"type": "antidote", "value": 1.0, "duration": 60.0}])
+	antidote.icon = _load_icon("res://Potion/Blue Potion 3.png")
+	_register_item(antidote)
+	
+	# ===== Animal Products =====
+	
+	var egg = _create_food("egg", "Egg", "A fresh egg from a chicken or duck.", 5, 10.0, 0.0, 5.0)
+	egg.icon = _load_icon("res://Monster Part/Egg.png")
+	_register_item(egg)
+	
+	var milk = _create_material("milk", "Milk", "Fresh milk from a cow or goat.", 8, 20)
+	milk.icon = _load_icon("res://Potion/Water Bottle.png")
+	_register_item(milk)
+	
+	
+	var raw_meat = _create_food("raw_meat", "Raw Meat", "Uncooked meat. Best when cooked.", 6, 5.0, 0.0, 3.0)
+	raw_meat.icon = _load_icon("res://Food/Meat.png")
+	_register_item(raw_meat)
+	
+	var feathers = _create_material("feathers", "Feathers", "Soft feathers from poultry.", 3, 99)
+	feathers.icon = _load_icon("res://Monster Part/Feather.png")
+	_register_item(feathers)
+	
+	var animal_feed = _create_material("animal_feed", "Animal Feed", "A mix of grains and seeds for farm animals.", 4, 99)
+	animal_feed.icon = _load_icon("res://Food/Bread.png")
+	_register_item(animal_feed)
+	
+	var venison = _create_food("venison", "Venison", "Lean meat from a deer. Nutritious when cooked.", 10, 8.0, 0.0, 5.0)
+	venison.icon = _load_icon("res://Food/Meat.png")
+	venison.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(venison)
+	
+	var rabbit_meat = _create_food("rabbit_meat", "Rabbit Meat", "Tender rabbit meat.", 7, 6.0, 0.0, 4.0)
+	rabbit_meat.icon = _load_icon("res://Food/Meat.png")
+	_register_item(rabbit_meat)
+	
+	var rabbit_fur = _create_material("rabbit_fur", "Rabbit Fur", "Soft fur from a rabbit. Used in crafting.", 8, 50)
+	rabbit_fur.icon = _load_icon("res://Material/Leather.png")
+	_register_item(rabbit_fur)
+	
+	var deer_pelt = _create_material("deer_pelt", "Deer Pelt", "A sturdy pelt from a deer.", 15, 30)
+	deer_pelt.icon = _load_icon("res://Material/Leather.png")
+	deer_pelt.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(deer_pelt)
+	
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()
 	
@@ -396,6 +498,22 @@ func _create_weapon(id: String, name: String, desc: String, value: int, power: i
 	item.tool_type = weapon_type
 	item.tool_power = power
 	item.world_model_path = model_path
+	return item
+
+func _create_potion(id: String, name: String, desc: String, value: int, health: float, hunger: float, stamina: float, buffs: Array = []) -> ItemData:
+	var item = ItemData.new()
+	item.item_id = id
+	item.item_name = name
+	item.description = desc
+	item.item_type = ItemData.ItemType.POTION
+	item.base_value = value
+	item.max_stack_size = 10
+	item.is_stackable = true
+	item.is_consumable = true
+	item.health_restore = health
+	item.hunger_restore = hunger
+	item.stamina_restore = stamina
+	item.buff_effects.assign(buffs)
 	return item
 
 func _create_food(id: String, name: String, desc: String, value: int, hunger: float, health: float, stamina: float) -> ItemData:

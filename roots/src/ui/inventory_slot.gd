@@ -198,7 +198,15 @@ func _handle_hotbar_drop(drag_data: DragData) -> void:
 	match drag_data.source_type:
 		DragData.DragSource.INVENTORY:
 			# Move from inventory bag to hotbar
-			inventory.move_to_hotbar(drag_data.source_slot_index, slot_index)
+			# Ctrl = 1, Shift = half stack, default = full stack
+			var amount: int = -1
+			if Input.is_key_pressed(KEY_CTRL):
+				amount = 1
+			elif Input.is_key_pressed(KEY_SHIFT):
+				var src_item = inventory.get_slot(drag_data.source_slot_index)
+				if src_item and not src_item.is_empty():
+					amount = maxi(src_item.quantity / 2, 1)
+			inventory.move_to_hotbar(drag_data.source_slot_index, slot_index, amount)
 		
 		DragData.DragSource.HOTBAR:
 			# Move between hotbar slots
@@ -235,7 +243,15 @@ func _handle_inventory_drop(drag_data: DragData) -> void:
 		
 		DragData.DragSource.HOTBAR:
 			# Move from hotbar to specific inventory slot
-			var ok = inventory.move_to_bag(drag_data.source_slot_index, slot_index)
+			# Ctrl = 1, Shift = half stack, default = full stack
+			var amount: int = -1
+			if Input.is_key_pressed(KEY_CTRL):
+				amount = 1
+			elif Input.is_key_pressed(KEY_SHIFT):
+				var src_item = inventory.get_hotbar_slot(drag_data.source_slot_index)
+				if src_item and not src_item.is_empty():
+					amount = maxi(src_item.quantity / 2, 1)
+			var ok = inventory.move_to_bag(drag_data.source_slot_index, slot_index, amount)
 			if ok:
 				print("[Inventory] Moved from hotbar %d to bag slot %d" % [drag_data.source_slot_index, slot_index])
 		
@@ -284,6 +300,7 @@ func _create_drag_preview() -> Control:
 var _is_dragging: bool = false
 var _drag_start_pos: Vector2 = Vector2.ZERO
 const DRAG_THRESHOLD: float = 5.0
+var _is_hovered: bool = false
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -304,7 +321,10 @@ func _process(delta: float) -> void:
 		if distance > DRAG_THRESHOLD:
 			_is_dragging = false
 			print("[DragDebug] Drag threshold reached on slot %d" % slot_index)
+			SlotUtils.hide_tooltip()
 			_start_drag()
+	if _is_hovered and not _is_dragging:
+		SlotUtils.move_tooltip(self)
 
 func _start_drag() -> void:
 	if not item or item.is_empty():
@@ -325,6 +345,7 @@ func _start_drag() -> void:
 
 func _on_mouse_entered() -> void:
 	slot_hovered.emit(slot_index)
+	_is_hovered = true
 	var drag_data = get_viewport().gui_get_drag_data()
 	if drag_data:
 		# Show valid drop highlight
@@ -334,13 +355,19 @@ func _on_mouse_entered() -> void:
 		else:
 			modulate = Color(1.0, 0.8, 0.8)
 			_apply_hover_style(false)
+		SlotUtils.hide_tooltip()
 	else:
 		modulate = Color(1.15, 1.15, 1.15)
 		_apply_hover_style(true)
+		# Show tooltip
+		if item and not item.is_empty():
+			SlotUtils.show_tooltip(self, item)
 
 func _on_mouse_exited() -> void:
 	modulate = Color.WHITE
+	_is_hovered = false
 	_clear_hover_style()
+	SlotUtils.hide_tooltip()
 
 func _can_drop(data: Variant) -> bool:
 	if data == null:

@@ -194,18 +194,21 @@ graph TD
 **Goal:** Expand professions and world content
 
 #### 3.1 Profession System Expansion
-- [ ] Design profession structure (Blacksmithing, Cooking, Baking, Militia, Husbandry, Alchemy, Herb Gathering)
-- [ ] Create profession-specific skill trees
+- [x] Design profession structure (Blacksmithing, Cooking, Baking, Militia, Husbandry, Alchemy, Herb Gathering)
+- [x] Create profession-specific skill trees (PerkData resource, 5-tier perk chains per profession, unlock with skill points)
 - [ ] Implement profession tools and equipment
 - [ ] Add profession-specific interactions
-- [ ] Design profession progression rewards
+- [x] Design profession progression rewards (XP bonus, yield bonus, damage/defense, resource saving, buff duration, double harvest, crit chance perks)
 
 #### 3.2 Herb Gathering & Alchemy
-- [ ] Implement wild plant spawning
-- [ ] Create identification system
-- [ ] Design alchemy recipes
-- [ ] Implement potion brewing mechanics
-- [ ] Add potion effects system
+- [x] Implement wild plant spawning (mushrooms, flowers, ferns, clovers are harvestable biome decorations with loot tables)
+- [x] Add HERB target type to ToolAffinity (sickle/knife harvest herbs)
+- [x] Register herb items (common_mushroom, golden_mushroom, lavender, chamomile, mint_leaf, sage_leaf, nightshade, wild_clover, fern_frond)
+- [x] Design alchemy recipes (6 potions at Alchemy Table: health, greater health, stamina, speed, strength, antidote)
+- [x] Implement potion brewing mechanics (Alchemy Table crafting station, empty bottle recipe)
+- [x] Add potion effects system (buff system: heal-over-time, stamina regen, speed boost, strength boost, antidote)
+- [x] Herb gathering XP (HarvestableResource grants pick_mushroom/forage_item XP on harvest)
+- [ ] Create identification system (discovering new plants)
 
 #### 3.3 Cooking & Baking
 - [ ] Create cooking station (fire, stove)
@@ -222,11 +225,17 @@ graph TD
 - [ ] Create weapon/armor crafting (tiered weapons, armor sets)
 
 #### 3.5 Husbandry & Animals
-- [ ] Design animal AI behaviors
-- [ ] Implement animal feeding and care
+- [x] Design animal AI behaviors (BaseAnimal: idle/wander/flee/follow/feeding/hurt/dead states)
+- [x] Create AnimalData resource (species, products, feed, timers, collision, model)
+- [x] Implement 8 animal species: Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit
+- [x] Add animal product items (egg, milk, wool, raw_meat, feathers, venison, rabbit_meat, rabbit_fur, deer_pelt, animal_feed)
+- [x] Wire QiwiiPack 3D models (Chicken, Cow, Sheep White, Pig, Chick) with FBX offset/rotation fixes
+- [x] Animals produce items on timers (eggs, milk, wool) and drop loot on death
+- [x] Terrain snapping and smooth wander/flee movement
+- [ ] Implement animal feeding and care (player interaction)
 - [ ] Create breeding system
-- [ ] Add animal products (milk, eggs, wool, honey)
-- [ ] Design animal housing and pastures
+- [ ] Design animal housing and pastures (fences, coops, barns — QiwiiPack has Barn, Fence, Hut models)
+- [ ] Find/add models for goat, deer, rabbit (currently placeholder capsules)
 
 #### 3.6 Militia/Combat
 - [x] Design combat system (left-click swing, tool affinity damage, tier scaling)
@@ -259,6 +268,11 @@ graph TD
 - [ ] Implement reputation system
 
 #### 4.3 Settlement System
+- [x] Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel digs/flattens)
+- [x] TileMod types: TILLED, DUG, PATH, FOUNDATION (ChunkData per-cell tracking)
+- [x] Dynamic FarmPlot spawning on tilled terrain (replaces pre-placed farm plots)
+- [x] Terrain visual feedback (vertex color changes for modified cells)
+- [x] Save/load terrain modifications per chunk
 - [ ] Design plot claiming
 - [ ] Implement housing placement
 - [ ] Create decoration system
@@ -575,8 +589,8 @@ For solo development, prioritize these skills:
 7. ~~Phase 3.4: Blacksmithing — Forge/anvil crafting stations, ore mining, smelting~~ ✓
 8. ~~Phase 3.6: Militia/Combat — Enemy AI, combat system, loot drops~~ ✓
 9. ~~Harvestable world objects — Trees drop wood, rocks drop stone/ore~~ ✓
-10. **Phase 3.2: Herb Gathering & Alchemy** ← NEXT — Wild plant spawning, identification, potion brewing
-11. **Phase 3.3: Cooking** — Cooking stations, food buffs
+10. ~~Phase 3.2: Herb Gathering & Alchemy — Harvestable herbs, alchemy table, 6 potions, buff system~~ ✓
+11. **Phase 3.3: Cooking** ← NEXT — Cooking stations, food buffs
 12. **Phase 4.5: Environmental** — Day/night cycle, weather system
 13. **Phase 3.5: Husbandry** — Animal AI, feeding, breeding, products
 14. **Phase 4.2: NPC System** — Villagers, merchants, quests
@@ -586,4 +600,4 @@ For solo development, prioritize these skills:
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 partial.** Harvestable trees/rocks (HarvestableResource), crafting stations (Workbench/Forge/Anvil as world objects), enemy system (BaseEnemy with KayKit Skeleton 3D models, 4 enemy types, terrain height snapping, loot drops), player combat (take_damage, death/respawn). Full gameplay loop: chop trees → gather ore → smelt → craft tools → fight skeletons. Next: Herb Gathering & Alchemy (Phase 3.2).*
+*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 mostly done.** Harvestable trees/rocks/herbs (HarvestableResource), crafting stations (Workbench/Forge/Anvil/Alchemy Table), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs from biome decorations), alchemy (6 potions with buff system: heal, stamina, speed, strength, antidote). Full gameplay loop: explore → gather herbs → brew potions → fight skeletons. Next: Cooking (Phase 3.3).*

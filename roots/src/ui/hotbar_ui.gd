@@ -199,6 +199,13 @@ func _input(event: InputEvent) -> void:
 			select_slot(slot_index)
 			get_viewport().set_input_as_handled()
 	
+	# Handle right-click to use selected hotbar item during gameplay
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			use_selected_item()
+			get_viewport().set_input_as_handled()
+			return
+	
 	# Handle mouse wheel for hotbar scrolling
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:

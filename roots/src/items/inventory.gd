@@ -193,8 +193,9 @@ func set_hotbar_slot(slot_index: int, item: InventoryItem) -> void:
 	hotbar_slots[slot_index] = item
 	hotbar_changed.emit(slot_index)
 
-# Move one item from bag slot to hotbar slot (or swap if hotbar slot has item)
-func move_to_hotbar(from_bag_slot: int, to_hotbar_slot: int) -> bool:
+# Move items from bag slot to hotbar slot (or swap if hotbar slot has item)
+# amount: -1 = full stack (default), otherwise move that many
+func move_to_hotbar(from_bag_slot: int, to_hotbar_slot: int, amount: int = -1) -> bool:
 	if from_bag_slot < 0 or from_bag_slot >= max_slots or to_hotbar_slot < 0 or to_hotbar_slot >= hotbar_size:
 		print("[Inventory] move_to_hotbar: bad indices bag=%d hotbar=%d" % [from_bag_slot, to_hotbar_slot])
 		return false
@@ -206,19 +207,31 @@ func move_to_hotbar(from_bag_slot: int, to_hotbar_slot: int) -> bool:
 		print("[Inventory] move_to_hotbar: no item in bag slot %d" % from_bag_slot)
 		return false
 	var existing = get_hotbar_slot(to_hotbar_slot)
+	# Determine how many to move (-1 = full stack)
+	var move_count = item.quantity if amount < 0 else mini(amount, item.quantity)
+	move_count = maxi(move_count, 1)
 	if existing and not existing.is_empty():
-		# Swap whole stacks
+		# Try to merge stackable items
+		if existing.can_stack_with(item):
+			var overflow = existing.add_amount(move_count)
+			var actually_moved = move_count - overflow
+			if actually_moved > 0:
+				remove_from_slot(from_bag_slot, actually_moved)
+				hotbar_changed.emit(to_hotbar_slot)
+				return true
+			return false
+		# Not stackable — swap whole stacks (only when moving full stack)
 		slots[from_bag_slot] = existing
 		hotbar_slots[to_hotbar_slot] = item
 		inventory_changed.emit(from_bag_slot)
 		hotbar_changed.emit(to_hotbar_slot)
 		return true
-	# Move one to hotbar
-	var one = InventoryItem.new(item.item_data, 1)
-	one.durability = item.durability
-	one.quality = item.quality
-	remove_from_slot(from_bag_slot, 1)
-	hotbar_slots[to_hotbar_slot] = one
+	# Target slot is empty
+	var moved = InventoryItem.new(item.item_data, move_count)
+	moved.durability = item.durability
+	moved.quality = item.quality
+	remove_from_slot(from_bag_slot, move_count)
+	hotbar_slots[to_hotbar_slot] = moved
 	hotbar_changed.emit(to_hotbar_slot)
 	return true
 
@@ -234,7 +247,8 @@ func move_hotbar_to_hotbar(from_slot: int, to_slot: int) -> bool:
 	return true
 
 # Move item from hotbar slot to bag (find empty or swap at bag_slot)
-func move_to_bag(from_hotbar_slot: int, to_bag_slot: int = -1) -> bool:
+# amount: -1 = full stack (default), otherwise move that many
+func move_to_bag(from_hotbar_slot: int, to_bag_slot: int = -1, amount: int = -1) -> bool:
 	if from_hotbar_slot < 0 or from_hotbar_slot >= hotbar_size:
 		return false
 	var item = get_hotbar_slot(from_hotbar_slot)
@@ -242,23 +256,57 @@ func move_to_bag(from_hotbar_slot: int, to_bag_slot: int = -1) -> bool:
 		return false
 	if to_bag_slot >= 0 and to_bag_slot < max_slots:
 		var existing = get_slot(to_bag_slot)
+		# Determine how many to move
+		var move_count = item.quantity if amount < 0 else mini(amount, item.quantity)
+		move_count = maxi(move_count, 1)
 		if existing and not existing.is_empty():
-			# Swap
+			# Try to merge stackable items
+			if existing.can_stack_with(item):
+				var overflow = existing.add_amount(move_count)
+				var actually_moved = move_count - overflow
+				if actually_moved > 0:
+					if actually_moved >= item.quantity:
+						hotbar_slots[from_hotbar_slot] = null
+					else:
+						item.remove_amount(actually_moved)
+					inventory_changed.emit(to_bag_slot)
+					hotbar_changed.emit(from_hotbar_slot)
+					return true
+				return false
+			# Not stackable — swap whole stacks
 			hotbar_slots[from_hotbar_slot] = existing
 			slots[to_bag_slot] = item
 			inventory_changed.emit(to_bag_slot)
 			hotbar_changed.emit(from_hotbar_slot)
 			return true
-		slots[to_bag_slot] = item
-		hotbar_slots[from_hotbar_slot] = null
+		if move_count >= item.quantity:
+			# Move entire stack
+			slots[to_bag_slot] = item
+			hotbar_slots[from_hotbar_slot] = null
+		else:
+			# Split: move partial stack
+			var moved = InventoryItem.new(item.item_data, move_count)
+			moved.durability = item.durability
+			moved.quality = item.quality
+			slots[to_bag_slot] = moved
+			item.remove_amount(move_count)
 		inventory_changed.emit(to_bag_slot)
 		hotbar_changed.emit(from_hotbar_slot)
 		return true
 	# Find first empty bag slot
+	var move_count2 = item.quantity if amount < 0 else mini(amount, item.quantity)
+	move_count2 = maxi(move_count2, 1)
 	for i in range(max_slots):
 		if not slots[i] or slots[i].is_empty():
-			slots[i] = item
-			hotbar_slots[from_hotbar_slot] = null
+			if move_count2 >= item.quantity:
+				slots[i] = item
+				hotbar_slots[from_hotbar_slot] = null
+			else:
+				var moved = InventoryItem.new(item.item_data, move_count2)
+				moved.durability = item.durability
+				moved.quality = item.quality
+				slots[i] = moved
+				item.remove_amount(move_count2)
 			inventory_changed.emit(i)
 			hotbar_changed.emit(from_hotbar_slot)
 			return true
@@ -313,16 +361,16 @@ func use_hotbar_item(slot_index: int, user: Node = null) -> bool:
 		return false
 	var item_data = item.item_data
 	if item_data.is_consumable:
-		if user and user.has_method("restore_hunger"):
-			user.restore_hunger(item_data.hunger_restore)
-		if user and user.has_method("restore_health"):
-			user.restore_health(item_data.health_restore)
-		if user and user.has_method("restore_stamina"):
-			user.restore_stamina(item_data.stamina_restore)
+		if user and user.has_method("consume_item"):
+			user.consume_item(item_data)
+		else:
+			if user and user.has_method("heal") and item_data.health_restore > 0:
+				user.heal(item_data.health_restore)
 		item.remove_amount(1)
 		if item.is_empty():
 			hotbar_slots[slot_index] = null
 		hotbar_changed.emit(slot_index)
+		print("Used: %s" % item_data.item_name)
 		return true
 	if item_data.item_type == ItemData.ItemType.TOOL:
 		return true

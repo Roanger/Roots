@@ -5,6 +5,9 @@ class_name SlotUtils
 # Engine meta keys for coordinating drag-and-drop across all slot types
 const DROP_COUNTER_KEY = "_global_drop_counter"
 const LAST_DROP_SLOT_KEY = "_last_drop_slot_id"
+const TOOLTIP_KEY = "_shared_item_tooltip"
+
+const ItemTooltipScript = preload("res://src/ui/item_tooltip.gd")
 
 static func get_drop_counter() -> int:
 	if Engine.has_meta(DROP_COUNTER_KEY):
@@ -21,6 +24,42 @@ static func get_last_drop_slot() -> int:
 
 static func set_last_drop_slot(slot_id: int) -> void:
 	Engine.set_meta(LAST_DROP_SLOT_KEY, slot_id)
+
+static func get_tooltip(owner: Control) -> Control:
+	if Engine.has_meta(TOOLTIP_KEY):
+		var existing = Engine.get_meta(TOOLTIP_KEY)
+		if is_instance_valid(existing):
+			return existing
+	# Create new shared tooltip inside a high-z CanvasLayer so it draws on top of all UI
+	var canvas_layer = CanvasLayer.new()
+	canvas_layer.name = "TooltipLayer"
+	canvas_layer.layer = 128
+	var tooltip = ItemTooltipScript.new()
+	tooltip.name = "SharedItemTooltip"
+	canvas_layer.add_child(tooltip)
+	var root = owner.get_tree().root
+	if root:
+		root.call_deferred("add_child", canvas_layer)
+	Engine.set_meta(TOOLTIP_KEY, tooltip)
+	return tooltip
+
+static func show_tooltip(owner: Control, inv_item: InventoryItem) -> void:
+	var tip = get_tooltip(owner)
+	if tip and tip.has_method("show_item"):
+		tip.show_item(inv_item)
+		tip.update_position(owner.get_global_mouse_position())
+
+static func hide_tooltip() -> void:
+	if Engine.has_meta(TOOLTIP_KEY):
+		var tip = Engine.get_meta(TOOLTIP_KEY)
+		if is_instance_valid(tip) and tip.has_method("hide_tooltip"):
+			tip.hide_tooltip()
+
+static func move_tooltip(owner: Control) -> void:
+	if Engine.has_meta(TOOLTIP_KEY):
+		var tip = Engine.get_meta(TOOLTIP_KEY)
+		if is_instance_valid(tip) and tip.visible and tip.has_method("update_position"):
+			tip.update_position(owner.get_global_mouse_position())
 
 static func set_children_mouse_filter_ignore(node: Node) -> void:
 	for child in node.get_children():

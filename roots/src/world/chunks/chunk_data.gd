@@ -18,6 +18,17 @@ var tree_positions: Array[Vector3] = []
 var rock_positions: Array[Vector3] = []
 var prop_positions: Array[Dictionary] = []
 
+# Terrain tile modifications: { "x,z" -> TileMod enum value }
+# Tracks player-made changes to individual terrain cells
+enum TileMod {
+	NONE = 0,
+	TILLED = 1,    # Hoe: farmable soil
+	DUG = 2,       # Shovel: flattened/dug out
+	PATH = 3,      # Future: walkway
+	FOUNDATION = 4 # Future: building base
+}
+var tile_modifications: Dictionary = {}  # "x,z" -> TileMod
+
 # Modification tracking
 var is_modified: bool = false
 var last_saved: float = 0.0
@@ -117,6 +128,35 @@ func add_prop(data: Dictionary) -> void:
 	prop_positions.append(data)
 	is_modified = true
 
+func set_tile_mod(local_x: int, local_z: int, mod_type: int) -> void:
+	var key = "%d,%d" % [local_x, local_z]
+	if mod_type == TileMod.NONE:
+		tile_modifications.erase(key)
+	else:
+		tile_modifications[key] = mod_type
+	is_modified = true
+
+func get_tile_mod(local_x: int, local_z: int) -> int:
+	var key = "%d,%d" % [local_x, local_z]
+	return tile_modifications.get(key, TileMod.NONE)
+
+func has_tile_mod(local_x: int, local_z: int) -> bool:
+	var key = "%d,%d" % [local_x, local_z]
+	return tile_modifications.has(key)
+
+func get_all_tilled_positions() -> Array:
+	var result := []
+	for key in tile_modifications:
+		if tile_modifications[key] == TileMod.TILLED:
+			var parts = key.split(",")
+			var lx = int(parts[0])
+			var lz = int(parts[1])
+			var wx = world_position.x + lx + 0.5
+			var wz = world_position.z + lz + 0.5
+			var h = get_height(lx, lz)
+			result.append(Vector3(wx, h, wz))
+	return result
+
 func has_object_at(world_pos: Vector3, radius: float = 0.5) -> bool:
 	# Check tree positions
 	for tree_pos in tree_positions:
@@ -147,6 +187,7 @@ func serialize() -> Dictionary:
 		"tree_positions": tree_positions,
 		"rock_positions": rock_positions,
 		"prop_positions": prop_positions,
+		"tile_modifications": tile_modifications,
 		"timestamp": Time.get_unix_time_from_system()
 	}
 
@@ -176,6 +217,9 @@ func deserialize(data: Dictionary) -> void:
 	
 	if data.has("prop_positions"):
 		prop_positions = data.prop_positions
+	
+	if data.has("tile_modifications"):
+		tile_modifications = data.tile_modifications
 	
 	is_modified = false
 	last_saved = Time.get_unix_time_from_system()
