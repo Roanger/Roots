@@ -3,6 +3,7 @@ class_name HUD
 ## HUD - Displays player health, stamina, and mini-map
 
 const CompassUIScript = preload("res://src/ui/hud/compass_ui.gd")
+const ClockUIScript = preload("res://src/ui/hud/clock_ui.gd")
 
 @onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthBar
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/StaminaBar
@@ -13,6 +14,7 @@ const CompassUIScript = preload("res://src/ui/hud/compass_ui.gd")
 
 var player: Node = null
 var compass: Control = null
+var clock: Control = null
 
 func _ready() -> void:
 	# Initially hidden until initialized
@@ -51,6 +53,22 @@ func initialize(p_player: Node) -> void:
 	var cam = player.get_node_or_null("CameraPivot/Camera3D")
 	if cam:
 		compass.set_camera(cam)
+	
+	# Create clock UI below minimap
+	clock = ClockUIScript.new()
+	clock.name = "ClockUI"
+	clock.anchor_left = 1.0
+	clock.anchor_right = 1.0
+	clock.anchor_top = 0.0
+	clock.anchor_bottom = 0.0
+	# Position below minimap: minimap bottom is at 284, add 4px gap
+	clock.offset_left = -210.0
+	clock.offset_top = 288.0
+	clock.offset_right = -20.0
+	clock.offset_bottom = 340.0
+	clock.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(clock)
 	
 	visible = true
 	print("HUD initialized")

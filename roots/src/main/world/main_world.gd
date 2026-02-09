@@ -75,6 +75,8 @@ func _ready() -> void:
 	if game_manager:
 		game_manager.time_changed.connect(_on_time_changed)
 		game_manager.day_changed.connect(_on_day_changed)
+		game_manager.season_changed.connect(_on_season_changed)
+		_update_season_sky(game_manager.current_season)
 	
 	if game_manager:
 		print("Main World loaded - Seed: ", game_manager.world_seed)
@@ -197,38 +199,129 @@ func _on_day_changed(day: int) -> void:
 	if game_manager:
 		print("Day ", day, " - Season: ", game_manager.get_season_name())
 
+func _on_season_changed(season: int) -> void:
+	_update_season_sky(season)
+
+func _update_season_sky(season: int) -> void:
+	if not world_environment or not world_environment.environment:
+		return
+	var env = world_environment.environment
+	if not env.sky or not env.sky.sky_material:
+		return
+	var sky_mat = env.sky.sky_material
+	
+	# Season-specific cloud and atmosphere settings
+	# GameManager.Season: SPRING=0, SUMMER=1, AUTUMN=2, WINTER=3
+	var target_density: float
+	var target_cloud_color: Color
+	var target_fog_density: float
+	
+	match season:
+		0: # SPRING
+			target_density = 1.5
+			target_cloud_color = Color(0.8, 0.8, 0.8, 1.0)
+			target_fog_density = 0.001
+		1: # SUMMER
+			target_density = 0.6
+			target_cloud_color = Color(0.9, 0.9, 0.95, 1.0)
+			target_fog_density = 0.0005
+		2: # AUTUMN
+			target_density = 2.0
+			target_cloud_color = Color(0.7, 0.68, 0.65, 1.0)
+			target_fog_density = 0.0015
+		3: # WINTER
+			target_density = 3.5
+			target_cloud_color = Color(0.6, 0.62, 0.65, 1.0)
+			target_fog_density = 0.002
+		_:
+			target_density = 1.5
+			target_cloud_color = Color(0.8, 0.8, 0.8, 1.0)
+			target_fog_density = 0.001
+	
+	sky_mat.set_shader_parameter("cloud_density", target_density)
+	sky_mat.set_shader_parameter("cloud_color", target_cloud_color)
+	env.fog_density = target_fog_density
+	
+	var season_names = ["Spring", "Summer", "Autumn", "Winter"]
+	var sname = season_names[season] if season < season_names.size() else "Unknown"
+	print("Season sky updated: ", sname, " (clouds: ", target_density, ", fog: ", target_fog_density, ")")
+
 func _update_lighting(hour: float) -> void:
-	var sun_angle = (hour - 6.0) * 15.0
+	# Sun rotation: hour 6 = sunrise (0°), hour 12 = noon (90°), hour 18 = sunset (180°)
+	# Negative X rotation arcs the sun overhead (LIGHT0_DIRECTION.y positive = day).
+	# Clamp so the sun stays below horizon at night (LIGHT0_DIRECTION.y negative = night).
+	var sun_angle = clampf(-((hour - 6.0) * 15.0), -270.0, 15.0)
 	sun.rotation_degrees.x = sun_angle
 	
+	# --- Sun light ---
 	var light_energy: float
 	var light_color: Color
 	
-	if hour >= 5 and hour < 7:
-		light_energy = 0.5 + (hour - 5.0) * 0.5
-		light_color = Color(1.0, 0.6, 0.4)
-	elif hour >= 7 and hour < 18:
+	if hour >= 5.0 and hour < 6.5:
+		# Dawn: dark to warm sunrise
+		var t = (hour - 5.0) / 1.5
+		light_energy = lerp(0.0, 0.7, t)
+		light_color = Color(1.0, 0.5, 0.3).lerp(Color(1.0, 0.7, 0.5), t)
+	elif hour >= 6.5 and hour < 8.0:
+		# Early morning: warm to full daylight
+		var t = (hour - 6.5) / 1.5
+		light_energy = lerp(0.7, 1.0, t)
+		light_color = Color(1.0, 0.7, 0.5).lerp(Color(1.0, 0.95, 0.9), t)
+	elif hour >= 8.0 and hour < 17.0:
+		# Full day
 		light_energy = 1.0
 		light_color = Color(1.0, 0.95, 0.9)
-	elif hour >= 18 and hour < 20:
-		light_energy = 1.0 - (hour - 18.0) * 0.5
-		light_color = Color(1.0, 0.4, 0.3)
+	elif hour >= 17.0 and hour < 18.5:
+		# Late afternoon: daylight to warm sunset
+		var t = (hour - 17.0) / 1.5
+		light_energy = lerp(1.0, 0.7, t)
+		light_color = Color(1.0, 0.95, 0.9).lerp(Color(1.0, 0.5, 0.25), t)
+	elif hour >= 18.5 and hour < 20.0:
+		# Dusk: sunset to dark
+		var t = (hour - 18.5) / 1.5
+		light_energy = lerp(0.7, 0.0, t)
+		light_color = Color(1.0, 0.4, 0.2).lerp(Color(0.3, 0.2, 0.4), t)
 	else:
+		# Night
 		light_energy = 0.0
 		light_color = Color(0.2, 0.2, 0.4)
 	
 	sun.light_energy = light_energy
 	sun.light_color = light_color
 	
-	# Update ambient light
+	# Sky colors are handled automatically by BinbunSky shader via LIGHT0_DIRECTION
+	# Cloud density is set per-season via _update_season_sky()
+	
 	if world_environment and world_environment.environment:
 		var env = world_environment.environment
-		if hour >= 6 and hour < 18:
+		
+		# --- Ambient light ---
+		if hour >= 6.0 and hour < 18.0:
 			env.ambient_light_color = Color(0.6, 0.6, 0.7)
 			env.ambient_light_energy = 0.5
+		elif hour >= 5.0 and hour < 6.0:
+			var t = hour - 5.0
+			env.ambient_light_color = Color(0.2, 0.2, 0.4).lerp(Color(0.6, 0.6, 0.7), t)
+			env.ambient_light_energy = lerp(0.15, 0.5, t)
+		elif hour >= 18.0 and hour < 20.0:
+			var t = (hour - 18.0) / 2.0
+			env.ambient_light_color = Color(0.6, 0.6, 0.7).lerp(Color(0.05, 0.05, 0.1), t)
+			env.ambient_light_energy = lerp(0.5, 0.05, t)
 		else:
-			env.ambient_light_color = Color(0.2, 0.2, 0.4)
-			env.ambient_light_energy = 0.2
+			env.ambient_light_color = Color(0.05, 0.05, 0.1)
+			env.ambient_light_energy = 0.05
+		
+		# --- Fog ---
+		if hour >= 6.0 and hour < 18.0:
+			env.fog_light_color = Color(0.7, 0.8, 0.9)
+		elif hour >= 5.0 and hour < 6.0:
+			var t = hour - 5.0
+			env.fog_light_color = Color(0.05, 0.04, 0.08).lerp(Color(0.7, 0.8, 0.9), t)
+		elif hour >= 18.0 and hour < 20.0:
+			var t = (hour - 18.0) / 2.0
+			env.fog_light_color = Color(0.7, 0.8, 0.9).lerp(Color(0.05, 0.04, 0.08), t)
+		else:
+			env.fog_light_color = Color(0.05, 0.04, 0.08)
 
 func save_world() -> void:
 	if game_manager:

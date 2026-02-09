@@ -109,7 +109,7 @@ graph TD
 - [x] Implement procedural heightmap generation
 - [x] Create basic grass and ground textures
 - [x] Add simple water plane
-- [x] Implement fog and skybox
+- [x] Implement fog and skybox (BinbunSky shader: procedural clouds, sun disc, stars, day/night auto-blend)
 - [x] Integrate FBX trees and rocks with scale/rotation variation
 - [x] Biome-based props (e.g. dead trees in Plains/Mountains/Snow)
 - [x] Solid terrain rendering (vertex-colored ground, single-sided shader)
@@ -292,8 +292,10 @@ graph TD
 
 #### 4.5 Environmental Systems
 - [ ] Implement weather system (rain, sun, storms, snow)
-- [ ] Create day/night cycle
-- [ ] Design seasonal effects
+- [x] Create day/night cycle (sun rotation, light energy/color transitions, ambient/fog darkening)
+- [x] BinbunSky shader integration (procedural clouds, sun disc, stars, automatic day/night/sunset via LIGHT0_DIRECTION)
+- [x] In-game clock UI below minimap (time, day of week, season, sun/moon icon)
+- [x] Design seasonal effects (cloud density/color + fog density per season: Summer clear → Winter overcast)
 - [ ] Add environmental hazards
 - [ ] Implement natural disasters
 
@@ -594,8 +596,8 @@ For solo development, prioritize these skills:
 8. ~~Phase 3.6: Militia/Combat — Enemy AI, combat system, loot drops~~ ✓
 9. ~~Harvestable world objects — Trees drop wood, rocks drop stone/ore~~ ✓
 10. ~~Phase 3.2: Herb Gathering & Alchemy — Harvestable herbs, alchemy table, 6 potions, buff system~~ ✓
-11. **Phase 3.3: Cooking** ← NEXT — Cooking stations, food buffs
-12. **Phase 4.5: Environmental** — Day/night cycle, weather system
+11. ~~Phase 4.5: Environmental — Day/night cycle, BinbunSky shader, seasonal sky, clock UI~~ ✓
+12. **Phase 3.3: Cooking** ← NEXT — Cooking stations, food buffs
 13. **Phase 3.5: Husbandry** — Animal AI, feeding, breeding, products
 14. **Phase 4.2: NPC System** — Villagers, merchants, quests
 15. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
@@ -604,4 +606,4 @@ For solo development, prioritize these skills:
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 mostly done.** Harvestable trees/rocks/herbs (HarvestableResource), crafting stations (Workbench/Forge/Anvil/Alchemy Table), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs from biome decorations), alchemy (6 potions with buff system: heal, stamina, speed, strength, antidote). Full gameplay loop: explore → gather herbs → brew potions → fight skeletons. Next: Cooking (Phase 3.3).*
+*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 mostly done + Phase 4.5 partial.** Harvestable trees/rocks/herbs (HarvestableResource), crafting stations (Workbench/Forge/Anvil/Alchemy Table), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs from biome decorations), alchemy (6 potions with buff system: heal, stamina, speed, strength, antidote). Day/night cycle with BinbunSky shader (procedural clouds, stars, sun disc, automatic transitions), seasonal sky variation (Summer clear → Winter overcast), in-game clock UI. Full gameplay loop: explore → gather herbs → brew potions → fight skeletons. Next: Cooking (Phase 3.3).*
