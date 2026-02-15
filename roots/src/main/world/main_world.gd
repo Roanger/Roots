@@ -516,6 +516,8 @@ func _spawn_crafting_stations() -> void:
 	_create_station(spawn_pos + Vector3(5, 0, 4), 3, "Anvil", Color(0.25, 0.25, 0.3))
 	# Alchemy Table - near the other stations
 	_create_station(spawn_pos + Vector3(3, 0, 4), 5, "Alchemy Table", Color(0.4, 0.2, 0.5))
+	# Cooking Fire - warm orange
+	_create_station(spawn_pos + Vector3(5, 0, 6), 4, "Cooking Fire", Color(0.8, 0.4, 0.1))
 
 func _create_station(pos: Vector3, station_type: int, station_name: String, color: Color) -> void:
 	# Snap to terrain height

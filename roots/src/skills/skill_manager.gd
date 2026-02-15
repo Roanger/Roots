@@ -45,6 +45,7 @@ const BASE_XP_ACTIONS: Dictionary = {
 	"feed_animal": {"skill": "husbandry", "xp": 2},
 	"pet_animal": {"skill": "husbandry", "xp": 1},
 	"shear_animal": {"skill": "husbandry", "xp": 4},
+	"breed_animal": {"skill": "husbandry", "xp": 15},
 	"brew_potion": {"skill": "alchemy", "xp": 20},
 	"extract_herb": {"skill": "alchemy", "xp": 8},
 	"defeat_enemy": {"skill": "militia", "xp": 25},

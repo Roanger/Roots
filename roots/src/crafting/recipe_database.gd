@@ -373,6 +373,111 @@ func _init_recipes() -> void:
 		"antidote", 1, 5.0, "alchemy", 15.0
 	))
 	
+	# ===== COOKING (Cooking Fire) =====
+	
+	# Ingredient prep
+	_register_recipe(_make_recipe(
+		"grind_flour", "Flour", "Grind wheat into flour.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "wheat", "amount": 2}],
+		"flour", 2, 2.0, "cooking", 5.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"churn_butter", "Butter", "Churn milk into butter.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "milk", "amount": 2}],
+		"butter", 1, 3.0, "cooking", 5.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"make_cheese", "Cheese", "Age milk into cheese.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "milk", "amount": 3}],
+		"cheese", 1, 5.0, "cooking", 8.0
+	))
+	
+	# Basic cooked meats
+	_register_recipe(_make_recipe(
+		"cook_meat", "Cooked Meat", "Cook raw meat over the fire.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "raw_meat", "amount": 1}],
+		"cooked_meat", 1, 3.0, "cooking", 8.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"cook_venison", "Cooked Venison", "Roast venison over the fire.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "venison", "amount": 1}],
+		"cooked_venison", 1, 4.0, "cooking", 12.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"cook_rabbit", "Cooked Rabbit", "Cook tender rabbit meat.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "rabbit_meat", "amount": 1}],
+		"cooked_rabbit", 1, 3.0, "cooking", 10.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"fry_egg", "Fried Egg", "Fry an egg on a hot stone.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "egg", "amount": 1}],
+		"fried_egg", 1, 2.0, "cooking", 5.0
+	))
+	
+	# Baked goods
+	_register_recipe(_make_recipe(
+		"bake_bread", "Bread", "Bake bread from flour.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "flour", "amount": 2}],
+		"bread", 1, 4.0, "baking", 10.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"bake_meat_pie", "Meat Pie", "Bake a hearty meat pie.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "flour", "amount": 2}, {"item_id": "cooked_meat", "amount": 1}, {"item_id": "butter", "amount": 1}],
+		"meat_pie", 1, 6.0, "baking", 18.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"bake_apple_pie", "Apple Pie", "Bake a sweet apple pie.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "flour", "amount": 2}, {"item_id": "apple", "amount": 2}, {"item_id": "butter", "amount": 1}],
+		"apple_pie", 1, 6.0, "baking", 15.0
+	))
+	
+	# Soups & Stews
+	_register_recipe(_make_recipe(
+		"cook_vegetable_soup", "Vegetable Soup", "Simmer a pot of garden vegetables.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "carrot", "amount": 1}, {"item_id": "potato", "amount": 1}, {"item_id": "tomato", "amount": 1}],
+		"vegetable_soup", 1, 5.0, "cooking", 12.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"cook_mushroom_soup", "Mushroom Soup", "Brew a rich mushroom soup.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "common_mushroom", "amount": 3}, {"item_id": "milk", "amount": 1}],
+		"mushroom_soup", 1, 5.0, "cooking", 12.0
+	))
+	
+	_register_recipe(_make_recipe(
+		"cook_hearty_stew", "Hearty Stew", "Slow-cook a thick stew of meat and vegetables.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "cooked_meat", "amount": 1}, {"item_id": "potato", "amount": 2}, {"item_id": "carrot", "amount": 1}, {"item_id": "tomato", "amount": 1}],
+		"hearty_stew", 1, 8.0, "cooking", 20.0
+	))
+	
+	# Drinks
+	_register_recipe(_make_recipe(
+		"brew_mushroom_tea", "Mushroom Tea", "Brew a warm tea from golden mushrooms.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "golden_mushroom", "amount": 1}, {"item_id": "chamomile", "amount": 1}, {"item_id": "empty_bottle", "amount": 1}],
+		"mushroom_tea", 1, 5.0, "cooking", 15.0
+	))
+	
 	# ===== BUILDING (Workbench) =====
 	
 	# Wooden Fence - 2 planks + 1 string
@@ -397,4 +502,44 @@ func _init_recipes() -> void:
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "string", "amount": 2}, {"item_id": "iron_ingot", "amount": 1}],
 		"fence_gate", 1, 3.0, "construction", 10.0
+	))
+	
+	# Barn - large building, expensive
+	_register_recipe(_make_recipe(
+		"craft_barn", "Barn", "Build a barn to shelter your animals.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 10}, {"item_id": "wood_plank", "amount": 8}, {"item_id": "iron_ingot", "amount": 2}, {"item_id": "rope", "amount": 2}],
+		"barn", 1, 10.0, "construction", 25.0
+	))
+	
+	# Hut - smaller building
+	_register_recipe(_make_recipe(
+		"craft_hut", "Hut", "Build a small hut for storage or shelter.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 6}, {"item_id": "wood_plank", "amount": 4}, {"item_id": "rope", "amount": 1}],
+		"hut", 1, 8.0, "construction", 18.0
+	))
+	
+	# Feeding Trough
+	_register_recipe(_make_recipe(
+		"craft_feeding_trough", "Feeding Trough", "Craft a trough for feeding farm animals.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 4}, {"item_id": "iron_ingot", "amount": 1}],
+		"feeding_trough", 1, 4.0, "construction", 10.0
+	))
+	
+	# Campfire
+	_register_recipe(_make_recipe(
+		"craft_campfire", "Campfire", "Build a campfire for warmth and cooking.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "stone", "amount": 5}, {"item_id": "stick", "amount": 3}, {"item_id": "coal", "amount": 1}],
+		"campfire", 1, 3.0, "crafting", 8.0
+	))
+	
+	# Sitting Log
+	_register_recipe(_make_recipe(
+		"craft_sitting_log", "Sitting Log", "Carve a log into a seat.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "wood_log", "amount": 2}],
+		"sitting_log", 1, 2.0, "lumberjack", 4.0
 	))

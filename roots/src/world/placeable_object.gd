@@ -25,6 +25,13 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 			if res is PackedScene:
 				_model_node = res.instantiate() as Node3D
 				if _model_node:
+					# FBX models may have baked-in position offsets and rotation — reset them
+					_model_node.position = Vector3.ZERO
+					_model_node.rotation = Vector3.ZERO
+					for child_node in _model_node.get_children():
+						if child_node is Node3D:
+							child_node.position = Vector3.ZERO
+							child_node.rotation = Vector3(-PI / 2.0, 0, 0)
 					_model_node.scale = Vector3.ONE * model_scale
 			elif res is Mesh:
 				_model_node = MeshInstance3D.new()

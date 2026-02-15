@@ -211,11 +211,13 @@ graph TD
 - [ ] Create identification system (discovering new plants)
 
 #### 3.3 Cooking & Baking
-- [ ] Create cooking station (fire, stove)
-- [ ] Implement recipe cookbook
-- [ ] Design food hunger restoration
-- [ ] Add cooking speed and quality bonuses
-- [ ] Create meal buffs and effects
+- [x] Create cooking station (Cooking Fire, station_type=4, spawned near player)
+- [x] Implement 14 cooking recipes (flour, butter, cheese, cooked meats, soups, stews, pies, tea)
+- [x] Design food as buffs (no hunger bar — cozy approach: food heals + grants timed buffs)
+- [x] Add well_fed buff (multiplies healing/stamina restore while active)
+- [x] Create meal buffs and effects (well_fed, speed, strength, heal-over-time, stamina regen)
+- [x] Cooking XP on food consumption (cook_food action → 10 XP)
+- [x] New items: flour, butter, cheese, apple, cooked_meat, cooked_venison, cooked_rabbit, fried_egg, vegetable_soup, mushroom_soup, hearty_stew, meat_pie, apple_pie, mushroom_tea
 
 #### 3.4 Blacksmithing
 - [x] Implement forge and anvil stations (CraftingStationObject world objects)
@@ -236,9 +238,10 @@ graph TD
 - [x] PlaceableObject world script (collision blocks animals, gates open/close, hammer to pick up)
 - [x] Fence crafting recipes at Workbench (fence=2 planks+string, post=1 log, gate=3 planks+2 string+iron)
 - [x] Modular terrain collection integrated (Hilly_Prop_Fence OBJ models for fences/gates/posts)
-- [ ] Implement animal feeding and care (player interaction)
-- [ ] Create breeding system
-- [ ] Add more building placeables (QiwiiPack Barn/Hut, modular_terrain_collection camp/bridge pieces)
+- [x] Implement animal feeding and care (E-key: hold food → feed, empty hand → pet, floating text feedback)
+- [x] Create breeding system (feed two same-species adults near each other → baby spawns, breed cooldown)
+- [x] Add more building placeables (Barn, Hut, Feeding Trough, Campfire, Sitting Log + crafting recipes)
+- [x] FBX offset fix in PlaceableObject for QiwiiPack building models
 - [ ] Find/add models for goat, deer, rabbit (currently placeholder capsules)
 
 #### 3.6 Militia/Combat
@@ -597,13 +600,13 @@ For solo development, prioritize these skills:
 9. ~~Harvestable world objects — Trees drop wood, rocks drop stone/ore~~ ✓
 10. ~~Phase 3.2: Herb Gathering & Alchemy — Harvestable herbs, alchemy table, 6 potions, buff system~~ ✓
 11. ~~Phase 4.5: Environmental — Day/night cycle, BinbunSky shader, seasonal sky, clock UI~~ ✓
-12. **Phase 3.3: Cooking** ← NEXT — Cooking stations, food buffs
-13. **Phase 3.5: Husbandry** — Animal AI, feeding, breeding, products
-14. **Phase 4.2: NPC System** — Villagers, merchants, quests
+12. ~~Phase 3.3: Cooking — 14 recipes, food buffs, well_fed system, cooking XP~~ ✓
+13. ~~Phase 3.5: Husbandry — Animal feeding/petting, breeding system, building placeables~~ ✓
+14. **Phase 4.2: NPC System** ← NEXT — Villagers, merchants, quests
 15. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 mostly done + Phase 4.5 partial.** Harvestable trees/rocks/herbs (HarvestableResource), crafting stations (Workbench/Forge/Anvil/Alchemy Table), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs from biome decorations), alchemy (6 potions with buff system: heal, stamina, speed, strength, antidote). Day/night cycle with BinbunSky shader (procedural clouds, stars, sun disc, automatic transitions), seasonal sky variation (Summer clear → Winter overcast), in-game clock UI. Full gameplay loop: explore → gather herbs → brew potions → fight skeletons. Next: Cooking (Phase 3.3).*
+*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 complete + Phase 4.5 partial.** Harvestable trees/rocks/herbs, crafting stations (Workbench/Forge/Anvil/Alchemy Table/Cooking Fire), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs), alchemy (6 potions with buff system). Cooking system (14 recipes, food buffs: well_fed/speed/strength/heal-over-time). Animal husbandry (feeding, petting, breeding with baby spawns, 5 building placeables: Barn/Hut/Trough/Campfire/Sitting Log). Day/night cycle with BinbunSky shader, seasonal sky variation, in-game clock UI. Full gameplay loop: explore → farm → cook → breed animals → fight. Next: NPC System (Phase 4.2).*

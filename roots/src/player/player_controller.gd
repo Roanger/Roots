@@ -765,6 +765,8 @@ func take_damage(amount: float, _attacker: Node3D = null) -> void:
 		_on_death()
 
 func heal(amount: float) -> void:
+	if has_buff("well_fed"):
+		amount *= get_buff_value("well_fed")
 	var old_health = current_health
 	current_health = min(max_health, current_health + amount)
 	
@@ -772,6 +774,8 @@ func heal(amount: float) -> void:
 		health_changed.emit(current_health, max_health)
 
 func restore_stamina(amount: float) -> void:
+	if has_buff("well_fed"):
+		amount *= get_buff_value("well_fed")
 	var old_stamina = current_stamina
 	current_stamina = min(max_stamina, current_stamina + amount)
 	if current_stamina != old_stamina:
@@ -798,11 +802,13 @@ func consume_item(item_data: ItemData) -> void:
 		if buff_type != "" and buff_duration > 0:
 			buff_duration *= (1.0 + buff_dur_bonus)
 			_apply_buff(buff_type, buff_value, buff_duration)
-	# Grant alchemy XP for potions
-	if item_data.item_type == ItemData.ItemType.POTION:
-		var skill_manager = get_node_or_null("/root/SkillManager")
-		if skill_manager and skill_manager.has_method("grant_action_xp"):
+	# Grant XP based on item type
+	var skill_manager = get_node_or_null("/root/SkillManager")
+	if skill_manager and skill_manager.has_method("grant_action_xp"):
+		if item_data.item_type == ItemData.ItemType.POTION:
 			skill_manager.grant_action_xp("brew_potion")
+		elif item_data.item_type == ItemData.ItemType.FOOD:
+			skill_manager.grant_action_xp("cook_food")
 
 func _apply_buff(buff_type: String, value: float, duration: float) -> void:
 	active_buffs[buff_type] = {"value": value, "remaining": duration, "duration": duration}

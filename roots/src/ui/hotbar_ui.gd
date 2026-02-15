@@ -16,6 +16,7 @@ var slots: Array[InventorySlot] = []
 var selected_slot: int = 0  # 0-7 for hotbar slots
 
 func _ready() -> void:
+	add_to_group("hotbar_ui")
 	# Set up hotbar container
 	if slots_container:
 		slots_container.add_theme_constant_override("separation", slot_spacing)

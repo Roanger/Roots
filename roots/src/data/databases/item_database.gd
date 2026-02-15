@@ -392,6 +392,84 @@ func _initialize_items() -> void:
 	deer_pelt.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(deer_pelt)
 	
+	# ===== Cooking Ingredients =====
+	
+	var flour = _create_material("flour", "Flour", "Ground wheat flour for baking.", 8, 50)
+	flour.icon = _load_icon("res://Material/Paper.png")
+	_register_item(flour)
+	
+	var cheese = _create_food("cheese", "Cheese", "Aged cheese made from milk.", 12, 20.0, 5.0, 5.0)
+	cheese.icon = _load_icon("res://Food/Cheese.png")
+	_register_item(cheese)
+	
+	var butter = _create_material("butter", "Butter", "Creamy butter churned from milk.", 10, 50)
+	butter.icon = _load_icon("res://Food/Cheese.png")
+	_register_item(butter)
+	
+	# ===== Cooked Foods =====
+	
+	# Basic cooked meats
+	var cooked_meat = _create_cooked_food("cooked_meat", "Cooked Meat", "Seared meat. Restores health and stamina.", 15, 30.0, 15.0, 10.0,
+		[{"type": "well_fed", "value": 1.1, "duration": 60.0}] as Array[Dictionary])
+	cooked_meat.icon = _load_icon("res://Food/Ham.png")
+	_register_item(cooked_meat)
+	
+	var cooked_venison = _create_cooked_food("cooked_venison", "Cooked Venison", "Tender roasted venison. Very nutritious.", 25, 40.0, 20.0, 15.0,
+		[{"type": "well_fed", "value": 1.15, "duration": 90.0}] as Array[Dictionary])
+	cooked_venison.icon = _load_icon("res://Food/Ham.png")
+	cooked_venison.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(cooked_venison)
+	
+	var cooked_rabbit = _create_cooked_food("cooked_rabbit", "Cooked Rabbit", "Light and tender rabbit meat.", 18, 25.0, 10.0, 15.0,
+		[{"type": "speed", "value": 1.15, "duration": 45.0}] as Array[Dictionary])
+	cooked_rabbit.icon = _load_icon("res://Food/Ham.png")
+	_register_item(cooked_rabbit)
+	
+	var fried_egg = _create_cooked_food("fried_egg", "Fried Egg", "A simple fried egg. Quick energy.", 10, 20.0, 5.0, 15.0)
+	fried_egg.icon = _load_icon("res://Monster Part/Egg.png")
+	_register_item(fried_egg)
+	
+	# Soups & Stews
+	var vegetable_soup = _create_cooked_food("vegetable_soup", "Vegetable Soup", "A hearty soup of garden vegetables.", 20, 35.0, 10.0, 10.0,
+		[{"type": "heal", "value": 20.0, "duration": 15.0}] as Array[Dictionary])
+	vegetable_soup.icon = _load_icon("res://Potion/Green Potion.png")
+	_register_item(vegetable_soup)
+	
+	var mushroom_soup = _create_cooked_food("mushroom_soup", "Mushroom Soup", "Earthy mushroom soup with restorative properties.", 22, 30.0, 15.0, 10.0,
+		[{"type": "heal", "value": 25.0, "duration": 15.0}] as Array[Dictionary])
+	mushroom_soup.icon = _load_icon("res://Potion/Green Potion 2.png")
+	_register_item(mushroom_soup)
+	
+	var hearty_stew = _create_cooked_food("hearty_stew", "Hearty Stew", "A thick stew of meat and vegetables. Very filling.", 40, 50.0, 25.0, 20.0,
+		[{"type": "well_fed", "value": 1.2, "duration": 120.0}, {"type": "strength", "value": 1.1, "duration": 60.0}] as Array[Dictionary])
+	hearty_stew.icon = _load_icon("res://Potion/Red Potion.png")
+	hearty_stew.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(hearty_stew)
+	
+	# Baked goods
+	var meat_pie = _create_cooked_food("meat_pie", "Meat Pie", "A golden-crusted pie filled with seasoned meat.", 35, 45.0, 20.0, 15.0,
+		[{"type": "well_fed", "value": 1.15, "duration": 90.0}] as Array[Dictionary])
+	meat_pie.icon = _load_icon("res://Food/Bread.png")
+	meat_pie.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(meat_pie)
+	
+	var apple_pie = _create_cooked_food("apple_pie", "Apple Pie", "Sweet baked apple pie. Boosts stamina recovery.", 30, 35.0, 10.0, 25.0,
+		[{"type": "stamina", "value": 30.0, "duration": 30.0}] as Array[Dictionary])
+	apple_pie.icon = _load_icon("res://Food/Bread.png")
+	_register_item(apple_pie)
+	
+	# Fruit (raw consumable)
+	var apple = _create_food("apple", "Apple", "A crisp apple. Light snack.", 5, 10.0, 5.0, 5.0)
+	apple.icon = _load_icon("res://Food/Apple.png")
+	_register_item(apple)
+	
+	# Drinks
+	var mushroom_tea = _create_cooked_food("mushroom_tea", "Mushroom Tea", "A warm brew of golden mushrooms. Enhances focus.", 30, 15.0, 10.0, 20.0,
+		[{"type": "well_fed", "value": 1.1, "duration": 60.0}, {"type": "speed", "value": 1.1, "duration": 45.0}] as Array[Dictionary])
+	mushroom_tea.icon = _load_icon("res://Food/Wine.png")
+	mushroom_tea.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(mushroom_tea)
+	
 	# ===== Placeable Items (Fences, Gates) =====
 	
 	var fence_wood = _create_placeable("fence_wood", "Wooden Fence", "A sturdy wooden fence section.", 8,
@@ -412,6 +490,40 @@ func _initialize_items() -> void:
 	fence_gate.icon = _load_icon("res://Material/Wooden Plank.png")
 	fence_gate.placeable_is_gate = true
 	_register_item(fence_gate)
+	
+	# ===== Placeable Buildings =====
+	
+	var barn = _create_placeable("barn", "Barn", "A cozy barn to shelter your animals.", 80,
+		"res://Animal QiwiiPack/Animal Models/Barn.fbx", 0.5,
+		Vector3(4.0, 3.0, 4.0))
+	barn.icon = _load_icon("res://Misc/Crate.png")
+	barn.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(barn)
+	
+	var hut = _create_placeable("hut", "Hut", "A small wooden hut for storage or shelter.", 50,
+		"res://Animal QiwiiPack/Animal Models/Hut.fbx", 0.5,
+		Vector3(2.5, 2.5, 2.5))
+	hut.icon = _load_icon("res://Misc/Crate.png")
+	hut.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(hut)
+	
+	var feeding_trough = _create_placeable("feeding_trough", "Feeding Trough", "A wooden trough for feeding farm animals.", 20,
+		"", 1.0,
+		Vector3(1.5, 0.5, 0.6))
+	feeding_trough.icon = _load_icon("res://Material/Wooden Plank.png")
+	_register_item(feeding_trough)
+	
+	var campfire = _create_placeable("campfire", "Campfire", "A warm campfire for light and cooking.", 15,
+		"res://modular_terrain_collection/Hilly_Prop_Camp_Campfire.obj", 2.0,
+		Vector3(0.8, 0.4, 0.8))
+	campfire.icon = _load_icon("res://Weapon & Tool/Torch.png")
+	_register_item(campfire)
+	
+	var sitting_log = _create_placeable("sitting_log", "Sitting Log", "A log to sit on by the fire.", 8,
+		"res://modular_terrain_collection/Hilly_Prop_Camp_Sitting_Log.obj", 2.0,
+		Vector3(1.2, 0.5, 0.5))
+	sitting_log.icon = _load_icon("res://Material/Wood Log.png")
+	_register_item(sitting_log)
 	
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()
@@ -546,6 +658,11 @@ func _create_food(id: String, name: String, desc: String, value: int, hunger: fl
 	item.hunger_restore = hunger
 	item.health_restore = health
 	item.stamina_restore = stamina
+	return item
+
+func _create_cooked_food(id: String, name: String, desc: String, value: int, hunger: float, health: float, stamina: float, buffs: Array[Dictionary] = []) -> ItemData:
+	var item = _create_food(id, name, desc, value, hunger, health, stamina)
+	item.buff_effects = buffs
 	return item
 
 func _create_placeable(id: String, name: String, desc: String, value: int, model_path: String, model_scale: float, collision_size: Vector3) -> ItemData:

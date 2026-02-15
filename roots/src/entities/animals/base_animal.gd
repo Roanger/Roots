@@ -196,6 +196,8 @@ func _physics_process(delta: float) -> void:
 	_update_hunger(delta)
 	_update_products(delta)
 	_update_baby(delta)
+	if breed_timer > 0:
+		breed_timer -= delta
 
 	move_and_slide()
 
@@ -393,6 +395,66 @@ func _drop_product() -> void:
 
 # ── Interaction ──────────────────────────────────────────────────────────────
 
+func on_interact(player: Node3D) -> void:
+	## Called when the player presses E while looking at this animal.
+	## If holding a food item the animal eats → feed it.
+	## If holding nothing or non-food → pet it (tamed only).
+	if ai_state == AIState.DEAD:
+		return
+
+	# Check what the player is holding
+	var held_item: ItemData = null
+	if player.has_method("_get_held_item_data"):
+		held_item = player._get_held_item_data()
+
+	# Try feeding first
+	if held_item and animal_data and held_item.item_id in animal_data.feed_item_ids:
+		if feed(player, held_item.item_id):
+			# Consume one item from the player's hotbar
+			var inv = player.get("inventory") if player else null
+			if inv:
+				var hotbar_ui_node = player.get_tree().get_first_node_in_group("hotbar_ui")
+				if not hotbar_ui_node:
+					# Fallback: search all HotbarUI nodes
+					for ui_node in player.get_tree().get_nodes_in_group("hotbar_ui"):
+						hotbar_ui_node = ui_node
+						break
+				var slot_idx: int = hotbar_ui_node.selected_slot if hotbar_ui_node else 0
+				var slot_item = inv.get_hotbar_slot(slot_idx)
+				if slot_item:
+					slot_item.remove_amount(1)
+					if slot_item.is_empty():
+						inv.hotbar_slots[slot_idx] = null
+					inv.hotbar_changed.emit(slot_idx)
+			_show_floating_text("Fed!", Color(0.4, 1.0, 0.4))
+			# Try breeding after feeding (if conditions met)
+			_try_breed()
+			return
+
+	# If tamed and not fed, pet instead
+	if is_tamed:
+		pet(player)
+		_show_floating_text("Petted!", Color(0.6, 0.8, 1.0))
+		return
+
+	# Wild animals — show a hint
+	if animal_data and animal_data.animal_type == AnimalDataScript.AnimalType.HUNTABLE:
+		_show_floating_text("Wild", Color(0.9, 0.9, 0.6))
+
+func _show_floating_text(text: String, color: Color = Color.WHITE) -> void:
+	var label = Label3D.new()
+	label.text = text
+	label.font_size = 28
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = color
+	label.position = global_position + Vector3(0, (animal_data.collision_height if animal_data else 1.0) + 0.8, 0)
+	label.no_depth_test = true
+	get_tree().current_scene.add_child(label)
+	var tween = label.create_tween()
+	tween.tween_property(label, "position:y", label.position.y + 1.0, 1.0)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 1.0)
+	tween.tween_callback(label.queue_free)
+
 func get_target_type() -> int:
 	# Wild/huntable animals can be hit
 	if animal_data and animal_data.animal_type == AnimalDataScript.AnimalType.HUNTABLE:
@@ -476,6 +538,55 @@ func can_breed() -> bool:
 func start_breed_cooldown() -> void:
 	if animal_data:
 		breed_timer = animal_data.breed_cooldown
+
+func _try_breed() -> void:
+	if not can_breed():
+		return
+	# Find a nearby same-species partner that can also breed
+	var partner: BaseAnimal = null
+	for node in get_tree().get_nodes_in_group("animals"):
+		if node == self or not node is BaseAnimal:
+			continue
+		var other := node as BaseAnimal
+		if not other.animal_data or other.animal_data.species_id != animal_data.species_id:
+			continue
+		if not other.can_breed():
+			continue
+		var dist = global_position.distance_to(other.global_position)
+		if dist < 8.0:
+			partner = other
+			break
+
+	if not partner:
+		return
+
+	# Both parents go on cooldown
+	start_breed_cooldown()
+	partner.start_breed_cooldown()
+
+	# Spawn baby between the two parents
+	var baby_pos = (global_position + partner.global_position) * 0.5
+	baby_pos += Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1))
+
+	var baby = BaseAnimal.new()
+	baby.setup(animal_data, true, true)
+	baby.position = baby_pos
+
+	# Snap baby to terrain
+	if _chunk_manager and _chunk_manager.has_method("get_terrain_height"):
+		baby.position.y = _chunk_manager.get_terrain_height(baby_pos)
+
+	get_tree().current_scene.add_child(baby)
+
+	_show_floating_text("Baby!", Color(1.0, 0.8, 1.0))
+	partner._show_floating_text("Baby!", Color(1.0, 0.8, 1.0))
+
+	# Grant husbandry XP
+	var skill_manager = get_node_or_null("/root/SkillManager")
+	if skill_manager and skill_manager.has_method("grant_action_xp"):
+		skill_manager.grant_action_xp("breed_animal")
+
+	print("[Animal] %s bred! Baby spawned at %s" % [animal_data.display_name, str(baby_pos)])
 
 # ── Damage / Death ───────────────────────────────────────────────────────────
 
