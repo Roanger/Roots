@@ -16,10 +16,25 @@ const BaseEnemy = preload("res://src/entities/base_enemy.gd")
 const CraftingStationObject = preload("res://src/world/crafting_station_object.gd")
 const BaseAnimalScript = preload("res://src/entities/animals/base_animal.gd")
 const AnimalDataScript = preload("res://src/entities/animals/animal_data.gd")
+const TownBuilderScript = preload("res://src/world/town_builder.gd")
+const BaseNPCScript = preload("res://src/entities/npcs/base_npc.gd")
+const NPCDataScript = preload("res://src/entities/npcs/npc_data.gd")
+const DialogueUIScript = preload("res://src/ui/dialogue_ui.gd")
+const ShopUIScript = preload("res://src/ui/shop_ui.gd")
+const QuestJournalUIScript = preload("res://src/ui/quest_journal_ui.gd")
 var hud: Control = null
+var town_builder: Node3D = null
 var water_plane: MeshInstance3D = null
 var skill_tree_ui: Control = null
 var crafting_ui: CraftingUI = null
+var dialogue_ui: Control = null
+var shop_ui: Control = null
+var quest_journal_ui: Control = null
+
+# Underground ambient state
+var _is_player_underground: bool = false
+var _surface_ambient_energy: float = 0.5   # Cached surface ambient (set by _update_lighting)
+var _surface_ambient_color: Color = Color(0.6, 0.6, 0.7)
 
 # Explicit references to autoload singletons
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
@@ -29,6 +44,12 @@ func _ready() -> void:
 	# Set game state to playing
 	if game_manager:
 		game_manager.set_game_state(game_manager.GameState.PLAYING)
+	
+	# Register town exclusion zone BEFORE terrain generation
+	# Village center is 25m east of world origin (player spawns near origin)
+	var village_center = Vector3(25, 0, 0)
+	if chunk_manager and chunk_manager.has_method("add_exclusion_zone"):
+		chunk_manager.add_exclusion_zone(village_center, 22.0)  # 22m radius covers all buildings
 	
 	# Initialize world first (generates terrain)
 	_initialize_world()
@@ -67,6 +88,20 @@ func _ready() -> void:
 	# Spawn animals
 	call_deferred("_spawn_animals")
 	
+	# Build starter village
+	call_deferred("_build_village")
+	
+	# Initialize quest system (before NPCs so starter quests can be triggered)
+	call_deferred("_init_quest_system")
+	
+	# Spawn NPCs in village
+	call_deferred("_spawn_npcs")
+	
+	# Setup dialogue & shop & journal UI
+	call_deferred("_setup_dialogue_ui")
+	call_deferred("_setup_shop_ui")
+	call_deferred("_setup_quest_journal_ui")
+	
 	# Restore saved data (player inventory/equipment/stats, farm plots)
 	call_deferred("_load_player_data")
 	call_deferred("_load_farm_plots")
@@ -77,6 +112,10 @@ func _ready() -> void:
 		game_manager.day_changed.connect(_on_day_changed)
 		game_manager.season_changed.connect(_on_season_changed)
 		_update_season_sky(game_manager.current_season)
+	
+	var event_bus = get_node_or_null("/root/EventBus")
+	if event_bus:
+		event_bus.player_underground_changed.connect(_on_player_underground_changed)
 	
 	if game_manager:
 		print("Main World loaded - Seed: ", game_manager.world_seed)
@@ -296,20 +335,29 @@ func _update_lighting(hour: float) -> void:
 		var env = world_environment.environment
 		
 		# --- Ambient light ---
+		var target_ambient_color: Color
+		var target_ambient_energy: float
 		if hour >= 6.0 and hour < 18.0:
-			env.ambient_light_color = Color(0.6, 0.6, 0.7)
-			env.ambient_light_energy = 0.5
+			target_ambient_color = Color(0.6, 0.6, 0.7)
+			target_ambient_energy = 0.5
 		elif hour >= 5.0 and hour < 6.0:
 			var t = hour - 5.0
-			env.ambient_light_color = Color(0.2, 0.2, 0.4).lerp(Color(0.6, 0.6, 0.7), t)
-			env.ambient_light_energy = lerp(0.15, 0.5, t)
+			target_ambient_color = Color(0.2, 0.2, 0.4).lerp(Color(0.6, 0.6, 0.7), t)
+			target_ambient_energy = lerp(0.15, 0.5, t)
 		elif hour >= 18.0 and hour < 20.0:
 			var t = (hour - 18.0) / 2.0
-			env.ambient_light_color = Color(0.6, 0.6, 0.7).lerp(Color(0.05, 0.05, 0.1), t)
-			env.ambient_light_energy = lerp(0.5, 0.05, t)
+			target_ambient_color = Color(0.6, 0.6, 0.7).lerp(Color(0.05, 0.05, 0.1), t)
+			target_ambient_energy = lerp(0.5, 0.05, t)
 		else:
-			env.ambient_light_color = Color(0.05, 0.05, 0.1)
-			env.ambient_light_energy = 0.05
+			target_ambient_color = Color(0.05, 0.05, 0.1)
+			target_ambient_energy = 0.05
+		# Cache surface values for underground override
+		_surface_ambient_color = target_ambient_color
+		_surface_ambient_energy = target_ambient_energy
+		# Apply (underground handler will override if needed)
+		if not _is_player_underground:
+			env.ambient_light_color = target_ambient_color
+			env.ambient_light_energy = target_ambient_energy
 		
 		# --- Fog ---
 		if hour >= 6.0 and hour < 18.0:
@@ -322,6 +370,32 @@ func _update_lighting(hour: float) -> void:
 			env.fog_light_color = Color(0.7, 0.8, 0.9).lerp(Color(0.05, 0.04, 0.08), t)
 		else:
 			env.fog_light_color = Color(0.05, 0.04, 0.08)
+
+func _on_player_underground_changed(underground: bool, depth: float) -> void:
+	_is_player_underground = underground
+	if not world_environment or not world_environment.environment:
+		return
+	var env = world_environment.environment
+	if underground:
+		# Darken ambient based on depth: at 5 units deep = cave dark, deeper = pitch black
+		var darkness = clampf(depth / 20.0, 0.0, 1.0)
+		var cave_color = Color(0.08, 0.06, 0.05)  # Warm dark cave tone
+		env.ambient_light_color = _surface_ambient_color.lerp(cave_color, darkness)
+		env.ambient_light_energy = lerpf(_surface_ambient_energy, 0.04, darkness)
+		# Suppress sun contribution underground
+		if sun:
+			sun.light_energy = lerpf(sun.light_energy, 0.0, darkness * 0.8)
+		# Add cave fog
+		env.fog_enabled = true
+		env.fog_density = lerpf(0.002, 0.025, darkness)
+		env.fog_light_color = Color(0.05, 0.04, 0.03)
+	else:
+		# Restore surface ambient
+		env.ambient_light_color = _surface_ambient_color
+		env.ambient_light_energy = _surface_ambient_energy
+		# Restore sun
+		if game_manager:
+			_update_lighting(game_manager.current_hour)
 
 func save_world() -> void:
 	if game_manager:
@@ -564,6 +638,18 @@ func _create_station(pos: Vector3, station_type: int, station_name: String, colo
 	
 	add_child(container)
 
+func _build_village() -> void:
+	await get_tree().process_frame
+	# Fixed village center matching the exclusion zone registered in _ready()
+	var village_center = Vector3(25, 0, 0)
+	
+	town_builder = TownBuilderScript.new()
+	town_builder.name = "TownBuilder"
+	town_builder.setup(chunk_manager)
+	add_child(town_builder)
+	town_builder.build_village(village_center)
+	print("Starter village built at ", village_center)
+
 const SKELETON_MINION = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Minion.glb"
 const SKELETON_WARRIOR = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Warrior.glb"
 const SKELETON_ROGUE = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Rogue.glb"
@@ -575,12 +661,12 @@ func _spawn_enemies() -> void:
 	await get_tree().process_frame
 	var spawn_pos = player.global_position
 	
-	# Skeleton Minions - easy, near spawn (3)
+	# Skeleton Minions - easy, near spawn but AWAY from village (village at X=25)
 	for i in 3:
 		var offset = Vector3(
-			randf_range(-15, -8) if i % 2 == 0 else randf_range(8, 15),
+			randf_range(-20, -10),
 			0,
-			randf_range(-12, 12)
+			randf_range(-15, 15)
 		)
 		_create_enemy(spawn_pos + offset, "Skeleton Minion", 15.0, 1.5, 2.5, 3.0, 1.5, 10.0,
 			Color.WHITE, 10.0, [
@@ -591,9 +677,9 @@ func _spawn_enemies() -> void:
 	# Skeleton Rogues - fast, medium difficulty (2)
 	for i in 2:
 		var offset = Vector3(
-			randf_range(-22, -14) if i % 2 == 0 else randf_range(14, 22),
+			randf_range(-30, -18),
 			0,
-			randf_range(-15, 15)
+			randf_range(-20, 20)
 		)
 		_create_enemy(spawn_pos + offset, "Skeleton Rogue", 20.0, 2.5, 4.5, 5.0, 1.5, 12.0,
 			Color.WHITE, 18.0, [
@@ -601,16 +687,16 @@ func _spawn_enemies() -> void:
 				{"item_id": "string", "min_amount": 1, "max_amount": 3, "chance": 0.6},
 			], SKELETON_ROGUE, 1.0)
 	
-	# Skeleton Warrior - tough melee (1)
-	_create_enemy(spawn_pos + Vector3(18, 0, 18), "Skeleton Warrior", 40.0, 1.2, 2.5, 8.0, 1.8, 12.0,
+	# Skeleton Warrior - tough melee (1) — far from village
+	_create_enemy(spawn_pos + Vector3(-25, 0, 22), "Skeleton Warrior", 40.0, 1.2, 2.5, 8.0, 1.8, 12.0,
 		Color.WHITE, 30.0, [
 			{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.7},
 			{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.4},
 			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15},
 		], SKELETON_WARRIOR, 1.0)
 	
-	# Skeleton Mage - ranged caster, dangerous (1)
-	_create_enemy(spawn_pos + Vector3(-20, 0, 16), "Skeleton Mage", 25.0, 1.0, 2.0, 10.0, 2.5, 14.0,
+	# Skeleton Mage - ranged caster, dangerous (1) — far from village
+	_create_enemy(spawn_pos + Vector3(-28, 0, -18), "Skeleton Mage", 25.0, 1.0, 2.0, 10.0, 2.5, 14.0,
 		Color.WHITE, 35.0, [
 			{"item_id": "coal", "min_amount": 2, "max_amount": 4, "chance": 0.8},
 			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.25},
@@ -631,24 +717,24 @@ func _spawn_animals() -> void:
 	
 	_register_animal_species()
 	
-	# Farm animals near spawn
-	_create_animal("chicken", spawn_pos + Vector3(6, 0, 4))
-	_create_animal("chicken", spawn_pos + Vector3(7, 0, 5))
-	_create_animal("chicken", spawn_pos + Vector3(5, 0, 6))
-	_create_animal("cow", spawn_pos + Vector3(10, 0, -5))
-	_create_animal("cow", spawn_pos + Vector3(12, 0, -3))
+	# Farm animals near spawn — AWAY from village (village at X=25)
+	_create_animal("chicken", spawn_pos + Vector3(-6, 0, 4))
+	_create_animal("chicken", spawn_pos + Vector3(-7, 0, 5))
+	_create_animal("chicken", spawn_pos + Vector3(-5, 0, 6))
+	_create_animal("cow", spawn_pos + Vector3(-10, 0, -5))
+	_create_animal("cow", spawn_pos + Vector3(-12, 0, -3))
 	_create_animal("sheep", spawn_pos + Vector3(-8, 0, 6))
 	_create_animal("sheep", spawn_pos + Vector3(-6, 0, 8))
-	_create_animal("goat", spawn_pos + Vector3(-10, 0, -4))
-	_create_animal("duck", spawn_pos + Vector3(4, 0, 8))
-	_create_animal("duck", spawn_pos + Vector3(3, 0, 10))
-	_create_animal("boar", spawn_pos + Vector3(14, 0, 10))
+	_create_animal("goat", spawn_pos + Vector3(-10, 0, -8))
+	_create_animal("duck", spawn_pos + Vector3(-4, 0, 8))
+	_create_animal("duck", spawn_pos + Vector3(-3, 0, 10))
+	_create_animal("boar", spawn_pos + Vector3(-14, 0, 10))
 	
-	# Wild/huntable animals further out
-	_create_animal("deer", spawn_pos + Vector3(25, 0, 20))
-	_create_animal("deer", spawn_pos + Vector3(-22, 0, 25))
-	_create_animal("rabbit", spawn_pos + Vector3(18, 0, -15))
-	_create_animal("rabbit", spawn_pos + Vector3(-16, 0, -18))
+	# Wild/huntable animals further out — away from village
+	_create_animal("deer", spawn_pos + Vector3(-25, 0, 25))
+	_create_animal("deer", spawn_pos + Vector3(-22, 0, -20))
+	_create_animal("rabbit", spawn_pos + Vector3(-18, 0, -15))
+	_create_animal("rabbit", spawn_pos + Vector3(-16, 0, 18))
 	_create_animal("rabbit", spawn_pos + Vector3(20, 0, 12))
 	
 	print("Animals spawned")
@@ -904,6 +990,432 @@ func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
 	enemy.position = pos
 	add_child(enemy)
 
+# ── NPC System ───────────────────────────────────────────────────────────────
+
+const ADVENTURER_BARBARIAN = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Barbarian.glb"
+const ADVENTURER_KNIGHT = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb"
+const ADVENTURER_MAGE = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb"
+const ADVENTURER_RANGER = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Ranger.glb"
+const ADVENTURER_ROGUE = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue.glb"
+const ADVENTURER_ROGUE_HOODED = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue_Hooded.glb"
+
+var _npc_registry: Dictionary = {}  # npc_id -> NPCData
+
+func _setup_dialogue_ui() -> void:
+	dialogue_ui = DialogueUIScript.new()
+	dialogue_ui.name = "DialogueUI"
+	$UI.add_child(dialogue_ui)
+
+func _setup_shop_ui() -> void:
+	shop_ui = ShopUIScript.new()
+	shop_ui.name = "ShopUI"
+	$UI.add_child(shop_ui)
+
+func _setup_quest_journal_ui() -> void:
+	quest_journal_ui = QuestJournalUIScript.new()
+	quest_journal_ui.name = "QuestJournalUI"
+	$UI.add_child(quest_journal_ui)
+	# Give journal a direct reference to the quest tracker
+	if hud and hud.quest_tracker:
+		quest_journal_ui.set("_tracker_ref", hud.quest_tracker)
+
+func _spawn_npcs() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame  # Wait for village to be built
+	
+	_register_npc_data()
+	
+	var village_center = Vector3(25, 0, 0)
+	
+	# NPCs placed near their respective buildings (matching build_village layout)
+	# Building positions from town_builder: offset from village_center
+	_create_npc("shopkeeper",   village_center + Vector3(2, 0, -12))   # General Store (north)
+	_create_npc("innkeeper",    village_center + Vector3(12, 0, -8))   # Tavern (northeast)
+	_create_npc("blacksmith",   village_center + Vector3(12, 0, 2))    # Blacksmith (east)
+	_create_npc("baker",        village_center + Vector3(8, 0, 12))    # Bakery (southeast)
+	_create_npc("mayor",        village_center + Vector3(-2, 0, 12))   # Town Hall (south)
+	_create_npc("herbalist",    village_center + Vector3(-8, 0, 8))    # Herbalist (southwest)
+	_create_npc("farmer",       village_center + Vector3(-12, 0, -2))  # Farmer House (west)
+	_create_npc("guard",        village_center + Vector3(-8, 0, -8))   # Guard Post (northwest)
+	
+	# Start quests via QuestManager
+	_add_starter_quests()
+	_refresh_npc_quest_glows()
+	
+	print("Village NPCs spawned")
+
+func _get_quest_tracker():
+	if hud and hud.quest_tracker:
+		return hud.quest_tracker
+	return null
+
+func _init_quest_system() -> void:
+	var qm = get_node_or_null("/root/QuestManager")
+	var qdb = get_node_or_null("/root/QuestDatabase")
+	if not qm or not qdb:
+		push_warning("main_world: QuestManager or QuestDatabase not found")
+		return
+	
+	# Give QuestManager access to the player inventory
+	if player and player.has_method("get_inventory"):
+		qm.set_inventory(player.get_inventory())
+	elif player and player.get("inventory"):
+		qm.set_inventory(player.inventory)
+	
+	# Register all quest definitions
+	qdb.register_all_quests(qm)
+	
+	# Connect QuestManager signals to QuestTrackerUI
+	qm.quest_accepted.connect(_on_qm_quest_accepted)
+	qm.quest_objective_updated.connect(_on_qm_objective_updated)
+	qm.quest_completed.connect(_on_qm_quest_completed)
+	qm.quest_turned_in.connect(_on_qm_quest_turned_in)
+	qm.quest_available.connect(_on_qm_quest_available)
+	
+	print("Quest system initialized with %d quests" % qm.quest_definitions.size())
+
+func _add_starter_quests() -> void:
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return
+	
+	# Welcome quest is available immediately
+	qm.make_available("welcome")
+	qm.accept_quest("welcome")
+
+func _register_npc_data() -> void:
+	# Shopkeeper — General Store
+	var shopkeeper = NPCDataScript.new()
+	shopkeeper.npc_id = "shopkeeper"
+	shopkeeper.display_name = "Elara"
+	shopkeeper.role = NPCDataScript.NPCRole.MERCHANT
+	shopkeeper.title = "General Store"
+	shopkeeper.model_path = ADVENTURER_RANGER
+	shopkeeper.model_scale = 1.0
+	shopkeeper.body_color = Color(0.6, 0.8, 0.5)
+	shopkeeper.wander_radius = 2.0
+	shopkeeper.greeting_lines = ["Welcome!", "Need supplies?", "Browse my wares!"]
+	shopkeeper.dialogue = [
+		{"text": "Welcome to my shop! I've got all the essentials a traveler needs.", "choices": [
+			{"text": "Show me your wares.", "action": "shop"},
+			{"text": "Just passing through.", "action": "close"},
+		]}
+	]
+	shopkeeper.shop_inventory = [
+		{"item_id": "wood_log", "buy_price": 5, "stock": -1},
+		{"item_id": "stone", "buy_price": 5, "stock": -1},
+		{"item_id": "stick", "buy_price": 2, "stock": -1},
+		{"item_id": "string", "buy_price": 3, "stock": -1},
+		{"item_id": "rope", "buy_price": 8, "stock": -1},
+		{"item_id": "torch", "buy_price": 10, "stock": 10},
+		{"item_id": "animal_feed", "buy_price": 4, "stock": -1},
+	]
+	_npc_registry["shopkeeper"] = shopkeeper
+	
+	# Innkeeper — Tavern
+	var innkeeper = NPCDataScript.new()
+	innkeeper.npc_id = "innkeeper"
+	innkeeper.display_name = "Bram"
+	innkeeper.role = NPCDataScript.NPCRole.INNKEEPER
+	innkeeper.title = "Innkeeper"
+	innkeeper.model_path = ADVENTURER_BARBARIAN
+	innkeeper.model_scale = 1.0
+	innkeeper.body_color = Color(0.7, 0.5, 0.4)
+	innkeeper.wander_radius = 2.5
+	innkeeper.greeting_lines = ["Come in, come in!", "Hungry?", "Rest your feet!"]
+	innkeeper.dialogue = [
+		{"text": "Welcome to the Rusty Tankard! Best food and drink in town.", "choices": [
+			{"text": "What's on the menu?", "action": "shop"},
+			{"text": "Any rumors?", "next": 1},
+			{"text": "I'll be going.", "action": "close"},
+		]},
+		{"text": "I've heard strange noises from the forest at night. Skeletons, they say. Be careful out there.", "choices": [
+			{"text": "Thanks for the warning.", "action": "close"},
+		]}
+	]
+	innkeeper.shop_inventory = [
+		{"item_id": "health_potion", "buy_price": 25, "stock": 5},
+		{"item_id": "stamina_potion", "buy_price": 20, "stock": 5},
+		{"item_id": "empty_bottle", "buy_price": 3, "stock": -1},
+	]
+	_npc_registry["innkeeper"] = innkeeper
+	
+	# Blacksmith
+	var blacksmith = NPCDataScript.new()
+	blacksmith.npc_id = "blacksmith"
+	blacksmith.display_name = "Tormund"
+	blacksmith.role = NPCDataScript.NPCRole.BLACKSMITH
+	blacksmith.title = "Blacksmith"
+	blacksmith.model_path = ADVENTURER_KNIGHT
+	blacksmith.model_scale = 1.0
+	blacksmith.body_color = Color(0.5, 0.4, 0.35)
+	blacksmith.wander_radius = 2.0
+	blacksmith.greeting_lines = ["Need something forged?", "Steel and fire!", "What'll it be?"]
+	blacksmith.dialogue = [
+		{"text": "I forge the finest tools and weapons in the region. Interested?", "choices": [
+			{"text": "Show me what you've got.", "action": "shop"},
+			{"text": "Not right now.", "action": "close"},
+		]}
+	]
+	blacksmith.shop_inventory = [
+		{"item_id": "iron_ingot", "buy_price": 15, "stock": 10},
+		{"item_id": "copper_ingot", "buy_price": 10, "stock": 10},
+		{"item_id": "steel_ingot", "buy_price": 30, "stock": 5},
+		{"item_id": "coal", "buy_price": 5, "stock": -1},
+	]
+	_npc_registry["blacksmith"] = blacksmith
+	
+	# Baker
+	var baker = NPCDataScript.new()
+	baker.npc_id = "baker"
+	baker.display_name = "Marta"
+	baker.role = NPCDataScript.NPCRole.MERCHANT
+	baker.title = "Baker"
+	baker.model_path = ADVENTURER_ROGUE
+	baker.model_scale = 1.0
+	baker.body_color = Color(0.85, 0.75, 0.6)
+	baker.wander_radius = 2.0
+	baker.greeting_lines = ["Fresh bread!", "Smells good, right?", "Try my pastries!"]
+	baker.dialogue = [
+		{"text": "Everything's baked fresh this morning! Can I tempt you?", "choices": [
+			{"text": "What do you have?", "action": "shop"},
+			{"text": "Maybe later.", "action": "close"},
+		]}
+	]
+	baker.shop_inventory = [
+		{"item_id": "wheat", "buy_price": 3, "stock": -1},
+		{"item_id": "carrot_raw", "buy_price": 4, "stock": 10},
+		{"item_id": "potato", "buy_price": 4, "stock": 10},
+	]
+	_npc_registry["baker"] = baker
+	
+	# Mayor — Town Hall
+	var mayor = NPCDataScript.new()
+	mayor.npc_id = "mayor"
+	mayor.display_name = "Aldric"
+	mayor.role = NPCDataScript.NPCRole.QUEST_GIVER
+	mayor.title = "Village Elder"
+	mayor.model_path = ADVENTURER_MAGE
+	mayor.model_scale = 1.0
+	mayor.body_color = Color(0.6, 0.5, 0.7)
+	mayor.wander_radius = 3.0
+	mayor.greeting_lines = ["Ah, the newcomer!", "Good day, friend.", "Our village grows!"]
+	mayor.dialogue = [
+		{"text": "Welcome to our humble village! We could use someone with your talents around here.", "choices": [
+			{"text": "What needs doing?", "next": 1},
+			{"text": "Just exploring.", "action": "close"},
+		]},
+		{"text": "The skeleton menace in the forest grows bolder. Clear some out and I'll make it worth your while. Also, we always need more supplies — wood, stone, food.", "choices": [
+			{"text": "I'll see what I can do.", "action": "close"},
+		]}
+	]
+	_npc_registry["mayor"] = mayor
+	
+	# Herbalist
+	var herbalist = NPCDataScript.new()
+	herbalist.npc_id = "herbalist"
+	herbalist.display_name = "Sage Willow"
+	herbalist.role = NPCDataScript.NPCRole.HERBALIST
+	herbalist.title = "Herbalist"
+	herbalist.model_path = ADVENTURER_ROGUE_HOODED
+	herbalist.model_scale = 1.0
+	herbalist.body_color = Color(0.4, 0.7, 0.5)
+	herbalist.wander_radius = 2.5
+	herbalist.greeting_lines = ["Herbs and remedies...", "Nature provides.", "Need a cure?"]
+	herbalist.dialogue = [
+		{"text": "I deal in herbs, potions, and natural remedies. The forest holds many secrets.", "choices": [
+			{"text": "Show me your potions.", "action": "shop"},
+			{"text": "Tell me about the herbs.", "next": 1},
+			{"text": "Farewell.", "action": "close"},
+		]},
+		{"text": "Mushrooms grow near trees, flowers in meadows, and ferns in the shade. Use a sickle or knife to harvest them carefully.", "choices": [
+			{"text": "Thanks for the tip!", "action": "close"},
+		]}
+	]
+	herbalist.shop_inventory = [
+		{"item_id": "health_potion", "buy_price": 20, "stock": 5},
+		{"item_id": "greater_health_potion", "buy_price": 50, "stock": 3},
+		{"item_id": "antidote", "buy_price": 15, "stock": 5},
+		{"item_id": "speed_potion", "buy_price": 30, "stock": 3},
+		{"item_id": "strength_potion", "buy_price": 35, "stock": 3},
+		{"item_id": "empty_bottle", "buy_price": 2, "stock": -1},
+	]
+	_npc_registry["herbalist"] = herbalist
+	
+	# Farmer
+	var farmer_npc = NPCDataScript.new()
+	farmer_npc.npc_id = "farmer"
+	farmer_npc.display_name = "Old Hank"
+	farmer_npc.role = NPCDataScript.NPCRole.FARMER
+	farmer_npc.title = "Farmer"
+	farmer_npc.model_path = ADVENTURER_BARBARIAN
+	farmer_npc.model_scale = 1.0
+	farmer_npc.body_color = Color(0.65, 0.55, 0.4)
+	farmer_npc.wander_radius = 3.0
+	farmer_npc.greeting_lines = ["Fine day for farming!", "Howdy!", "Crops are coming in!"]
+	farmer_npc.dialogue = [
+		{"text": "Nothing beats a good day's work in the fields. I sell seeds and animal feed if you need 'em.", "choices": [
+			{"text": "I'll take a look.", "action": "shop"},
+			{"text": "Any farming tips?", "next": 1},
+			{"text": "See you around.", "action": "close"},
+		]},
+		{"text": "Till the soil with a hoe, plant your seeds, water 'em, and wait. Different crops grow at different speeds. And don't forget to feed your animals!", "choices": [
+			{"text": "Good advice, thanks!", "action": "close"},
+		]}
+	]
+	farmer_npc.shop_inventory = [
+		{"item_id": "animal_feed", "buy_price": 3, "stock": -1},
+		{"item_id": "wheat", "buy_price": 2, "stock": -1},
+	]
+	_npc_registry["farmer"] = farmer_npc
+	
+	# Guard
+	var guard = NPCDataScript.new()
+	guard.npc_id = "guard"
+	guard.display_name = "Captain Rolf"
+	guard.role = NPCDataScript.NPCRole.GUARD
+	guard.title = "Guard Captain"
+	guard.model_path = ADVENTURER_KNIGHT
+	guard.model_scale = 1.0
+	guard.body_color = Color(0.5, 0.5, 0.6)
+	guard.wander_radius = 4.0
+	guard.greeting_lines = ["Stay safe.", "Keep your wits about you.", "All clear... for now."]
+	guard.dialogue = [
+		{"text": "I keep watch over this village. The skeletons in the forest have been getting bolder lately.", "choices": [
+			{"text": "I can help with that.", "next": 1},
+			{"text": "I'll be careful.", "action": "close"},
+		]},
+		{"text": "If you're heading into the forest, bring a good weapon. Those bone-heads hit harder than they look.", "choices": [
+			{"text": "Noted. Thanks.", "action": "close"},
+		]}
+	]
+	_npc_registry["guard"] = guard
+
+func _create_npc(npc_id: String, pos: Vector3) -> void:
+	var data = _npc_registry.get(npc_id)
+	if not data:
+		push_warning("Unknown NPC: %s" % npc_id)
+		return
+	
+	# Snap to terrain height
+	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+		pos.y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+	else:
+		pos.y = 30.0
+	
+	var npc = BaseNPCScript.new()
+	npc.setup(data)
+	npc.position = pos
+	add_child(npc)
+	_npc_nodes[npc_id] = npc
+	
+	# Connect NPC signals to UI
+	npc.dialogue_requested.connect(_on_npc_dialogue_requested)
+	npc.shop_requested.connect(_on_npc_shop_requested)
+
+func _on_npc_dialogue_requested(npc: Node, npc_player: Node3D) -> void:
+	var npc_id = npc.npc_data.npc_id if npc.npc_data else ""
+	var qm = get_node_or_null("/root/QuestManager")
+	
+	# Check if NPC has quests to offer or turn in
+	if qm and not npc_id.is_empty():
+		# Turn in completed quests first
+		var turnable = qm.get_turnable_quests_for_npc(npc_id)
+		for quest_id in turnable:
+			qm.turn_in_quest(quest_id)
+		
+		# Offer available quests
+		var available = qm.get_available_quests_for_npc(npc_id)
+		for quest_id in available:
+			qm.accept_quest(quest_id)
+		
+		_refresh_npc_quest_glows()
+	
+	# Emit EventBus signal so QuestManager tracks TALK_TO_NPC objectives
+	var event_bus = get_node_or_null("/root/EventBus")
+	if event_bus and not npc_id.is_empty():
+		event_bus.npc_dialogue_started.emit(npc_id)
+	
+	if dialogue_ui and dialogue_ui.has_method("open"):
+		dialogue_ui.open(npc, npc_player)
+
+func _on_npc_shop_requested(npc: Node, npc_player: Node3D) -> void:
+	if shop_ui and shop_ui.has_method("open"):
+		shop_ui.open(npc, npc_player)
+
+# ── Quest System Integration ──────────────────────────────────────────────────
+
+var _npc_nodes: Dictionary = {}  # npc_id -> BaseNPC node
+
+func _on_qm_quest_accepted(quest_id: String) -> void:
+	# Auto-track in journal
+	if quest_journal_ui and quest_journal_ui.has_method("auto_track_quest"):
+		quest_journal_ui.auto_track_quest(quest_id)
+		quest_journal_ui._sync_tracker_ui()
+	else:
+		# Fallback: add directly to tracker
+		var tracker = _get_quest_tracker()
+		var qm = get_node_or_null("/root/QuestManager")
+		if tracker and qm:
+			var quest = qm.quest_definitions.get(quest_id) as QuestData
+			if quest:
+				var objectives: Array = []
+				for obj in quest.objectives:
+					objectives.append({
+						"text": obj.get("text", ""),
+						"current": qm.get_objective_progress(quest_id, objectives.size()),
+						"target": obj.get("target", 1),
+					})
+				tracker.add_quest(quest_id, quest.quest_name, objectives)
+	_refresh_npc_quest_glows()
+
+func _on_qm_objective_updated(quest_id: String, objective_index: int, current: int, _target: int) -> void:
+	var tracker = _get_quest_tracker()
+	if tracker:
+		tracker.update_objective(quest_id, objective_index, current)
+
+func _on_qm_quest_completed(_quest_id: String) -> void:
+	# Quest objectives are done — if auto-turnin, it will fire turned_in next
+	# If NPC turnin required, the glow will update
+	_refresh_npc_quest_glows()
+
+func _on_qm_quest_turned_in(quest_id: String) -> void:
+	# Untrack from journal and HUD tracker
+	if quest_journal_ui and quest_journal_ui.has_method("auto_untrack_quest"):
+		quest_journal_ui.auto_untrack_quest(quest_id)
+		quest_journal_ui._sync_tracker_ui()
+	else:
+		var tracker = _get_quest_tracker()
+		if tracker:
+			tracker.complete_quest(quest_id)
+	_refresh_npc_quest_glows()
+
+func _on_qm_quest_available(quest_id: String) -> void:
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return
+	var quest = qm.quest_definitions.get(quest_id) as QuestData
+	if not quest:
+		return
+	
+	# Auto-accept quests with no giver NPC (they're given by the world/system)
+	if quest.giver_npc_id.is_empty():
+		qm.accept_quest(quest_id)
+	else:
+		_refresh_npc_quest_glows()
+
+func _refresh_npc_quest_glows() -> void:
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return
+	
+	# Update glow on all registered NPCs
+	for npc_id in _npc_nodes:
+		if not is_instance_valid(_npc_nodes[npc_id]):
+			continue
+		var has_business = qm.npc_has_quest_business(npc_id)
+		_npc_nodes[npc_id].set_quest_available(has_business)
+
 func _input(event: InputEvent) -> void:
 	# Handle Tab key to toggle both inventory and character UI
 	if event is InputEventKey and event.pressed:
@@ -942,4 +1454,13 @@ func _input(event: InputEvent) -> void:
 					crafting_ui.close()
 				else:
 					crafting_ui.show_crafting()
+				get_viewport().set_input_as_handled()
+		
+		# J key to toggle quest journal
+		elif event.keycode == KEY_J:
+			if quest_journal_ui:
+				if quest_journal_ui.visible:
+					quest_journal_ui.close()
+				else:
+					quest_journal_ui.open()
 				get_viewport().set_input_as_handled()

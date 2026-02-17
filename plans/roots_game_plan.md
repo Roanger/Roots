@@ -267,12 +267,17 @@ graph TD
 - [ ] Add biome climate effects
 
 #### 4.2 NPC System
-- [ ] Design NPC structure and behaviors
-- [ ] Create villager AI
+- [x] Design NPC structure and behaviors (NPCData resource: role, identity, model, dialogue tree, shop inventory, quest refs)
+- [x] Create villager AI (BaseNPC: IDLE/WANDER/TALKING states, terrain snapping, on_interact → dialogue)
 - [ ] Implement NPC schedules
-- [ ] Design merchant system
-- [ ] Add quest givers
+- [x] Design merchant system (ShopUI: item list with buy buttons, gold_coin currency, stock management)
+- [x] Add quest givers (NPC quest glow system, dialogue-driven quest accept/turnin)
 - [ ] Implement reputation system
+- [x] 8 village NPCs: Elara (Shopkeeper), Bram (Innkeeper), Tormund (Blacksmith), Marta (Baker), Aldric (Mayor/Quest Giver), Sage Willow (Herbalist), Old Hank (Farmer), Captain Rolf (Guard)
+- [x] DialogueUI (bottom panel: NPC name, rich text, choice buttons, actions: shop/close/quest/next)
+- [x] KayKit Adventurers 3D models (Barbarian, Knight, Mage, Ranger, Rogue, Rogue_Hooded)
+- [x] NPC quest glow (yellow glow when NPC has available/turnable quests or active TALK_TO_NPC objectives)
+- [x] Town Builder system (Medieval Village MegaKit modular buildings for village layout)
 
 #### 4.3 Settlement System
 - [x] Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel digs/flattens)
@@ -280,11 +285,29 @@ graph TD
 - [x] Dynamic FarmPlot spawning on tilled terrain (replaces pre-placed farm plots)
 - [x] Terrain visual feedback (vertex color changes for modified cells)
 - [x] Save/load terrain modifications per chunk
+- [ ] **[WIP] Terrain digging** — `dig_at()` removes topmost voxel and rebuilds chunk mesh, but the full digging experience is not flushed out. Needs: proper tool integration, dig depth limits, visual polish, and interaction feel. Will continue in a future session.
 - [ ] Design plot claiming
 - [ ] Implement housing placement
 - [ ] Create decoration system
 - [ ] Design community buildings
 - [ ] Add player-specific land permissions
+
+#### 4.6 Quest System
+- [x] QuestData resource (status, objectives, rewards, prerequisites, NPC giver/turnin, quest chains)
+- [x] QuestManager autoload (accept, track progress, complete, turn in, prerequisite gating)
+- [x] QuestDatabase with 10+ quests across 3 chains (gather_supplies, first_harvest, skeleton_threat)
+- [x] Objective types: COLLECT_ITEM, DEFEAT_ENEMY, TALK_TO_NPC, CRAFT_ITEM, HARVEST_CROP, TILL_SOIL
+- [x] COLLECT_ITEM tracking via inventory polling (connected to inventory_changed/hotbar_changed signals)
+- [x] Quest Journal UI (J key toggle, full-screen panel with Active/Available/Completed tabs)
+- [x] Quest detail pane (description, objectives with progress, rewards, NPC info)
+- [x] Click-to-track system (up to 4 tracked quests shown on HUD quest tracker)
+- [x] Auto-track on quest accept, auto-untrack on quest turn in
+- [x] Quest flow gating: only "welcome" quest available at start, others unlock after welcome is turned in
+- [x] HUD Quest Tracker UI (top-right, shows tracked quest names + objective progress)
+- [x] NPC dialogue-driven quest accept and turn-in with reward granting
+- [ ] Quest notification popups (quest accepted, quest complete, quest turned in)
+- [ ] Quest compass/waypoint markers
+- [ ] More quest content and chains
 
 #### 4.4 Wildlife System
 - [ ] Design animal spawn tables per biome
@@ -524,6 +547,15 @@ sequenceDiagram
 - Implement chunk culling for unrendered areas
 - Use instancing for repeated objects (trees, rocks)
 
+### Voxel Terrain Performance (Completed Feb 2026)
+- **Chunk system:** 32×32×145 voxel grid per chunk, CHUNK_HEIGHT=145, VOXEL_Y_OFFSET=-80
+- **Noise pre-caching:** Cave and ore noise pre-sampled into flat `PackedByteArray` arrays before voxel fill loop — eliminates redundant 3D noise calls
+- **ArrayMesh builder:** Replaced `SurfaceTool` with direct `PackedArrays → ArrayMesh` — mesh build time ~330ms → ~30ms
+- **WorkerThreadPool:** Chunk data generation AND mesh geometry build run on background threads (up to 4 parallel). Main thread only does `add_child` + object placement
+- **Thread-safe noise:** `NoiseBundle` inner class (`RefCounted`) created per worker thread — owns its own `FastNoiseLite` instances, no shared state
+- **Cave noise octaves:** Reduced 3 → 2, halving cave sampling cost
+- **Result:** Game is immediately playable at spawn; chunks stream in progressively in the background
+
 ### Save System
 - **Local Saves:** Player progress, inventory, skills
 - **Cloud Saves:** GD-Sync persistent data
@@ -602,11 +634,13 @@ For solo development, prioritize these skills:
 11. ~~Phase 4.5: Environmental — Day/night cycle, BinbunSky shader, seasonal sky, clock UI~~ ✓
 12. ~~Phase 3.3: Cooking — 14 recipes, food buffs, well_fed system, cooking XP~~ ✓
 13. ~~Phase 3.5: Husbandry — Animal feeding/petting, breeding system, building placeables~~ ✓
-14. **Phase 4.2: NPC System** ← NEXT — Villagers, merchants, quests
-15. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
+14. ~~Voxel terrain performance overhaul — WorkerThreadPool threading, ArrayMesh, noise pre-caching~~ ✓
+15. **[WIP] Terrain digging** — basic `dig_at()` exists but not fully flushed out; continue in future session
+16. **Phase 4.2: NPC System** ← NEXT — Villagers, merchants, quests
+17. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 complete + Phase 4.5 partial.** Harvestable trees/rocks/herbs, crafting stations (Workbench/Forge/Anvil/Alchemy Table/Cooking Fire), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs), alchemy (6 potions with buff system). Cooking system (14 recipes, food buffs: well_fed/speed/strength/heal-over-time). Animal husbandry (feeding, petting, breeding with baby spawns, 5 building placeables: Barn/Hut/Trough/Campfire/Sitting Log). Day/night cycle with BinbunSky shader, seasonal sky variation, in-game clock UI. Full gameplay loop: explore → farm → cook → breed animals → fight. Next: NPC System (Phase 4.2).*
+*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 complete + Phase 4.5 partial + Voxel terrain performance overhaul complete.** Harvestable trees/rocks/herbs, crafting stations (Workbench/Forge/Anvil/Alchemy Table/Cooking Fire), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs), alchemy (6 potions with buff system). Cooking system (14 recipes, food buffs: well_fed/speed/strength/heal-over-time). Animal husbandry (feeding, petting, breeding with baby spawns, 5 building placeables: Barn/Hut/Trough/Campfire/Sitting Log). Day/night cycle with BinbunSky shader, seasonal sky variation, in-game clock UI. Full gameplay loop: explore → farm → cook → breed animals → fight. Voxel terrain now uses WorkerThreadPool (4 parallel jobs), ArrayMesh builder, noise pre-caching, and thread-local NoiseBundle — chunks stream in smoothly without blocking the main thread. **[WIP] Terrain digging** not yet flushed out — will continue. Next: NPC System (Phase 4.2).*

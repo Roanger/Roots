@@ -90,6 +90,9 @@ func plant_seed(seed_id: String, p_crop_data: CropData) -> bool:
 	
 	_update_visuals()
 	crop_planted.emit(crop_id)
+	var eb = get_node_or_null("/root/EventBus")
+	if eb:
+		eb.crop_planted.emit(global_position, crop_id)
 	return true
 
 func water() -> bool:

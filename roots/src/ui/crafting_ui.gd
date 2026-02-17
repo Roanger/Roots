@@ -28,8 +28,10 @@ var _detail_desc: Label
 var _ingredients_container: VBoxContainer
 var _output_container: HBoxContainer
 var _craft_button: Button
+var _craft_all_button: Button
 var _progress_bar: ProgressBar
 var _category_buttons: Dictionary = {}
+var _craft_queue: int = 0  # Remaining crafts in a Craft All batch
 
 func _ready() -> void:
 	visible = false
@@ -186,13 +188,26 @@ func _build_ui() -> void:
 	_progress_bar.visible = false
 	detail_vbox.add_child(_progress_bar)
 	
-	# Craft button
+	# Craft buttons row
+	var craft_row = HBoxContainer.new()
+	craft_row.add_theme_constant_override("separation", 6)
+	detail_vbox.add_child(craft_row)
+	
 	_craft_button = Button.new()
 	_craft_button.text = "Craft"
 	_craft_button.custom_minimum_size = Vector2(0, 40)
+	_craft_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_craft_button.disabled = true
 	_craft_button.pressed.connect(_on_craft_pressed)
-	detail_vbox.add_child(_craft_button)
+	craft_row.add_child(_craft_button)
+	
+	_craft_all_button = Button.new()
+	_craft_all_button.text = "Craft All"
+	_craft_all_button.custom_minimum_size = Vector2(0, 40)
+	_craft_all_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_craft_all_button.disabled = true
+	_craft_all_button.pressed.connect(_on_craft_all_pressed)
+	craft_row.add_child(_craft_all_button)
 
 func _process(delta: float) -> void:
 	if not visible:
@@ -323,10 +338,16 @@ func _update_detail_panel() -> void:
 		out_label.add_theme_font_size_override("font_size", 16)
 		_output_container.add_child(out_label)
 	
-	# Update craft button
+	# Update craft buttons
 	var can_craft = selected_recipe.has_ingredients(inventory) if inventory else false
 	_craft_button.disabled = not can_craft or _is_crafting
 	_craft_button.text = "Craft" if not _is_crafting else "Crafting..."
+	
+	var max_count = _get_max_craftable(selected_recipe)
+	_craft_all_button.disabled = max_count < 2 or _is_crafting
+	_craft_all_button.text = "Craft All (%d)" % max_count if max_count >= 2 else "Craft All"
+	if _is_crafting and _craft_queue > 0:
+		_craft_all_button.text = "Crafting... (%d left)" % _craft_queue
 
 func _on_craft_pressed() -> void:
 	if not selected_recipe or _is_crafting:
@@ -334,12 +355,44 @@ func _on_craft_pressed() -> void:
 	if not selected_recipe.has_ingredients(inventory):
 		return
 	
+	_craft_queue = 0
+	_start_crafting()
+
+func _on_craft_all_pressed() -> void:
+	if not selected_recipe or _is_crafting:
+		return
+	var max_count = _get_max_craftable(selected_recipe)
+	if max_count < 1:
+		return
+	
+	_craft_queue = max_count - 1  # First craft starts immediately
+	_start_crafting()
+
+func _start_crafting() -> void:
 	_is_crafting = true
 	_crafting_timer = selected_recipe.crafting_time
 	_progress_bar.visible = true
 	_progress_bar.value = 0
 	_craft_button.disabled = true
 	_craft_button.text = "Crafting..."
+	_craft_all_button.disabled = true
+	if _craft_queue > 0:
+		_craft_all_button.text = "Crafting... (%d left)" % _craft_queue
+
+func _get_max_craftable(recipe: CraftingRecipe) -> int:
+	if not recipe or not inventory:
+		return 0
+	var max_possible := 999
+	for ingredient in recipe.ingredients:
+		var item_id: String = ingredient.get("item_id", "")
+		var amount: int = ingredient.get("amount", 1)
+		if amount <= 0:
+			continue
+		var have = inventory.get_item_count(item_id)
+		@warning_ignore("integer_division")
+		var can_make = have / amount
+		max_possible = mini(max_possible, can_make)
+	return max_possible
 
 func _finish_crafting() -> void:
 	_is_crafting = false
@@ -375,10 +428,25 @@ func _finish_crafting() -> void:
 	# Grant XP
 	if selected_recipe.xp_skill != "" and selected_recipe.xp_amount > 0:
 		var skill_manager = get_node_or_null("/root/SkillManager")
-		if skill_manager and skill_manager.has_method("grant_action_xp"):
-			skill_manager.grant_action_xp("craft_" + selected_recipe.recipe_id)
+		if skill_manager and skill_manager.has_method("grant_xp"):
+			skill_manager.grant_xp(selected_recipe.xp_skill, int(selected_recipe.xp_amount))
 	
 	emit_signal("item_crafted", selected_recipe.recipe_id)
+	
+	# Notify EventBus for quest tracking
+	var eb = get_node_or_null("/root/EventBus")
+	if eb:
+		eb.crafting_completed.emit(selected_recipe.recipe_id, {"item_id": selected_recipe.output_item_id, "amount": selected_recipe.output_amount})
+	
+	# Continue queue if Craft All is active
+	if _craft_queue > 0 and selected_recipe and selected_recipe.has_ingredients(inventory):
+		_craft_queue -= 1
+		_start_crafting()
+		_refresh_recipes()
+		_update_detail_panel()
+		return
+	
+	_craft_queue = 0
 	
 	# Refresh UI
 	_refresh_recipes()
@@ -396,6 +464,7 @@ func _on_category_pressed(category_index: int) -> void:
 func close() -> void:
 	visible = false
 	_is_crafting = false
+	_craft_queue = 0
 	_progress_bar.visible = false
 	
 	# Check if other UIs are open before recapturing mouse

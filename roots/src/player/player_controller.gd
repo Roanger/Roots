@@ -86,6 +86,10 @@ var _tool_use_cooldown_max: float = 0.5  # Seconds between swings
 var _terrain_highlight: MeshInstance3D = null
 var _highlight_visible: bool = false
 
+# Underground tracking
+var is_underground: bool = false
+var _underground_depth: float = 0.0  # How far below surface (positive = deeper)
+
 # Currently selected hotbar item (set by main_world when hotbar selection changes)
 var _selected_hotbar_item: InventoryItem = null
 
@@ -184,6 +188,7 @@ func _physics_process(delta: float) -> void:
 	_process_tool_use()
 	_update_terrain_highlight()
 	_update_placement_preview()
+	_update_underground_state()
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_ground:
@@ -221,6 +226,21 @@ func _update_terrain_height() -> void:
 	else:
 		# Fallback to basic height
 		terrain_height = 10.0
+
+func _update_underground_state() -> void:
+	## Detect when player is below the terrain surface (in a dug hole or cave).
+	var depth = terrain_height - global_position.y
+	_underground_depth = depth
+	var was_underground = is_underground
+	# Underground if more than 1.5 units below surface
+	is_underground = depth > 1.5
+	if is_underground != was_underground:
+		var eb = get_node_or_null("/root/EventBus")
+		if eb and eb.has_signal("player_underground_changed"):
+			eb.player_underground_changed.emit(is_underground, _underground_depth)
+
+func get_underground_depth() -> float:
+	return _underground_depth
 
 func _move_character(delta: float) -> void:
 	var speed = move_speed
@@ -412,20 +432,30 @@ func _swing_tool() -> void:
 			return
 	
 	# No collider hit — try terrain modification (hoe/shovel on ground)
-	if tool_type in ["hoe", "shovel"] and chunk_manager and chunk_manager.has_method("modify_terrain_at"):
+	if tool_type in ["hoe", "shovel"] and chunk_manager:
 		var terrain_pos = _get_terrain_look_position()
 		if terrain_pos != Vector3.ZERO:
-			var mod_type: int = 1 if tool_type == "hoe" else 2  # TILLED=1, DUG=2
-			if chunk_manager.modify_terrain_at(terrain_pos, mod_type):
-				if tool_type == "hoe":
+			if tool_type == "hoe":
+				var mod_type: int = 1  # TILLED=1
+				if chunk_manager.has_method("modify_terrain_at") and chunk_manager.modify_terrain_at(terrain_pos, mod_type):
 					var skill_mgr = get_node_or_null("/root/SkillManager")
 					if skill_mgr:
 						skill_mgr.grant_action_xp("till_soil")
+					var eb = get_node_or_null("/root/EventBus")
+					if eb:
+						eb.soil_tilled.emit(terrain_pos)
 					_show_tool_feedback("Tilled soil!")
 				else:
-					_show_tool_feedback("Dug ground!")
-			else:
-				_show_tool_feedback("Can't modify terrain here.")
+					_show_tool_feedback("Can't till here.")
+			elif tool_type == "shovel":
+				# Shovel digs down — vertex deformation + underground reveal
+				if chunk_manager.has_method("dig_terrain_at") and chunk_manager.dig_terrain_at(terrain_pos):
+					var skill_mgr = get_node_or_null("/root/SkillManager")
+					if skill_mgr:
+						skill_mgr.grant_action_xp("till_soil")
+					_show_tool_feedback("Dug!")
+				else:
+					_show_tool_feedback("Can't dig here.")
 
 func _get_terrain_look_position() -> Vector3:
 	if not camera or not chunk_manager:

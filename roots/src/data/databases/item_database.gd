@@ -243,6 +243,9 @@ func _initialize_items() -> void:
 	gold_ingot.icon = _load_icon("res://Ore & Gem/Golden Ingot.png")
 	gold_ingot.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Gold_Bar.fbx"
 	_register_item(gold_ingot)
+	var gold_coin = _create_material("gold_coin", "Gold Coin", "Standard currency used for trading.", 1, 999)
+	gold_coin.icon = _load_icon("res://Ore & Gem/Gold Nugget.png")
+	_register_item(gold_coin)
 	
 	# Steel & Mythril (advanced tier materials)
 	var steel_ingot = _create_material("steel_ingot", "Steel Ingot", "An alloy of iron and coal, stronger than iron.", 60, 30)

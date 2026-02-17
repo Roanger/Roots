@@ -4,6 +4,8 @@ class_name HUD
 
 const CompassUIScript = preload("res://src/ui/hud/compass_ui.gd")
 const ClockUIScript = preload("res://src/ui/hud/clock_ui.gd")
+const BuffDisplayUIScript = preload("res://src/ui/hud/buff_display_ui.gd")
+const QuestTrackerUIScript = preload("res://src/ui/hud/quest_tracker_ui.gd")
 
 @onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthBar
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/StaminaBar
@@ -15,6 +17,8 @@ const ClockUIScript = preload("res://src/ui/hud/clock_ui.gd")
 var player: Node = null
 var compass: Control = null
 var clock: Control = null
+var buff_display: Control = null
+var quest_tracker: Control = null
 
 func _ready() -> void:
 	# Initially hidden until initialized
@@ -69,6 +73,36 @@ func initialize(p_player: Node) -> void:
 	clock.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(clock)
+	
+	# Create buff display below health/stamina bars
+	buff_display = BuffDisplayUIScript.new()
+	buff_display.name = "BuffDisplayUI"
+	buff_display.set_player(player)
+	# Position below the MarginContainer (health/stamina bars end around y=120)
+	buff_display.anchor_left = 0.0
+	buff_display.anchor_top = 0.0
+	buff_display.offset_left = 258.0
+	buff_display.offset_top = 20.0
+	buff_display.offset_right = 600.0
+	buff_display.offset_bottom = 60.0
+	buff_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(buff_display)
+	
+	# Create quest tracker below clock
+	quest_tracker = QuestTrackerUIScript.new()
+	quest_tracker.name = "QuestTrackerUI"
+	quest_tracker.anchor_left = 1.0
+	quest_tracker.anchor_right = 1.0
+	quest_tracker.anchor_top = 0.0
+	quest_tracker.anchor_bottom = 0.0
+	# Clock ends at y=340, add 4px gap
+	quest_tracker.offset_left = -210.0
+	quest_tracker.offset_top = 344.0
+	quest_tracker.offset_right = -20.0
+	quest_tracker.offset_bottom = 500.0
+	quest_tracker.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	quest_tracker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(quest_tracker)
 	
 	visible = true
 	print("HUD initialized")

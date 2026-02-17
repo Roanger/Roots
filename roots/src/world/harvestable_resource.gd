@@ -36,9 +36,6 @@ func on_hit(player: Node3D, _tool_type: String, power: float = 1.0) -> void:
 	# Visual feedback: shake
 	_play_hit_effect()
 	
-	# Grant XP to player
-	_grant_xp(player, power)
-	
 	if current_health <= 0:
 		_destroy(player)
 
@@ -73,6 +70,17 @@ func _destroy(player: Node3D) -> void:
 	if _is_destroyed:
 		return
 	_is_destroyed = true
+	
+	# Grant XP once on destroy
+	_grant_xp(player, 1.0)
+	
+	# Notify QuestManager for resource destroy objectives
+	var qm = get_node_or_null("/root/QuestManager")
+	if qm and qm.has_method("on_resource_destroyed"):
+		if resource_type == ToolAffinity.TargetType.TREE:
+			qm.on_resource_destroyed("tree")
+		elif resource_type == ToolAffinity.TargetType.ROCK:
+			qm.on_resource_destroyed("rock")
 	
 	# Spawn loot drops
 	_spawn_drops(player)

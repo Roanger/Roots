@@ -381,6 +381,10 @@ func _die() -> void:
 	var tween = create_tween()
 	tween.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.8)
 	
+	# Notify quest system
+	if event_bus:
+		event_bus.enemy_defeated.emit(enemy_name)
+	
 	print("%s defeated!" % enemy_name)
 
 func _spawn_loot() -> void:

@@ -18,10 +18,23 @@ signal season_changed(season: int)
 signal weather_changed(weather_type: String, intensity: float)
 
 # Farming events
+signal soil_tilled(position: Vector3)
 signal crop_planted(position: Vector3, crop_type: String)
 signal crop_harvested(position: Vector3, crop_type: String, amount: int)
 signal crop_watered(position: Vector3)
 signal animal_interacted(animal_id: String, action: String)
+
+# Combat events
+signal enemy_defeated(enemy_name: String)
+
+# Underground events
+signal player_underground_changed(is_underground: bool, depth: float)
+
+# NPC events
+signal npc_dialogue_started(npc_id: String)
+signal npc_dialogue_ended(npc_id: String)
+signal npc_shop_opened(npc_id: String)
+signal npc_item_bought(npc_id: String, item_id: String, price: int)
 
 # Crafting events
 signal open_crafting_station(station_type: int)

@@ -485,7 +485,7 @@ func _init_recipes() -> void:
 		"craft_fence_wood", "Wooden Fence", "Craft a wooden fence section.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_plank", "amount": 2}, {"item_id": "string", "amount": 1}],
-		"fence_wood", 2, 2.0, "construction", 5.0
+		"fence_wood", 2, 2.0, "crafting", 5.0
 	))
 	
 	# Fence Post - 1 log
@@ -493,7 +493,7 @@ func _init_recipes() -> void:
 		"craft_fence_post", "Fence Post", "Craft a fence post for corners and ends.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_log", "amount": 1}],
-		"fence_post", 2, 1.5, "construction", 3.0
+		"fence_post", 2, 1.5, "crafting", 3.0
 	))
 	
 	# Fence Gate - 3 planks + 2 string + 1 iron ingot (hinge)
@@ -501,7 +501,7 @@ func _init_recipes() -> void:
 		"craft_fence_gate", "Fence Gate", "Craft a gate that can be opened and closed.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "string", "amount": 2}, {"item_id": "iron_ingot", "amount": 1}],
-		"fence_gate", 1, 3.0, "construction", 10.0
+		"fence_gate", 1, 3.0, "crafting", 10.0
 	))
 	
 	# Barn - large building, expensive
@@ -509,7 +509,7 @@ func _init_recipes() -> void:
 		"craft_barn", "Barn", "Build a barn to shelter your animals.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_log", "amount": 10}, {"item_id": "wood_plank", "amount": 8}, {"item_id": "iron_ingot", "amount": 2}, {"item_id": "rope", "amount": 2}],
-		"barn", 1, 10.0, "construction", 25.0
+		"barn", 1, 10.0, "crafting", 25.0
 	))
 	
 	# Hut - smaller building
@@ -517,7 +517,7 @@ func _init_recipes() -> void:
 		"craft_hut", "Hut", "Build a small hut for storage or shelter.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_log", "amount": 6}, {"item_id": "wood_plank", "amount": 4}, {"item_id": "rope", "amount": 1}],
-		"hut", 1, 8.0, "construction", 18.0
+		"hut", 1, 8.0, "crafting", 18.0
 	))
 	
 	# Feeding Trough
@@ -525,7 +525,7 @@ func _init_recipes() -> void:
 		"craft_feeding_trough", "Feeding Trough", "Craft a trough for feeding farm animals.",
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_plank", "amount": 4}, {"item_id": "iron_ingot", "amount": 1}],
-		"feeding_trough", 1, 4.0, "construction", 10.0
+		"feeding_trough", 1, 4.0, "crafting", 10.0
 	))
 	
 	# Campfire
