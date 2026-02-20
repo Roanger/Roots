@@ -172,8 +172,9 @@ func _cache_mesh_materials(node: Node) -> void:
 # ── Physics ──────────────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	# Snap to terrain height BEFORE move (same pattern as BaseEnemy)
-	_snap_to_terrain()
+	# Apply standard Godot gravity
+	if not is_on_floor():
+		velocity.y -= 20.0 * delta
 
 	match ai_state:
 		AIState.IDLE:
@@ -200,18 +201,6 @@ func _physics_process(delta: float) -> void:
 		breed_timer -= delta
 
 	move_and_slide()
-
-func _snap_to_terrain() -> void:
-	if _chunk_manager and _chunk_manager.has_method("get_terrain_height"):
-		var terrain_y = _chunk_manager.get_terrain_height(global_position)
-		if global_position.y < terrain_y + 0.1:
-			global_position.y = terrain_y
-			velocity.y = 0
-		elif global_position.y > terrain_y + 2.0:
-			velocity.y -= 20.0 * get_physics_process_delta_time()
-		else:
-			global_position.y = terrain_y
-			velocity.y = 0
 
 # ── AI States ────────────────────────────────────────────────────────────────
 

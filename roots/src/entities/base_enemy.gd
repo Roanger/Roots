@@ -156,9 +156,10 @@ func _cache_mesh_materials(node: Node) -> void:
 		_cache_mesh_materials(child)
 
 func _physics_process(delta: float) -> void:
-	# Snap to terrain height (terrain has no physics collision body)
-	_snap_to_terrain()
-	
+	# Apply standard Godot gravity
+	if not is_on_floor():
+		velocity.y -= _gravity * delta
+
 	match ai_state:
 		AIState.IDLE:
 			_process_idle(delta)
@@ -173,25 +174,12 @@ func _physics_process(delta: float) -> void:
 		AIState.DEAD:
 			_process_dead(delta)
 			return
-	
+
 	# Always check for player detection (except when dead/hurt)
 	if ai_state != AIState.DEAD and ai_state != AIState.HURT:
 		_check_player_detection()
-	
-	move_and_slide()
 
-func _snap_to_terrain() -> void:
-	if _chunk_manager and _chunk_manager.has_method("get_terrain_height"):
-		var terrain_y = _chunk_manager.get_terrain_height(global_position)
-		if global_position.y < terrain_y + 0.1:
-			global_position.y = terrain_y
-			velocity.y = 0
-		elif global_position.y > terrain_y + 2.0:
-			# Falling — apply gravity toward terrain
-			velocity.y -= _gravity * get_physics_process_delta_time()
-		else:
-			global_position.y = terrain_y
-			velocity.y = 0
+	move_and_slide()
 
 func _process_idle(delta: float) -> void:
 	velocity.x = 0

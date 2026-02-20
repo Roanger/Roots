@@ -1,8 +1,8 @@
 extends CharacterBody3D
 class_name BaseNPC
-## Base class for all village NPCs. Handles terrain snapping, idle/wander AI,
+## Base class for all village NPCs. Handles idle/wander AI,
 ## interaction (dialogue, shopping), and visual setup.
-## Uses the same terrain-snapping pattern as BaseEnemy and BaseAnimal.
+## Uses standard Godot CharacterBody3D physics for grounding.
 
 const NPCDataScript = preload("res://src/entities/npcs/npc_data.gd")
 
@@ -16,7 +16,6 @@ var _spawn_position: Vector3 = Vector3.ZERO
 var _wander_target: Vector3 = Vector3.ZERO
 var _idle_timer: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var _chunk_manager: Node = null
 var _model_node: Node3D = null
 var _mesh: MeshInstance3D = null
 var _name_label: Label3D = null
@@ -33,23 +32,10 @@ signal shop_requested(npc: BaseNPC, player: Node3D)
 func _ready() -> void:
 	add_to_group("npcs")
 	collision_layer = 2  # World objects layer — so player raycast hits us
-	collision_mask = 0   # NPCs don't collide with anything
+	collision_mask = 1   # Collide with terrain (layer 1) for gravity grounding
 	_rng.randomize()
 	_spawn_position = global_position
 	_idle_timer = _rng.randf_range(2.0, 5.0)
-
-	# Find chunk_manager for terrain height queries
-	var scene = get_tree().current_scene
-	if scene:
-		_chunk_manager = scene.get_node_or_null("ChunkManager")
-		if not _chunk_manager and scene.has_method("get_chunk_manager"):
-			_chunk_manager = scene.get_chunk_manager()
-		if not _chunk_manager:
-			for child in scene.get_children():
-				if child.has_method("get_terrain_height"):
-					_chunk_manager = child
-					break
-
 	_build_visual()
 
 func setup(data) -> void:
@@ -128,7 +114,8 @@ func _build_placeholder_visual() -> void:
 # ── Physics ─────────────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	_snap_to_terrain()
+	if not is_on_floor():
+		velocity.y -= 20.0 * delta
 	_update_quest_glow(delta)
 
 	match ai_state:
@@ -140,18 +127,6 @@ func _physics_process(delta: float) -> void:
 			_process_talking(delta)
 
 	move_and_slide()
-
-func _snap_to_terrain() -> void:
-	if _chunk_manager and _chunk_manager.has_method("get_terrain_height"):
-		var terrain_y = _chunk_manager.get_terrain_height(global_position)
-		if global_position.y < terrain_y + 0.1:
-			global_position.y = terrain_y
-			velocity.y = 0
-		elif global_position.y > terrain_y + 2.0:
-			velocity.y -= 20.0 * get_physics_process_delta_time()
-		else:
-			global_position.y = terrain_y
-			velocity.y = 0
 
 # ── AI States ───────────────────────────────────────────────────────────────
 

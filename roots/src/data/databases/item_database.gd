@@ -204,7 +204,12 @@ func _initialize_items() -> void:
 	var stick = _create_material("stick", "Stick", "A simple wooden stick.", 1, 99)
 	stick.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(stick)
-	
+
+	# Earth
+	var dirt = _create_material("dirt", "Dirt", "A handful of loose earth.", 1, 99)
+	dirt.icon = _load_icon("res://Ore & Gem/Coal.png") # Temp icon
+	_register_item(dirt)
+
 	# Stone
 	var stone = _create_material("stone", "Stone", "A chunk of raw stone.", 3, 50)
 	stone.icon = _load_icon("res://Ore & Gem/Obsidian.png")

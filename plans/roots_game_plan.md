@@ -112,8 +112,8 @@ graph TD
 - [x] Implement fog and skybox (BinbunSky shader: procedural clouds, sun disc, stars, day/night auto-blend)
 - [x] Integrate FBX trees and rocks with scale/rotation variation
 - [x] Biome-based props (e.g. dead trees in Plains/Mountains/Snow)
-- [x] Solid terrain rendering (vertex-colored ground, single-sided shader)
 - [x] KayKit Forest Nature Pack: 3D grass and bushes
+- [x] **[REWRITE]** Transition from Voxel Terrain to Smooth Heightmap Terrain (better AI nav, building placement, cozy aesthetic) — *Complete Feb 2026. See terrain_rewrite_plan.md*
 
 #### 1.5 Basic UI Framework
 - [x] Create main menu with single/multiplayer options
@@ -280,12 +280,12 @@ graph TD
 - [x] Town Builder system (Medieval Village MegaKit modular buildings for village layout)
 
 #### 4.3 Settlement System
-- [x] Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel digs/flattens)
-- [x] TileMod types: TILLED, DUG, PATH, FOUNDATION (ChunkData per-cell tracking)
-- [x] Dynamic FarmPlot spawning on tilled terrain (replaces pre-placed farm plots)
-- [x] Terrain visual feedback (vertex color changes for modified cells)
-- [x] Save/load terrain modifications per chunk
-- [ ] **[WIP] Terrain digging** — `dig_at()` removes topmost voxel and rebuilds chunk mesh, but the full digging experience is not flushed out. Needs: proper tool integration, dig depth limits, visual polish, and interaction feel. Will continue in a future session.
+- [x] **[REWRITE]** Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel flattens/digs)
+- [x] **[REWRITE]** TileMod types tracking (TILLED, DUG, PATH, FOUNDATION)
+- [x] **[REWRITE]** Dynamic FarmPlot spawning on tilled terrain
+- [x] **[REWRITE]** Terrain visual feedback (vertex color changes for modified cells)
+- [x] **[REWRITE]** Save/load terrain modifications per chunk
+- [~] Shovel digging visuals — *In Progress: bowl depression works, further polish needed*
 - [ ] Design plot claiming
 - [ ] Implement housing placement
 - [ ] Create decoration system
@@ -547,14 +547,13 @@ sequenceDiagram
 - Implement chunk culling for unrendered areas
 - Use instancing for repeated objects (trees, rocks)
 
-### Voxel Terrain Performance (Completed Feb 2026)
-- **Chunk system:** 32×32×145 voxel grid per chunk, CHUNK_HEIGHT=145, VOXEL_Y_OFFSET=-80
-- **Noise pre-caching:** Cave and ore noise pre-sampled into flat `PackedByteArray` arrays before voxel fill loop — eliminates redundant 3D noise calls
-- **ArrayMesh builder:** Replaced `SurfaceTool` with direct `PackedArrays → ArrayMesh` — mesh build time ~330ms → ~30ms
-- **WorkerThreadPool:** Chunk data generation AND mesh geometry build run on background threads (up to 4 parallel). Main thread only does `add_child` + object placement
-- **Thread-safe noise:** `NoiseBundle` inner class (`RefCounted`) created per worker thread — owns its own `FastNoiseLite` instances, no shared state
-- **Cave noise octaves:** Reduced 3 → 2, halving cave sampling cost
-- **Result:** Game is immediately playable at spawn; chunks stream in progressively in the background
+### Smooth Heightmap Terrain Rewrite (Planned Feb 2026)
+- **Motivation:** Voxel terrain (while optimized) clashes with the smooth low-poly aesthetic, breaks standard AI NavMesh generation, and makes building placement (farmhouses, large plots) extremely difficult. A cozy game requires predictable, rolling terrain.
+- **Architecture:** `ChunkData` will shift from a 3D voxel array (`PackedByteArray`) to a 2D heightmap array (`PackedFloat32Array`).
+- **Mesh Generation:** Chunks will generate a standard grid mesh using `ArrayMesh`.
+- **Physics:** The terrain will use a standard `StaticBody3D` with a `ConcavePolygonShape3D` or `HeightMapShape3D` (Jolt Physics). This allows players and AI to use standard `CharacterBody3D` physics (`move_and_slide`, `is_on_floor`) instead of manual raycast grounding.
+- **Modifications:** Digging will be replaced with localized vertex height adjustments (flattening) or splatmap painting (paths, tilled soil).
+- **Caves:** Will be moved to dedicated instanced scenes rather than seamless holes in the overworld.
 
 ### Save System
 - **Local Saves:** Player progress, inventory, skills
@@ -634,13 +633,20 @@ For solo development, prioritize these skills:
 11. ~~Phase 4.5: Environmental — Day/night cycle, BinbunSky shader, seasonal sky, clock UI~~ ✓
 12. ~~Phase 3.3: Cooking — 14 recipes, food buffs, well_fed system, cooking XP~~ ✓
 13. ~~Phase 3.5: Husbandry — Animal feeding/petting, breeding system, building placeables~~ ✓
-14. ~~Voxel terrain performance overhaul — WorkerThreadPool threading, ArrayMesh, noise pre-caching~~ ✓
-15. **[WIP] Terrain digging** — basic `dig_at()` exists but not fully flushed out; continue in future session
-16. **Phase 4.2: NPC System** ← NEXT — Villagers, merchants, quests
-17. **Phase 1 remaining:** Camera polish, GD-Sync lobby, project settings optimization
+14. ~~**[REWRITE]** Smooth Heightmap Terrain Transition~~ ✓
+    - ~~Strip out Voxel 3D arrays~~ ✓
+    - ~~Implement 2D Grid Heightmap generation~~ ✓
+    - ~~Add real Physics collision (`ConcavePolygonShape3D`)~~ ✓
+    - ~~Update Player/AI to use standard `move_and_slide()` physics~~ ✓
+    - ~~Re-integrate farm plot tilling and object placement~~ ✓
+    - ~~Fix chunk seam stitching~~ ✓
+    - ~~Fix WorldItem collision (not pushed by player)~~ ✓
+    - **Shovel digging visuals** — In Progress (bowl shape works, polish needed) ⚠️
+15. ~~**Phase 4.2: NPC System** — Villagers, merchants, quests~~ ✓
+16. **Next:** Continue digging polish, then Phase 1 remaining (camera, GD-Sync lobby, project settings)
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Phase 2 complete + Phase 3 complete + Phase 4.5 partial + Voxel terrain performance overhaul complete.** Harvestable trees/rocks/herbs, crafting stations (Workbench/Forge/Anvil/Alchemy Table/Cooking Fire), enemy system (4 KayKit Skeleton types), player combat, herb gathering (9 herbs), alchemy (6 potions with buff system). Cooking system (14 recipes, food buffs: well_fed/speed/strength/heal-over-time). Animal husbandry (feeding, petting, breeding with baby spawns, 5 building placeables: Barn/Hut/Trough/Campfire/Sitting Log). Day/night cycle with BinbunSky shader, seasonal sky variation, in-game clock UI. Full gameplay loop: explore → farm → cook → breed animals → fight. Voxel terrain now uses WorkerThreadPool (4 parallel jobs), ArrayMesh builder, noise pre-caching, and thread-local NoiseBundle — chunks stream in smoothly without blocking the main thread. **[WIP] Terrain digging** not yet flushed out — will continue. Next: NPC System (Phase 4.2).*
+*Last updated: Feb 2026 – **Smooth Heightmap Terrain Rewrite complete.** All voxel systems stripped. 2D heightmap generation with `ConcavePolygonShape3D` physics collision. Player, AI (animals, enemies, NPCs), and WorldItems all use standard Godot physics (`move_and_slide`, `RigidBody3D`). Chunk seam stitching implemented (edge vertices sample noise for seamless boundaries). Hoe tilling + FarmPlot spawning re-integrated. Shovel digging functional (3×3 bowl depression + DUG vertex color) but visual polish still in progress. WorldItem loot pickup fixed (not pushed by player). NPC system complete (8 village NPCs, dialogue, shops, quests). Full gameplay loop: explore → farm → cook → breed animals → fight. Next: digging polish, then camera/GD-Sync/project settings.*

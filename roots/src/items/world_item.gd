@@ -1,4 +1,4 @@
-extends Area3D
+extends RigidBody3D
 class_name WorldItem
 ## A pickupable item in the world
 
@@ -9,14 +9,13 @@ class_name WorldItem
 
 @onready var sprite: Sprite3D = $Sprite3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var pickup_area: Area3D = $PickupArea
 @onready var item_database: ItemDatabase = get_node_or_null("/root/ItemDatabase")
 @onready var event_bus: Node = get_node_or_null("/root/EventBus")
 
 var item_data: ItemData = null
-var bob_offset: float = 0.0
-var bob_speed: float = 3.0
-var bob_height: float = 0.2
-var initial_y: float = 0.0
+var _picked_up: bool = false
+var _bob_time: float = 0.0
 
 func _ready() -> void:
 	# Get item data from database
@@ -32,27 +31,20 @@ func _ready() -> void:
 			# Scale based on icon size
 			sprite.pixel_size = 0.005
 	
-	# Set up collision
-	if collision_shape:
-		var sphere = SphereShape3D.new()
-		sphere.radius = pickup_radius
-		collision_shape.shape = sphere
-	
 	# Connect body entered signal for auto-pickup or proximity detection
-	body_entered.connect(_on_body_entered)
-	
-	initial_y = position.y
-	bob_offset = randf() * 100.0  # Random starting phase
+	if pickup_area:
+		pickup_area.body_entered.connect(_on_body_entered)
+		
+	# Randomize bobbing start time
+	_bob_time = randf() * 10.0
 
 func _process(delta: float) -> void:
-	# Bobbing animation
-	var time = Time.get_time_dict_from_system()
-	var seconds = time.hour * 3600 + time.minute * 60 + time.second
-	var bob = sin((seconds + bob_offset) * bob_speed) * bob_height
-	position.y = initial_y + bob
-	
 	# Rotate slowly
-	rotate_y(delta * 1.0)
+	if sprite:
+		_bob_time += delta
+		# Add a subtle hover effect to the sprite relative to the rigidbody
+		sprite.position.y = sin(_bob_time * 3.0) * 0.1 + 0.1
+		sprite.rotate_y(delta * 1.0)
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.is_in_group("player"):
@@ -61,8 +53,6 @@ func _on_body_entered(body: Node3D) -> void:
 		else:
 			# Show pickup prompt or highlight
 			print("Press E to pick up ", item_data.item_name if item_data else item_id)
-
-var _picked_up: bool = false
 
 func _pickup(player: Node3D) -> void:
 	if _picked_up:

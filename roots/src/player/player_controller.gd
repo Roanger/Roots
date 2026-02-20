@@ -179,7 +179,6 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_handle_movement_input()
 	_apply_gravity(delta)
-	_update_terrain_height()
 	_update_stamina(delta)
 	_update_buffs(delta)
 	_move_character(delta)
@@ -191,7 +190,7 @@ func _physics_process(delta: float) -> void:
 	_update_underground_state()
 
 func _apply_gravity(delta: float) -> void:
-	if not is_on_ground:
+	if not is_on_floor():
 		velocity.y -= gravity * delta
 
 func _handle_movement_input() -> void:
@@ -228,16 +227,9 @@ func _update_terrain_height() -> void:
 		terrain_height = 10.0
 
 func _update_underground_state() -> void:
-	## Detect when player is below the terrain surface (in a dug hole or cave).
-	var depth = terrain_height - global_position.y
-	_underground_depth = depth
-	var was_underground = is_underground
-	# Underground if more than 1.5 units below surface
-	is_underground = depth > 1.5
-	if is_underground != was_underground:
-		var eb = get_node_or_null("/root/EventBus")
-		if eb and eb.has_signal("player_underground_changed"):
-			eb.player_underground_changed.emit(is_underground, _underground_depth)
+	# No longer valid with heightmap. Let's assume we're never underground.
+	is_underground = false
+	_underground_depth = 0.0
 
 func get_underground_depth() -> float:
 	return _underground_depth
@@ -267,44 +259,25 @@ func _move_character(delta: float) -> void:
 		# - First person: camera rotates independently, player doesn't rotate with movement
 	
 	# Apply acceleration
-	var acceleration = ground_acceleration if is_on_ground else air_acceleration
+	var acceleration = ground_acceleration if is_on_floor() else air_acceleration
 	
 	velocity.x = move_toward(velocity.x, direction.x * speed, acceleration * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, acceleration * delta)
 	
-	# Move character
+	# Move character using Godot physics
 	move_and_slide()
 	
-	# Check ground collision with terrain
-	_check_terrain_collision()
+	# Update ground state tracking
+	is_on_ground = is_on_floor()
 	
 	# Update position signal
 	emit_signal("position_changed", global_position)
 
-func _check_terrain_collision() -> void:
-	# Get the terrain height at current position
-	var current_height = terrain_height
-	
-	# Check if player is below terrain
-	if global_position.y < current_height + 0.1:
-		global_position.y = current_height
-		velocity.y = 0
-		is_on_ground = true
-	elif global_position.y > current_height + 1.0:
-		# Player is in the air
-		is_on_ground = false
-	else:
-		# Check using ground ray
-		if ground_ray.is_colliding():
-			is_on_ground = true
-			velocity.y = max(velocity.y, -1.0)
-		else:
-			is_on_ground = false
-
 func _jump() -> void:
-	velocity.y = jump_force
-	is_on_ground = false
-	_set_state(PlayerState.JUMPING)
+	if is_on_floor() and not is_crouching:
+		velocity.y = jump_force
+		is_on_ground = false
+		_set_state(PlayerState.JUMPING)
 
 func _toggle_crouch() -> void:
 	is_crouching = not is_crouching
@@ -448,11 +421,31 @@ func _swing_tool() -> void:
 				else:
 					_show_tool_feedback("Can't till here.")
 			elif tool_type == "shovel":
-				# Shovel digs down — vertex deformation + underground reveal
-				if chunk_manager.has_method("dig_terrain_at") and chunk_manager.dig_terrain_at(terrain_pos):
+				# Shovel flattens/digs down
+				var dug_biome = -1
+				if chunk_manager.has_method("dig_terrain_at"):
+					dug_biome = chunk_manager.dig_terrain_at(terrain_pos)
+
+				if dug_biome != -1:
 					var skill_mgr = get_node_or_null("/root/SkillManager")
 					if skill_mgr:
-						skill_mgr.grant_action_xp("till_soil")
+						skill_mgr.grant_action_xp("dig")
+
+					# Drop dirt or other item based on biome type
+					var drop_item = "dirt"
+					if dug_biome == 1: # Beach / Sand
+						drop_item = "sand"
+					elif dug_biome == 7: # Snow
+						drop_item = "snow"
+
+					# Drop the item
+					var world_item = load("res://src/items/world_item.tscn").instantiate()
+					world_item.item_id = drop_item
+					world_item.quantity = 1
+					world_item.auto_pickup = true
+					world_item.position = terrain_pos + Vector3(0, 0.5, 0)
+					get_tree().current_scene.add_child(world_item)
+
 					_show_tool_feedback("Dug!")
 				else:
 					_show_tool_feedback("Can't dig here.")

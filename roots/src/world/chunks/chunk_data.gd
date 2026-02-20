@@ -1,35 +1,14 @@
 extends Resource
 class_name ChunkData
 
-## Voxel-based chunk data. Each chunk is SIZE x CHUNK_HEIGHT x SIZE voxels.
-## Voxel grid index: x + z * SIZE + y * SIZE * SIZE
-## World Y = world_position.y + VOXEL_Y_OFFSET + local_y
-
-# ── Voxel type constants ──────────────────────────────────────────────────────
-const VOXEL_AIR:       int = 0
-const VOXEL_GRASS:     int = 1
-const VOXEL_DIRT:      int = 2
-const VOXEL_STONE:     int = 3
-const VOXEL_DEEP_ROCK: int = 4
-const VOXEL_BEDROCK:   int = 5
-const VOXEL_SAND:      int = 6
-const VOXEL_SNOW:      int = 7
-const VOXEL_ORE_COAL:  int = 9
-const VOXEL_ORE_COPPER:int = 10
-const VOXEL_ORE_IRON:  int = 11
-const VOXEL_ORE_GOLD:  int = 12
-const VOXEL_ORE_MYTHRIL:int = 13
-
-# ── Chunk dimensions ──────────────────────────────────────────────────────────
-const CHUNK_HEIGHT: int = 145  # Local Y 0..144 → world Y -80..+64 (covers full terrain range)
-const VOXEL_Y_OFFSET: int = -80  # Local Y 0 = world Y -80 (bedrock floor)
+## Data container for a single 2D heightmap chunk.
 
 @export var chunk_position: Vector2i = Vector2i.ZERO
 @export var world_position: Vector3 = Vector3.ZERO
 @export var size: int = 32
 
-# 3D voxel grid: flat PackedByteArray, index = x + z*size + y*size*size
-var voxels: PackedByteArray = PackedByteArray()
+# 2D Heightmap grid: flat PackedFloat32Array, index = x + z*size
+var heights: PackedFloat32Array = PackedFloat32Array()
 
 # Per-column biome (surface biome, indexed x + z*size)
 var biomes: PackedByteArray = PackedByteArray()
@@ -61,69 +40,41 @@ func initialize(chunk_pos: Vector2i, chunk_size: int, _height_scale: float = 1.0
 	size = chunk_size
 	var offset = Vector2(chunk_pos.x, chunk_pos.y) * size
 	world_position = Vector3(offset.x, 0.0, offset.y)
-	voxels.resize(size * size * CHUNK_HEIGHT)
-	voxels.fill(VOXEL_AIR)
+	heights.resize(size * size)
+	heights.fill(0.0)
 	biomes.resize(size * size)
 	biomes.fill(0)
 	is_modified = false  # Don't count initial allocation as a modification
 
-# ── Voxel access ──────────────────────────────────────────────────────────────
-func _voxel_index(x: int, y: int, z: int) -> int:
-	return x + z * size + y * size * size
+# ── Heightmap access ────────────────────────────────────────────────────────
+func _height_index(x: int, z: int) -> int:
+	return x + z * size
 
-func get_voxel(x: int, y: int, z: int) -> int:
-	if x < 0 or x >= size or z < 0 or z >= size or y < 0 or y >= CHUNK_HEIGHT:
-		return VOXEL_AIR
-	return voxels[_voxel_index(x, y, z)]
+func get_height(x: int, z: int) -> float:
+	if x < 0 or x >= size or z < 0 or z >= size:
+		return 0.0
+	return heights[_height_index(x, z)]
 
-func set_voxel(x: int, y: int, z: int, type: int) -> void:
-	if x < 0 or x >= size or z < 0 or z >= size or y < 0 or y >= CHUNK_HEIGHT:
+func set_height(x: int, z: int, h: float) -> void:
+	if x < 0 or x >= size or z < 0 or z >= size:
 		return
-	voxels[_voxel_index(x, y, z)] = type
+	heights[_height_index(x, z)] = h
 	is_modified = true
 
-func is_solid(x: int, y: int, z: int) -> bool:
-	return get_voxel(x, y, z) != VOXEL_AIR
-
-# ── World ↔ local Y conversion ────────────────────────────────────────────────
-func world_y_to_local(world_y: float) -> int:
-	return int(world_y) - VOXEL_Y_OFFSET
-
-func local_y_to_world(local_y: int) -> float:
-	return float(local_y + VOXEL_Y_OFFSET)
-
-# ── Surface height query (top solid voxel in column) ─────────────────────────
-func get_surface_local_y(x: int, z: int) -> int:
-	## Returns the local Y of the topmost solid voxel in column (x,z), or -1 if all air.
-	for y in range(CHUNK_HEIGHT - 1, -1, -1):
-		if get_voxel(x, y, z) != VOXEL_AIR:
-			return y
-	return -1
-
 func get_surface_world_y(x: int, z: int) -> float:
-	## Returns the world Y of the TOP of the topmost solid voxel (i.e. standing height).
-	var ly = get_surface_local_y(x, z)
-	if ly < 0:
-		return float(VOXEL_Y_OFFSET)
-	return local_y_to_world(ly) + 1.0  # +1 = top face of the voxel
+	return get_height(x, z)
 
 func get_world_height(world_x: float, world_z: float) -> float:
-	## Query surface height at arbitrary world XZ (used by player grounding).
+	## Query surface height at arbitrary world XZ.
 	var lx = int(world_x - world_position.x)
 	var lz = int(world_z - world_position.z)
 	lx = clampi(lx, 0, size - 1)
 	lz = clampi(lz, 0, size - 1)
-	return get_surface_world_y(lx, lz)
+	return get_height(lx, lz)
 
-# ── Digging ───────────────────────────────────────────────────────────────────
-func dig_at(local_x: int, local_z: int) -> bool:
-	## Remove the topmost solid voxel in column (x,z). Returns true if something was dug.
-	var ly = get_surface_local_y(local_x, local_z)
-	if ly < 0:
-		return false
-	set_voxel(local_x, ly, local_z, VOXEL_AIR)
-	set_tile_mod(local_x, local_z, TileMod.DUG)
-	return true
+# ── Terrain Modification ──────────────────────────────────────────────────────
+func set_height_at(local_x: int, local_z: int, h: float) -> void:
+	set_height(local_x, local_z, h)
 
 # ── Biome access ──────────────────────────────────────────────────────────────
 func get_biome(x: int, z: int) -> int:
@@ -198,7 +149,7 @@ func serialize() -> Dictionary:
 	return {
 		"chunk_position": {"x": chunk_position.x, "y": chunk_position.y},
 		"size": size,
-		"voxels": Array(voxels),
+		"heights": Array(heights),
 		"biomes": Array(biomes),
 		"tree_positions": tree_positions,
 		"rock_positions": rock_positions,
@@ -213,11 +164,11 @@ func deserialize(data: Dictionary) -> void:
 	size = data.get("size", 32)
 	var offset = Vector2(chunk_position.x, chunk_position.y) * size
 	world_position = Vector3(offset.x, 0.0, offset.y)
-	if data.has("voxels"):
-		voxels = PackedByteArray(data.voxels)
+	if data.has("heights"):
+		heights = PackedFloat32Array(data.heights)
 	else:
-		voxels.resize(size * size * CHUNK_HEIGHT)
-		voxels.fill(VOXEL_AIR)
+		heights.resize(size * size)
+		heights.fill(0.0)
 	if data.has("biomes"):
 		biomes = PackedByteArray(data.biomes)
 	else:

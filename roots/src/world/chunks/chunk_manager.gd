@@ -284,10 +284,8 @@ func _process_generation_queue() -> void:
 		_diag_total_mesh_ms += t_mesh
 		if t_gen + t_mesh > 50:
 			var noise_ms = chunk_data.get_meta("diag_noise_us", 0) / 1000.0
-			var cave_ms  = chunk_data.get_meta("diag_cave_us",  0) / 1000.0
-			var ore_ms   = chunk_data.get_meta("diag_ore_us",   0) / 1000.0
-			print("[CHUNK] %s | gen=%dms(noise=%.0fms cave=%.0fms ore=%.0fms) mesh=%dms | jobs=%d queue=%d" % [
-				chunk_data.chunk_position, t_gen, noise_ms, cave_ms, ore_ms,
+			print("[CHUNK] %s | gen=%dms(noise=%.0fms) mesh=%dms | jobs=%d queue=%d" % [
+				chunk_data.chunk_position, t_gen, noise_ms,
 				t_mesh, _active_jobs, generation_queue.size()])
 		if _diag_chunks_timed % _diag_report_interval == 0:
 			var n = float(_diag_chunks_timed)
@@ -307,7 +305,7 @@ func _generate_chunk_threaded(chunk_pos: Vector2i, excl_snapshot: Array) -> void
 		chunk_data.set_meta("diag_gen_ms", t_gen)
 		# Build ArrayMesh on background thread — only add_child needs main thread
 		var t_mesh0 = Time.get_ticks_msec()
-		var built_mesh = _build_voxel_mesh_data(chunk_data)
+		var built_mesh = _build_heightmap_mesh_data(chunk_data, local_noise, excl_snapshot)
 		chunk_data.set_meta("built_mesh", built_mesh)
 		chunk_data.set_meta("diag_mesh_bg_ms", Time.get_ticks_msec() - t_mesh0)
 		mutex.lock()
@@ -365,13 +363,9 @@ func _generate_chunk_data(chunk_pos: Vector2i, local_noise = null, excl_zones: A
 	var chunk = ChunkData.new()
 	chunk.initialize(chunk_pos, chunk_size)
 	var sz = chunk.size
-	
+
 	# ── Pass 1: surface heights + biomes (2D, 1024 samples) ──────────────────
 	var _t0 = Time.get_ticks_msec()
-	var surface_lys: PackedInt32Array = PackedInt32Array()
-	surface_lys.resize(sz * sz)
-	var biomes_cache: PackedByteArray = PackedByteArray()
-	biomes_cache.resize(sz * sz)
 	for z in range(sz):
 		for x in range(sz):
 			var world_x = chunk.world_position.x + x
@@ -381,110 +375,19 @@ func _generate_chunk_data(chunk_pos: Vector2i, local_noise = null, excl_zones: A
 			if excl_h >= 0.0:
 				surface_h = excl_h
 			var biome = nu.get_biome_type(world_x, world_z)
-			var idx2 = x + z * sz
-			biomes_cache[idx2] = biome
 			chunk.set_biome(x, z, biome)
-			var sly = chunk.world_y_to_local(surface_h)
-			surface_lys[idx2] = clampi(sly, 0, ChunkData.CHUNK_HEIGHT - 1)
+			chunk.set_height(x, z, surface_h)
 	var _t_noise = Time.get_ticks_msec() - _t0
-	
-	# ── Pass 2: cave density (3D, sampled once per voxel column slice) ────────
-	var _t1 = Time.get_ticks_msec()
-	var max_surface_ly := 0
-	for i in range(sz * sz):
-		if surface_lys[i] > max_surface_ly:
-			max_surface_ly = surface_lys[i]
-	var cave_cache: PackedByteArray = PackedByteArray()
-	cave_cache.resize(sz * sz * (max_surface_ly + 1))
-	cave_cache.fill(0)
-	for y in range(1, max_surface_ly - 2):
-		var world_y = chunk.local_y_to_world(y)
-		for z in range(sz):
-			for x in range(sz):
-				var sly = surface_lys[x + z * sz]
-				if y >= sly - 3:
-					continue
-				var world_x = chunk.world_position.x + x
-				var world_z = chunk.world_position.z + z
-				if nu.is_cave_at(world_x, world_y, world_z):
-					cave_cache[x + z * sz + y * sz * sz] = 1
-	var _t_cave = Time.get_ticks_msec() - _t1
-	
-	# ── Pass 3: ore density (3D, only for deep voxels) ────────────────────────
-	var _t2 = Time.get_ticks_msec()
-	var ore_cache: PackedByteArray = PackedByteArray()
-	ore_cache.resize(sz * sz * (max_surface_ly + 1))
-	ore_cache.fill(0)
-	for y in range(1, max_surface_ly + 1):
-		var world_y = chunk.local_y_to_world(y)
-		if world_y > nu.DIRT_BOTTOM + 3:
-			continue
-		for z in range(sz):
-			for x in range(sz):
-				var sly = surface_lys[x + z * sz]
-				if sly - y <= 3:
-					continue
-				var world_x = chunk.world_position.x + x
-				var world_z = chunk.world_position.z + z
-				var ore = nu.get_ore_type_at(world_x, world_y, world_z)
-				var otype: int = 0
-				if ore != "":
-					if world_y >= nu.DIRT_BOTTOM:
-						if ore == "coal":            otype = ChunkData.VOXEL_ORE_COAL
-						elif ore == "copper_nugget": otype = ChunkData.VOXEL_ORE_COPPER
-					elif world_y >= nu.STONE_BOTTOM:
-						if ore == "iron_nugget":     otype = ChunkData.VOXEL_ORE_IRON
-						elif ore == "copper_nugget": otype = ChunkData.VOXEL_ORE_COPPER
-						elif ore == "coal":          otype = ChunkData.VOXEL_ORE_COAL
-					else:
-						if ore == "gold_nugget":     otype = ChunkData.VOXEL_ORE_GOLD
-						elif ore == "mythril_ore":   otype = ChunkData.VOXEL_ORE_MYTHRIL
-						elif ore == "iron_nugget":   otype = ChunkData.VOXEL_ORE_IRON
-				ore_cache[x + z * sz + y * sz * sz] = otype
-	var _t_ore = Time.get_ticks_msec() - _t2
-	
-	# ── Pass 4: fill voxel grid from cached data ──────────────────────────────
-	for z in range(sz):
-		for x in range(sz):
-			var idx2 = x + z * sz
-			var sly: int = surface_lys[idx2]
-			var biome: int = biomes_cache[idx2]
-			chunk.set_voxel(x, 0, z, ChunkData.VOXEL_BEDROCK)
-			for ly in range(1, sly + 1):
-				var cidx = idx2 + ly * sz * sz
-				if cave_cache[cidx] == 1:
-					continue
-				var depth = sly - ly
-				var vtype: int
-				if depth == 0:
-					match biome:
-						1: vtype = ChunkData.VOXEL_SAND
-						7: vtype = ChunkData.VOXEL_SNOW
-						_: vtype = ChunkData.VOXEL_GRASS
-				elif depth <= 3:
-					vtype = ChunkData.VOXEL_DIRT
-				else:
-					var otype = ore_cache[cidx]
-					if otype != 0:
-						vtype = otype
-					else:
-						var world_y = chunk.local_y_to_world(ly)
-						if world_y >= nu.DIRT_BOTTOM:    vtype = ChunkData.VOXEL_DIRT
-						elif world_y >= nu.STONE_BOTTOM: vtype = ChunkData.VOXEL_STONE
-						else:                            vtype = ChunkData.VOXEL_DEEP_ROCK
-				chunk.set_voxel(x, ly, z, vtype)
-	
+
 	# Store sub-timings for diagnostics
 	chunk.set_meta("diag_noise_us", _t_noise * 1000)
-	chunk.set_meta("diag_cave_us",  _t_cave  * 1000)
-	chunk.set_meta("diag_ore_us",   _t_ore   * 1000)
-	
+
 	# Generate objects if enabled
 	var _to2 = Time.get_ticks_msec()
 	if generate_objects:
 		_generate_chunk_objects(chunk)
 	chunk.set_meta("diag_objgen_ms", Time.get_ticks_msec() - _to2)
-	
+
 	# Reset modification flag — initial generation is not a player edit
 	chunk.is_modified = false
 	return chunk
@@ -539,11 +442,11 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 	if not terrain_container:
 		print("ERROR: terrain_container still null! Cannot create mesh for chunk ", chunk.chunk_position)
 		return
-	
+
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Chunk_%d_%d" % [chunk.chunk_position.x, chunk.chunk_position.y]
-	mesh_instance.position = chunk.world_position + Vector3(0, ChunkData.VOXEL_Y_OFFSET, 0)
-	
+	mesh_instance.position = chunk.world_position
+
 	# Use pre-built mesh from background thread if available, else build now
 	if chunk.has_meta("built_mesh") and chunk.get_meta("built_mesh") != null:
 		var prebuilt: ArrayMesh = chunk.get_meta("built_mesh")
@@ -552,88 +455,129 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 		material.vertex_color_use_as_albedo = true
 		material.roughness = 0.9
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		mesh_instance.material_override = material
 	else:
-		_build_voxel_mesh_into(chunk, mesh_instance)
-	
+		_build_heightmap_mesh_into(chunk, mesh_instance)
+
 	terrain_container.add_child(mesh_instance)
 	mesh_instance.set_meta("chunk_data", chunk)
-	
+
 	var obj_rng = RandomNumberGenerator.new()
 	obj_rng.seed = hash(chunk.chunk_position) + 7919
 	_create_chunk_objects(chunk, mesh_instance, obj_rng)
+	
+	_create_chunk_collision(chunk, mesh_instance)
 
-func _build_voxel_mesh_data(chunk: ChunkData) -> ArrayMesh:
-	## Builds and returns an ArrayMesh from chunk voxel data.
-	## Safe to call from a background thread — does NOT touch the scene tree.
+func _create_chunk_collision(chunk: ChunkData, parent: Node) -> void:
+	if not parent.get("mesh"):
+		return
+	var mesh = parent.mesh as Mesh
+	if not mesh:
+		return
+		
+	var static_body = StaticBody3D.new()
+	static_body.name = "TerrainCollision"
+	static_body.collision_layer = 1
+	static_body.collision_mask = 1
+	
+	var collision_shape = CollisionShape3D.new()
+	collision_shape.name = "CollisionShape"
+	collision_shape.shape = mesh.create_trimesh_shape()
+	
+	static_body.add_child(collision_shape)
+	parent.add_child(static_body)
+
+func _sample_height_at_world(world_x: float, world_z: float, nu, excl_zones: Array) -> float:
+	## Sample terrain height at any world XZ using noise — same formula as _generate_chunk_data.
+	## Used to stitch chunk edges to their neighbors.
+	var h = nu.get_terrain_height(world_x, world_z)
+	var excl_h = _get_exclusion_height(world_x, world_z, excl_zones, nu)
+	if excl_h >= 0.0:
+		h = excl_h
+	return h
+
+func _build_heightmap_mesh_data(chunk: ChunkData, nu = null, excl_zones: Array = []) -> ArrayMesh:
+	## Builds and returns a 2D grid ArrayMesh from chunk heightmap data.
+	## Safe to call from a background thread.
+	## nu: noise utility (thread-local copy). excl_zones: exclusion zone snapshot.
 	var verts   := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors  := PackedColorArray()
 	var indices := PackedInt32Array()
-	
+
 	var wx_off = chunk.world_position.x
 	var wz_off = chunk.world_position.z
 	var sz = chunk.size
-	
-	const DX = [0, 0, 1, -1, 0,  0]
-	const DY = [1,-1, 0,  0, 0,  0]
-	const DZ = [0, 0, 0,  0, 1, -1]
-	const NX = [Vector3(0,1,0), Vector3(0,-1,0), Vector3(1,0,0),
-				Vector3(-1,0,0), Vector3(0,0,1), Vector3(0,0,-1)]
-	const FV = [
-		[Vector3(0,1,0),Vector3(1,1,0),Vector3(1,1,1),Vector3(0,1,1)],
-		[Vector3(0,0,1),Vector3(1,0,1),Vector3(1,0,0),Vector3(0,0,0)],
-		[Vector3(1,0,0),Vector3(1,0,1),Vector3(1,1,1),Vector3(1,1,0)],
-		[Vector3(0,0,1),Vector3(0,0,0),Vector3(0,1,0),Vector3(0,1,1)],
-		[Vector3(1,0,1),Vector3(0,0,1),Vector3(0,1,1),Vector3(1,1,1)],
-		[Vector3(0,0,0),Vector3(1,0,0),Vector3(1,1,0),Vector3(0,1,0)],
-	]
-	
-	var max_solid_y := 0
+	var _nu = nu if nu != null else noise_util
+	var _excl = excl_zones if excl_zones.size() > 0 else exclusion_zones
+
+	# We build a grid of (sz) x (sz) quads, requiring (sz+1) x (sz+1) vertices.
+	# To keep things simple and allow for flat shading, we'll generate distinct vertices per quad.
+	var vi := 0
 	for z in range(sz):
 		for x in range(sz):
-			var sy = chunk.get_surface_local_y(x, z)
-			if sy > max_solid_y:
-				max_solid_y = sy
-	
-	var vi := 0
-	for y in range(max_solid_y + 1):
-		var world_y = chunk.local_y_to_world(y)
-		for z in range(sz):
-			for x in range(sz):
-				var vtype = chunk.get_voxel(x, y, z)
-				if vtype == ChunkData.VOXEL_AIR:
-					continue
-				var base_color = _get_voxel_color(vtype, chunk, x, z, wx_off, wz_off, world_y)
-				var origin = Vector3(x, y, z)
-				for fi in range(6):
-					var nx2 = x + DX[fi]; var ny2 = y + DY[fi]; var nz2 = z + DZ[fi]
-					var neighbour: int
-					if nx2 < 0 or nx2 >= sz or nz2 < 0 or nz2 >= sz \
-							or ny2 < 0 or ny2 >= ChunkData.CHUNK_HEIGHT:
-						neighbour = ChunkData.VOXEL_AIR
-					else:
-						neighbour = chunk.get_voxel(nx2, ny2, nz2)
-					if neighbour != ChunkData.VOXEL_AIR:
-						continue
-					var face_color: Color
-					if fi == 1:      face_color = base_color * 0.5
-					elif fi >= 2:    face_color = base_color * 0.75
-					else:            face_color = base_color
-					var nrm = NX[fi]; var fv = FV[fi]
-					verts.append(origin + fv[0]); verts.append(origin + fv[1])
-					verts.append(origin + fv[2]); verts.append(origin + fv[3])
-					normals.append(nrm); normals.append(nrm)
-					normals.append(nrm); normals.append(nrm)
-					colors.append(face_color); colors.append(face_color)
-					colors.append(face_color); colors.append(face_color)
-					indices.append(vi); indices.append(vi+1); indices.append(vi+2)
-					indices.append(vi); indices.append(vi+2); indices.append(vi+3)
-					vi += 4
-	
+			var h00 = chunk.get_height(x, z)
+			# For edge vertices, sample noise directly so they match the neighbor chunk.
+			var h10: float
+			if x + 1 < sz:
+				h10 = chunk.get_height(x + 1, z)
+			else:
+				h10 = _sample_height_at_world(wx_off + x + 1, wz_off + z, _nu, _excl)
+			var h01: float
+			if z + 1 < sz:
+				h01 = chunk.get_height(x, z + 1)
+			else:
+				h01 = _sample_height_at_world(wx_off + x, wz_off + z + 1, _nu, _excl)
+			var h11: float
+			if x + 1 < sz and z + 1 < sz:
+				h11 = chunk.get_height(x + 1, z + 1)
+			else:
+				h11 = _sample_height_at_world(wx_off + x + 1, wz_off + z + 1, _nu, _excl)
+
+			var v00 = Vector3(x, h00, z)
+			var v10 = Vector3(x + 1, h10, z)
+			var v01 = Vector3(x, h01, z + 1)
+			var v11 = Vector3(x + 1, h11, z + 1)
+
+			# Calculate normal for the quad (using cross product of diagonals)
+			var nrm = (v01 - v10).cross(v11 - v00).normalized()
+			if nrm.y < 0: nrm = -nrm
+
+			# Get color
+			var biome = chunk.get_biome(x, z)
+			var color = _get_terrain_vertex_color(biome, wx_off + x, wz_off + z)
+			
+			# Apply tile modifications — check this cell AND adjacent cells whose edge
+			# vertex dips into a dug/tilled cell, so depression walls get the right color.
+			var tile_mod    = chunk.get_tile_mod(x, z)
+			var tile_mod_xm = chunk.get_tile_mod(maxi(x - 1, 0), z)       # quad to the left
+			var tile_mod_zm = chunk.get_tile_mod(x, maxi(z - 1, 0))       # quad behind
+			var tile_mod_xm_zm = chunk.get_tile_mod(maxi(x - 1, 0), maxi(z - 1, 0))  # diagonal
+			if tile_mod != ChunkData.TileMod.NONE:
+				color = _get_tile_mod_color(tile_mod)
+			elif tile_mod_xm != ChunkData.TileMod.NONE or tile_mod_zm != ChunkData.TileMod.NONE or tile_mod_xm_zm != ChunkData.TileMod.NONE:
+				# This quad's edge vertex touches a modified cell — color the wall
+				var neighbor_mod = tile_mod_xm if tile_mod_xm != ChunkData.TileMod.NONE else (tile_mod_zm if tile_mod_zm != ChunkData.TileMod.NONE else tile_mod_xm_zm)
+				color = _get_tile_mod_color(neighbor_mod)
+
+			# Triangle 1: 00 -> 10 -> 01
+			verts.append(v00); verts.append(v10); verts.append(v01)
+			normals.append(nrm); normals.append(nrm); normals.append(nrm)
+			colors.append(color); colors.append(color); colors.append(color)
+			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
+			vi += 3
+
+			# Triangle 2: 10 -> 11 -> 01
+			verts.append(v10); verts.append(v11); verts.append(v01)
+			normals.append(nrm); normals.append(nrm); normals.append(nrm)
+			colors.append(color); colors.append(color); colors.append(color)
+			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
+			vi += 3
+
 	if vi == 0:
 		return null
-	
+
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX]  = verts
@@ -644,9 +588,9 @@ func _build_voxel_mesh_data(chunk: ChunkData) -> ArrayMesh:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 
-func _build_voxel_mesh_into(chunk: ChunkData, mesh_instance: MeshInstance3D) -> void:
+func _build_heightmap_mesh_into(chunk: ChunkData, mesh_instance: MeshInstance3D) -> void:
 	## Wrapper: builds mesh data and assigns to mesh_instance (main thread only).
-	var mesh = _build_voxel_mesh_data(chunk)
+	var mesh = _build_heightmap_mesh_data(chunk)
 	if mesh == null:
 		return
 	mesh_instance.mesh = mesh
@@ -654,47 +598,13 @@ func _build_voxel_mesh_into(chunk: ChunkData, mesh_instance: MeshInstance3D) -> 
 	material.vertex_color_use_as_albedo = true
 	material.roughness = 0.9
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh_instance.material_override = material
-
-func _get_voxel_color(vtype: int, chunk: ChunkData, lx: int, lz: int,
-		wx_off: float, wz_off: float, _world_y: float) -> Color:
-	## Returns the display color for a voxel, respecting tile mods on the top face.
-	match vtype:
-		ChunkData.VOXEL_GRASS:
-			var tile_mod = chunk.get_tile_mod(lx, lz)
-			if tile_mod != ChunkData.TileMod.NONE:
-				return _get_tile_mod_color(tile_mod)
-			var biome = chunk.get_biome(lx, lz)
-			return _get_terrain_vertex_color(biome, wx_off + lx, wz_off + lz)
-		ChunkData.VOXEL_DIRT:
-			return Color(0.38, 0.26, 0.14)
-		ChunkData.VOXEL_STONE:
-			return Color(0.48, 0.46, 0.42)
-		ChunkData.VOXEL_DEEP_ROCK:
-			return Color(0.22, 0.20, 0.20)
-		ChunkData.VOXEL_BEDROCK:
-			return Color(0.12, 0.11, 0.11)
-		ChunkData.VOXEL_SAND:
-			return Color(0.82, 0.74, 0.52)
-		ChunkData.VOXEL_SNOW:
-			return Color(0.92, 0.94, 0.98)
-		ChunkData.VOXEL_ORE_COAL:
-			return Color(0.18, 0.18, 0.18)
-		ChunkData.VOXEL_ORE_COPPER:
-			return Color(0.72, 0.42, 0.22)
-		ChunkData.VOXEL_ORE_IRON:
-			return Color(0.55, 0.50, 0.45)
-		ChunkData.VOXEL_ORE_GOLD:
-			return Color(0.85, 0.72, 0.15)
-		ChunkData.VOXEL_ORE_MYTHRIL:
-			return Color(0.30, 0.55, 0.75)
-	return Color(0.5, 0.5, 0.5)
 
 func _create_chunk_objects(chunk: ChunkData, parent: Node, rng: RandomNumberGenerator) -> void:
 	# Create tree instances (biome-aware, scale/rotation variation)
 	for tree_pos in chunk.tree_positions:
 		var local_pos = tree_pos - chunk.world_position
-		local_pos.y -= ChunkData.VOXEL_Y_OFFSET  # mesh node is offset by VOXEL_Y_OFFSET
 		var tree = _create_tree_mesh(chunk, local_pos, rng)
 		if tree:
 			parent.add_child(tree)
@@ -702,7 +612,6 @@ func _create_chunk_objects(chunk: ChunkData, parent: Node, rng: RandomNumberGene
 	# Create rock instances (scale and tilt variation)
 	for rock_pos in chunk.rock_positions:
 		var local_pos = rock_pos - chunk.world_position
-		local_pos.y -= ChunkData.VOXEL_Y_OFFSET
 		var rock = _create_rock_mesh(local_pos, rng)
 		if rock:
 			parent.add_child(rock)
@@ -923,7 +832,7 @@ func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
 		var world_z = chunk.world_position.z + lz
 		if is_in_exclusion_zone(world_x, world_z):
 			continue
-		var height = chunk.get_world_height(world_x, world_z) - ChunkData.VOXEL_Y_OFFSET
+		var height = chunk.get_world_height(world_x, world_z)
 		# Prefer 3D grass from KayKit Forest Nature Pack
 		if not _forest_grass_scenes.is_empty():
 			var scene: PackedScene = _forest_grass_scenes[rng.randi() % _forest_grass_scenes.size()]
@@ -975,7 +884,7 @@ func _create_bush_patches(chunk: ChunkData, parent: Node) -> void:
 		var world_z = chunk.world_position.z + lz
 		if is_in_exclusion_zone(world_x, world_z):
 			continue
-		var height = chunk.get_world_height(world_x, world_z) - ChunkData.VOXEL_Y_OFFSET
+		var height = chunk.get_world_height(world_x, world_z)
 		# Use common bushes for plains/meadow, forest pack bushes for forest/jungle
 		var bush_pool: Array[PackedScene] = []
 		if biome in [2, 8] and not _bush_common_scenes.is_empty():
@@ -1012,7 +921,7 @@ func _create_biome_decorations(chunk: ChunkData, parent: Node) -> void:
 		var world_z = chunk.world_position.z + lz
 		if is_in_exclusion_zone(world_x, world_z):
 			continue
-		var height = chunk.get_world_height(world_x, world_z) - ChunkData.VOXEL_Y_OFFSET
+		var height = chunk.get_world_height(world_x, world_z)
 		
 		var scene_pool: Array[PackedScene] = []
 		var node_name := "Decoration"
@@ -1327,18 +1236,22 @@ func _rebuild_chunk_mesh(chunk: ChunkData) -> void:
 	# Preserve child objects (trees, rocks, etc.)
 	var children_to_keep: Array[Node] = []
 	for child in old_mesh.get_children():
+		if child is StaticBody3D: continue # Don't keep the old collision body
 		children_to_keep.append(child)
 		old_mesh.remove_child(child)
 	old_mesh.queue_free()
-	
+
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = mesh_name
-	mesh_instance.position = chunk.world_position + Vector3(0, ChunkData.VOXEL_Y_OFFSET, 0)
-	_build_voxel_mesh_into(chunk, mesh_instance)
+	mesh_instance.position = chunk.world_position
+	_build_heightmap_mesh_into(chunk, mesh_instance)
 	terrain_container.add_child(mesh_instance)
 	mesh_instance.set_meta("chunk_data", chunk)
 	for child in children_to_keep:
 		mesh_instance.add_child(child)
+	
+	# Rebuild collision
+	_create_chunk_collision(chunk, mesh_instance)
 
 func _get_tile_mod_color(mod_type: int) -> Color:
 	match mod_type:
@@ -1423,22 +1336,42 @@ func _exit_tree() -> void:
 	
 	clear_all_chunks()
 
-func dig_terrain_at(world_pos: Vector3) -> bool:
-	## Called by player shovel swing. Removes the top voxel and rebuilds the chunk mesh.
+func dig_terrain_at(world_pos: Vector3) -> int:
+	## Called by player shovel swing. Digs a 3x3 bowl: center -0.8, ring -0.3.
+	## Returns the biome type to determine what item to drop, or -1 if digging failed.
 	var info = world_to_chunk_local(world_pos)
 	var chunk = loaded_chunks.get(info.chunk_pos, null) as ChunkData
 	if not chunk:
-		return false
+		return -1
 	var lx: int = info.local_x
 	var lz: int = info.local_z
+
 	# Don't dig on water/beach biomes
 	var biome = chunk.get_biome(lx, lz)
 	if biome == 0 or biome == 1:
-		return false
-	# Remove the top voxel in this column
-	var dug = chunk.dig_at(lx, lz)
-	if not dug:
-		return false
-	# Rebuild the mesh to show the hole
+		return -1
+
+	# Prevent digging below water level
+	var center_h = chunk.get_height(lx, lz)
+	if center_h <= noise_util.get_water_level() + 1.0:
+		return -1
+
+	var water_level = noise_util.get_water_level()
+	var sz = chunk.size
+
+	# Dig a 3x3 bowl — center deepest, ring shallower for smooth slopes
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var nx = lx + dx
+			var nz = lz + dz
+			if nx < 0 or nx >= sz or nz < 0 or nz >= sz:
+				continue
+			var depth = 0.8 if (dx == 0 and dz == 0) else 0.3
+			var h = chunk.get_height(nx, nz)
+			var new_h = maxf(h - depth, water_level + 0.2)
+			chunk.set_height(nx, nz, new_h)
+			chunk.set_tile_mod(nx, nz, ChunkData.TileMod.DUG)
+
+	# Rebuild the mesh to show the depression
 	_rebuild_chunk_mesh(chunk)
-	return true
+	return biome
