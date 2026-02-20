@@ -1,6 +1,6 @@
 # Roots
 
-A cozy multiplayer farming simulation built with **Godot 4.7**, featuring procedurally generated low-poly worlds, farming, crafting, and pure co-op via GD-Sync.
+A cozy multiplayer farming simulation built with **Godot 4.7**, featuring procedurally generated smooth low-poly worlds, farming, crafting, animal husbandry, combat, and pure co-op via GD-Sync.
 
 **Repository:** [https://github.com/Roanger/Roots.git](https://github.com/Roanger/Roots.git)  
 **Contact:** roanger@yahoo.com
@@ -17,12 +17,12 @@ A cozy multiplayer farming simulation built with **Godot 4.7**, featuring proced
 
 2. **Open in Godot**
    - Open Godot 4.7+
-   - Import or open the project: use the `roots` folder (contains `project.godot`)
+   - Import the project from the `roots/` folder (contains `project.godot`)
 
 3. **Run**
-   - Open `roots/project.godot` in Godot, then press **F5** to run.
+   - Press **F5** to run from the main menu.
 
-The main game scene is `roots/src/main/menu/main_menu.tscn` (loaded as main in project settings).
+The main scene is `roots/src/main/menu/main_menu.tscn`.
 
 ---
 
@@ -30,35 +30,52 @@ The main game scene is `roots/src/main/menu/main_menu.tscn` (loaded as main in p
 
 | Path | Description |
 |------|-------------|
-| `roots/` | Godot project (engine, scenes, scripts, assets) |
-| `roots/project.godot` | Godot project file — open this in the editor |
-| `roots/src/` | Game code (player, world, UI, items, etc.) |
-| `plans/` | Design docs and [roots_game_plan.md](plans/roots_game_plan.md) |
+| `roots/` | Godot project (scenes, scripts, assets) |
+| `roots/project.godot` | Open this in the Godot editor |
+| `roots/src/` | All game code (player, world, UI, items, entities, etc.) |
+| `plans/` | Design docs — see [roots_game_plan.md](plans/roots_game_plan.md) |
 
-For more detail (controls, structure, phases), see [roots/README.md](roots/README.md).
+For controls and detailed structure, see [roots/README.md](roots/README.md).
 
 ---
 
-## Status
+## Current Status (Feb 2026)
 
-- **Phase 1 (Foundation):** Mostly complete — player, camera, terrain, chunks, water, fog, main menu, pause, inventory slots.
-- **Phase 2 (Core Mechanics):** In progress — inventory UI, hotbar, character/equipment UI, farming (plant, grow, water, harvest). **Drag-and-drop between inventory/hotbar/equipment is now working!**
+Phases 1–4 are largely complete. The game has a full playable loop.
 
-### Recent Updates (Jan 2026)
-- ✅ Fixed item pickup bug (world items now properly destroyed after pickup)
-- ✅ Implemented drag-and-drop system with Godot 4.7 workaround
-- ✅ Items can be moved between inventory, hotbar, and equipment slots
-- ⚠️ Equipment slot visuals need polish (items persist but icons not displaying)
+### What's Working
+- ✅ **Smooth Heightmap Terrain** — 2D heightmap chunks with real physics collision (`StaticBody3D` + `ConcavePolygonShape3D`), threaded generation, seamless chunk stitching
+- ✅ **Player** — `CharacterBody3D` with `move_and_slide`, gravity, jump, crouch, sprint, first/third person camera
+- ✅ **Farming** — Hoe tilling (dark soil + FarmPlot spawn), planting, watering, growth stages, harvesting, crop drops
+- ✅ **Shovel Digging** — 3×3 bowl depression with DUG vertex coloring *(visual polish in progress)*
+- ✅ **Inventory & Hotbar** — Drag-and-drop between inventory, hotbar, and equipment slots
+- ✅ **Crafting** — 40+ recipes across Workbench, Forge, Anvil, Alchemy Table, Cooking Fire
+- ✅ **Tool System** — 5 tiers (Wood → Mythril), tool affinity per target type, durability
+- ✅ **Skill System** — 7 professions, action-based XP, perk tree with synergy bonuses
+- ✅ **Animals** — 8 species (Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit), feeding, petting, breeding, products
+- ✅ **Fences & Placeables** — Fence/gate/post placement with ghost preview, 5 building types
+- ✅ **Enemies** — 4 Skeleton types with AI (idle/wander/chase/attack), loot drops, XP
+- ✅ **Herb Gathering & Alchemy** — 9 harvestable herbs, 6 potions with timed buff system
+- ✅ **Cooking** — 14 recipes, food buffs (well_fed, speed, strength, heal-over-time)
+- ✅ **NPCs** — 8 village NPCs with dialogue trees, shops (gold coin currency), quest giving
+- ✅ **Quest System** — 25 quests across multiple chains, journal UI, HUD tracker
+- ✅ **Village** — Procedural medieval village (MegaKit modular buildings, town well, market stalls)
+- ✅ **Day/Night & Seasons** — BinbunSky shader, seasonal sky/fog variation, in-game clock UI
+- ✅ **World Items** — `RigidBody3D` drops with proximity auto-pickup, not pushed by player
 
-Development plan and checklist: [plans/roots_game_plan.md](plans/roots_game_plan.md).
+### In Progress
+- ⚠️ Shovel digging visual polish (bowl shape works, refinement needed)
+- ⚠️ GD-Sync multiplayer lobby (framework integrated, not yet wired)
 
 ---
 
 ## Tech
 
-- **Engine:** Godot 4.7 (Forward+)
+- **Engine:** Godot 4.7 (Forward+, Jolt Physics)
 - **Multiplayer:** GD-Sync
 - **Scripting:** GDScript 2.0
+- **Terrain:** 2D heightmap chunks, `WorkerThreadPool` async generation
+- **Physics:** `CharacterBody3D` (player/AI), `RigidBody3D` (items), `StaticBody3D` (terrain/objects)
 
 ---
 

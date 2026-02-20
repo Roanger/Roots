@@ -1,54 +1,77 @@
 # Roots - Cozy Farming Game
 
-A peaceful multiplayer farming simulation built with Godot 4.7, featuring procedurally generated low-poly worlds, multiple professions, and pure co-op gameplay.
+A peaceful multiplayer farming simulation built with Godot 4.7, featuring procedurally generated smooth low-poly worlds, multiple professions, and pure co-op gameplay.
 
 ## Features
 
 ### Core Gameplay
-- **Exploration** - Discover multiple biomes and settle wherever you choose
-- **Farming** - Grow crops, raise animals, and build your perfect farm
-- **Professions** - Choose from 7 unique professions:
+- **Exploration** — Discover 9+ biomes (Plains, Forest, Desert, Taiga, Mountains, Snow, Swamp, Beach, Highland) and settle wherever you choose
+- **Farming** — Till soil with a hoe, plant seeds, water crops, harvest at full growth, recover seeds
+- **Digging** — Shovel carves bowl-shaped depressions and drops dirt/sand/snow based on biome *(visual polish in progress)*
+- **Professions** — 7 professions with action-based XP and perk trees:
   - Cultivation (Farming)
-  - Resource Gathering
-  - Blacksmithing
+  - Resource Gathering (Mining, Lumberjack, Foraging)
+  - Blacksmithing (Forge, Anvil)
   - Cooking & Baking
   - Husbandry (Animal Care)
   - Alchemy
   - Herb Gathering
-- **Skill System** - Gain experience through actions and unlock perks
-
-### Multiplayer
-- Pure co-op gameplay with friends
-- GD-Sync integration for seamless multiplayer
-- Shared world state and synchronized progression
+- **Skill System** — Gain XP through actions, spend skill points on profession perks, synergy bonuses for dual/triple disciplines
+- **Combat** — Melee weapons (sword, axe, dagger), 4 enemy types, loot drops
 
 ### World
-- Procedurally generated biomes
-- Dynamic weather and day/night cycle
-- Living NPCs and wildlife
-- Seasonal changes
+- Smooth 2D heightmap terrain with real physics collision (`StaticBody3D` + `ConcavePolygonShape3D`)
+- Threaded chunk generation with seamless boundary stitching
+- Procedural medieval village (MegaKit modular buildings, 8 NPCs, market stalls)
+- Day/night cycle with BinbunSky shader, seasonal sky/fog variation
+- In-game clock (time, day of week, season)
+
+### Animals & Husbandry
+- 8 species: Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit
+- Feed, pet, and breed animals — babies spawn from two fed adults
+- Products on timers: eggs, milk, wool
+- Fence/gate/post placement system with ghost preview
+
+### NPCs & Quests
+- 8 village NPCs: Shopkeeper, Innkeeper, Blacksmith, Baker, Mayor, Herbalist, Farmer, Guard
+- Dialogue trees, shops (gold coin currency), quest giving and turn-in
+- 25 quests across multiple chains with journal UI and HUD tracker
+
+### Multiplayer
+- Pure co-op via GD-Sync *(lobby wiring in progress)*
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 - Godot Engine 4.7 or later
-- GD-Sync addon (included)
+- GD-Sync addon (included in `addons/`)
 
 ### Installation
 1. Clone the repository
-2. Open the project in Godot 4.7+
-3. Run the project (F5)
+2. Open `roots/project.godot` in Godot 4.7+
+3. Press **F5** to run
 
 ### Controls
-| Action | Keyboard | Gamepad |
-|--------|----------|---------|
-| Move | W/A/S/D | Left Stick |
-| Jump | Space | A |
-| Interact | E | X |
-| Crouch | C | B |
-| Toggle First Person | T | Y |
-| Inventory | I | Select |
-| Pause | Esc | Start |
+
+| Action | Key |
+|--------|-----|
+| Move | W / A / S / D |
+| Jump | Space |
+| Sprint | Shift |
+| Crouch | C |
+| Interact / Use Tool | Left Click |
+| Interact with NPC/Object | E |
+| Toggle First/Third Person | T |
+| Inventory | I |
+| Crafting | R |
+| Skill Tree | K |
+| Quest Journal | J |
+| Hotbar slots | 1–8 |
+| Pause | Esc |
+
+---
 
 ## Project Structure
 
@@ -56,89 +79,42 @@ A peaceful multiplayer farming simulation built with Godot 4.7, featuring proced
 roots/
 ├── src/
 │   ├── core/
-│   │   ├── singletons/       # Autoloaded global scripts
-│   │   │   ├── game_manager.gd
-│   │   │   ├── event_bus.gd
-│   │   │   ├── save_manager.gd
-│   │   │   └── settings.gd
-│   │   └── utils/
+│   │   └── singletons/       # Autoloads: GameManager, EventBus, SaveManager, SkillManager, QuestManager
 │   ├── main/
-│   │   ├── menu/             # Main menu scenes
-│   │   └── world/            # Main game world
-│   ├── player/               # Player controller and scenes
-│   ├── ui/                   # UI components and HUD
+│   │   ├── menu/             # Main menu scene
+│   │   └── world/            # main_world.gd — world setup, NPC/animal/enemy spawning
+│   ├── player/               # player_controller.gd, camera, farming, tool swing
+│   ├── ui/                   # HUD, inventory, hotbar, crafting, skill tree, quest journal, dialogue, shop
 │   ├── world/
-│   │   ├── terrain/          # Terrain generation
-│   │   ├── chunks/           # Chunk management
-│   │   ├── biomes/           # Biome definitions
-│   │   ├── structures/       # Building structures
-│   │   └── props/            # World props and decorations
+│   │   ├── chunks/           # chunk_manager.gd, chunk_data.gd — heightmap terrain
+│   │   ├── crops/            # farm_plot.gd, crop growth
+│   │   ├── terrain/          # noise_utilities.gd — biome/height noise
+│   │   └── harvestable_resource.gd
 │   ├── entities/
-│   │   ├── npcs/             # NPC logic
-│   │   ├── animals/          # Farm animals
-│   │   └── wildlife/         # Wild animals
-│   ├── items/                # Item definitions
-│   ├── skills/               # Skill system
-│   ├── crafting/             # Crafting system
-│   ├── data/                 # Databases and configs
-│   └── multiplayer/          # Multiplayer systems
-├── plans/                    # Design documents
-├── addons/GD-Sync/           # Multiplayer framework
-└── GD-SyncTemplates/         # GD-Sync example templates
+│   │   ├── npcs/             # base_npc.gd, npc_data.gd
+│   │   ├── animals/          # base_animal.gd, animal_data.gd
+│   │   └── base_enemy.gd
+│   ├── items/                # item_data.gd, world_item.gd, tool_affinity.gd
+│   ├── data/
+│   │   └── databases/        # ItemDatabase, CropDatabase, RecipeDatabase, QuestDatabase
+│   └── skills/               # skill_manager.gd, perk_data.gd
+├── addons/
+│   └── GD-Sync/              # Multiplayer framework
+└── plans/                    # Design docs (roots_game_plan.md, terrain_rewrite_plan.md)
 ```
 
-## Development Phases
-
-1. **Phase 1: Foundation** (Weeks 1-8)
-   - Project setup and configuration
-   - Player controller with movement
-   - Basic terrain generation
-   - UI framework
-
-2. **Phase 2: Core Mechanics** (Weeks 9-16)
-   - Inventory system
-   - Farming mechanics
-   - Tool system
-   - Skill system
-
-3. **Phase 3: Professions** (Weeks 17-28)
-   - All 7 professions implemented
-   - Crafting stations
-   - Recipe system
-
-4. **Phase 4: World & Exploration** (Weeks 29-40)
-   - Multiple biomes
-   - NPC system
-   - Settlement mechanics
-   - Wildlife
-
-5. **Phase 5: Multiplayer** (Weeks 41-52)
-   - Full GD-Sync integration
-   - Social features
-   - World events
-
-6. **Phase 6: Polish** (Ongoing)
-   - Art assets
-   - Audio design
-   - Quality of life features
+---
 
 ## Technical Details
 
 - **Engine:** Godot 4.7 (Forward Plus renderer)
-- **Physics:** Jolt Physics
+- **Physics:** Jolt Physics — `CharacterBody3D` (player/AI), `RigidBody3D` (world items), `StaticBody3D` (terrain/objects)
+- **Terrain:** 2D `PackedFloat32Array` heightmap per chunk, `WorkerThreadPool` async mesh + collision generation
 - **Multiplayer:** GD-Sync
 - **Scripting:** GDScript 2.0
-- **Save System:** JSON + GD-Sync cloud
+- **Save System:** JSON per-chunk saves for terrain modifications; player data via SaveManager
 
-### Performance Considerations
-- Chunk-based world generation
-- Object pooling for frequently spawned items
-- LOD system for distant terrain
-- Level of detail for models
-
-## Contributing
-
-As a solo developer project, contributions are welcome but should align with the development plan. Please open an issue to discuss major changes.
+---
 
 ## License
 
@@ -146,9 +122,10 @@ This project is proprietary software. All rights reserved.
 
 ## Acknowledgments
 
-- [GD-Sync](https://www.gd-sync.com) - Multiplayer framework
-- [Godot Engine](https://godotengine.org) - Game engine
-- [Jolt Physics](https://github.com/jrouwe/JoltPhysics) - Physics engine
+- [GD-Sync](https://www.gd-sync.com) — Multiplayer framework
+- [Godot Engine](https://godotengine.org) — Game engine
+- [KayKit](https://kaylousberg.com) — 3D asset packs (RPG Tools, Adventurers, Skeletons, Forest Nature)
+- [Jolt Physics](https://github.com/jrouwe/JoltPhysics) — Physics engine
 
 ---
 
