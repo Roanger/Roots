@@ -548,18 +548,18 @@ func _build_heightmap_mesh_data(chunk: ChunkData, nu = null, excl_zones: Array =
 			var biome = chunk.get_biome(x, z)
 			var color = _get_terrain_vertex_color(biome, wx_off + x, wz_off + z)
 			
-			# Apply tile modifications — check this cell AND adjacent cells whose edge
-			# vertex dips into a dug/tilled cell, so depression walls get the right color.
-			var tile_mod    = chunk.get_tile_mod(x, z)
-			var tile_mod_xm = chunk.get_tile_mod(maxi(x - 1, 0), z)       # quad to the left
-			var tile_mod_zm = chunk.get_tile_mod(x, maxi(z - 1, 0))       # quad behind
-			var tile_mod_xm_zm = chunk.get_tile_mod(maxi(x - 1, 0), maxi(z - 1, 0))  # diagonal
-			if tile_mod != ChunkData.TileMod.NONE:
-				color = _get_tile_mod_color(tile_mod)
-			elif tile_mod_xm != ChunkData.TileMod.NONE or tile_mod_zm != ChunkData.TileMod.NONE or tile_mod_xm_zm != ChunkData.TileMod.NONE:
-				# This quad's edge vertex touches a modified cell — color the wall
-				var neighbor_mod = tile_mod_xm if tile_mod_xm != ChunkData.TileMod.NONE else (tile_mod_zm if tile_mod_zm != ChunkData.TileMod.NONE else tile_mod_xm_zm)
-				color = _get_tile_mod_color(neighbor_mod)
+			# A quad at (x,z) has 4 corner vertices: (x,z),(x+1,z),(x,z+1),(x+1,z+1).
+			# Color it if ANY of those 4 corner cells has a tile modification.
+			var tm00 = chunk.get_tile_mod(x, z)
+			var tm10 = chunk.get_tile_mod(mini(x + 1, sz - 1), z)
+			var tm01 = chunk.get_tile_mod(x, mini(z + 1, sz - 1))
+			var tm11 = chunk.get_tile_mod(mini(x + 1, sz - 1), mini(z + 1, sz - 1))
+			var active_mod = tm00
+			if active_mod == ChunkData.TileMod.NONE: active_mod = tm10
+			if active_mod == ChunkData.TileMod.NONE: active_mod = tm01
+			if active_mod == ChunkData.TileMod.NONE: active_mod = tm11
+			if active_mod != ChunkData.TileMod.NONE:
+				color = _get_tile_mod_color(active_mod)
 
 			# Triangle 1: 00 -> 10 -> 01
 			verts.append(v00); verts.append(v10); verts.append(v01)
@@ -1336,42 +1336,48 @@ func _exit_tree() -> void:
 	
 	clear_all_chunks()
 
-func dig_terrain_at(world_pos: Vector3) -> int:
-	## Called by player shovel swing. Digs a 3x3 bowl: center -0.8, ring -0.3.
-	## Returns the biome type to determine what item to drop, or -1 if digging failed.
+func flatten_terrain_at(world_pos: Vector3) -> bool:
+	## Called by player shovel swing. Flattens a 3x3 area to the average height.
+	## Returns true if flattening succeeded.
 	var info = world_to_chunk_local(world_pos)
 	var chunk = loaded_chunks.get(info.chunk_pos, null) as ChunkData
 	if not chunk:
-		return -1
+		return false
 	var lx: int = info.local_x
 	var lz: int = info.local_z
 
-	# Don't dig on water/beach biomes
+	# Don't flatten on water/beach biomes
 	var biome = chunk.get_biome(lx, lz)
 	if biome == 0 or biome == 1:
-		return -1
+		return false
 
-	# Prevent digging below water level
-	var center_h = chunk.get_height(lx, lz)
-	if center_h <= noise_util.get_water_level() + 1.0:
-		return -1
-
-	var water_level = noise_util.get_water_level()
 	var sz = chunk.size
 
-	# Dig a 3x3 bowl — center deepest, ring shallower for smooth slopes
+	# Collect heights of all valid cells in the 3x3 area
+	var total_h := 0.0
+	var count := 0
 	for dz in range(-1, 2):
 		for dx in range(-1, 2):
 			var nx = lx + dx
 			var nz = lz + dz
 			if nx < 0 or nx >= sz or nz < 0 or nz >= sz:
 				continue
-			var depth = 0.8 if (dx == 0 and dz == 0) else 0.3
-			var h = chunk.get_height(nx, nz)
-			var new_h = maxf(h - depth, water_level + 0.2)
-			chunk.set_height(nx, nz, new_h)
-			chunk.set_tile_mod(nx, nz, ChunkData.TileMod.DUG)
+			total_h += chunk.get_height(nx, nz)
+			count += 1
 
-	# Rebuild the mesh to show the depression
+	if count == 0:
+		return false
+
+	# Set all cells to the average height
+	var avg_h = total_h / count
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var nx = lx + dx
+			var nz = lz + dz
+			if nx < 0 or nx >= sz or nz < 0 or nz >= sz:
+				continue
+			chunk.set_height(nx, nz, avg_h)
+			chunk.set_tile_mod(nx, nz, ChunkData.TileMod.PATH)
+
 	_rebuild_chunk_mesh(chunk)
-	return biome
+	return true

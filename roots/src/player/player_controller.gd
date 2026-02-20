@@ -421,34 +421,14 @@ func _swing_tool() -> void:
 				else:
 					_show_tool_feedback("Can't till here.")
 			elif tool_type == "shovel":
-				# Shovel flattens/digs down
-				var dug_biome = -1
-				if chunk_manager.has_method("dig_terrain_at"):
-					dug_biome = chunk_manager.dig_terrain_at(terrain_pos)
-
-				if dug_biome != -1:
+				# Shovel flattens terrain for building/farming
+				if chunk_manager.has_method("flatten_terrain_at") and chunk_manager.flatten_terrain_at(terrain_pos):
 					var skill_mgr = get_node_or_null("/root/SkillManager")
 					if skill_mgr:
 						skill_mgr.grant_action_xp("dig")
-
-					# Drop dirt or other item based on biome type
-					var drop_item = "dirt"
-					if dug_biome == 1: # Beach / Sand
-						drop_item = "sand"
-					elif dug_biome == 7: # Snow
-						drop_item = "snow"
-
-					# Drop the item
-					var world_item = load("res://src/items/world_item.tscn").instantiate()
-					world_item.item_id = drop_item
-					world_item.quantity = 1
-					world_item.auto_pickup = true
-					world_item.position = terrain_pos + Vector3(0, 0.5, 0)
-					get_tree().current_scene.add_child(world_item)
-
-					_show_tool_feedback("Dug!")
+					_show_tool_feedback("Flattened!")
 				else:
-					_show_tool_feedback("Can't dig here.")
+					_show_tool_feedback("Can't flatten here.")
 
 func _get_terrain_look_position() -> Vector3:
 	if not camera or not chunk_manager:
