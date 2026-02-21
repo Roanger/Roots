@@ -1337,47 +1337,45 @@ func _exit_tree() -> void:
 	clear_all_chunks()
 
 func flatten_terrain_at(world_pos: Vector3) -> bool:
-	## Called by player shovel swing. Flattens a 3x3 area to the average height.
-	## Returns true if flattening succeeded.
-	var info = world_to_chunk_local(world_pos)
-	var chunk = loaded_chunks.get(info.chunk_pos, null) as ChunkData
-	if not chunk:
+	## Called by player shovel swing. Flattens a 3x3 area to the max height.
+	## Works in world space so it correctly crosses chunk boundaries.
+	var center_info = world_to_chunk_local(world_pos)
+	var center_chunk = loaded_chunks.get(center_info.chunk_pos, null) as ChunkData
+	if not center_chunk:
 		return false
-	var lx: int = info.local_x
-	var lz: int = info.local_z
 
 	# Don't flatten on water/beach biomes
-	var biome = chunk.get_biome(lx, lz)
-	if biome == 0 or biome == 1:
+	var center_biome = center_chunk.get_biome(center_info.local_x, center_info.local_z)
+	if center_biome == 0 or center_biome == 1:
 		return false
 
-	var sz = chunk.size
+	var base_wx := int(floor(world_pos.x))
+	var base_wz := int(floor(world_pos.z))
 
-	# Collect heights of all valid cells in the 3x3 area
-	var total_h := 0.0
-	var count := 0
+	# Pass 1: find max height across all 9 cells in world space
+	var max_h := -INF
 	for dz in range(-1, 2):
 		for dx in range(-1, 2):
-			var nx = lx + dx
-			var nz = lz + dz
-			if nx < 0 or nx >= sz or nz < 0 or nz >= sz:
-				continue
-			total_h += chunk.get_height(nx, nz)
-			count += 1
+			var sample = world_to_chunk_local(Vector3(base_wx + dx, 0, base_wz + dz))
+			var c = loaded_chunks.get(sample.chunk_pos, null) as ChunkData
+			if c:
+				max_h = maxf(max_h, c.get_height(sample.local_x, sample.local_z))
 
-	if count == 0:
+	if max_h == -INF:
 		return false
 
-	# Set all cells to the average height
-	var avg_h = total_h / count
+	# Pass 2: set all 9 cells to max height, track which chunks need rebuilding
+	var dirty_chunks: Dictionary = {}
 	for dz in range(-1, 2):
 		for dx in range(-1, 2):
-			var nx = lx + dx
-			var nz = lz + dz
-			if nx < 0 or nx >= sz or nz < 0 or nz >= sz:
-				continue
-			chunk.set_height(nx, nz, avg_h)
-			chunk.set_tile_mod(nx, nz, ChunkData.TileMod.PATH)
+			var sample = world_to_chunk_local(Vector3(base_wx + dx, 0, base_wz + dz))
+			var c = loaded_chunks.get(sample.chunk_pos, null) as ChunkData
+			if c:
+				c.set_height(sample.local_x, sample.local_z, max_h)
+				c.set_tile_mod(sample.local_x, sample.local_z, ChunkData.TileMod.PATH)
+				dirty_chunks[sample.chunk_pos] = c
 
-	_rebuild_chunk_mesh(chunk)
+	for c in dirty_chunks.values():
+		_rebuild_chunk_mesh(c)
+
 	return true
