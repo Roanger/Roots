@@ -1,6 +1,31 @@
 [gd_scene format=3 uid="uid://kjd36q3rrmam"]
 
 [ext_resource type="Script" uid="uid://cu7r4u32j4wxr" path="res://src/main/menu/main_menu.gd" id="1_main_menu"]
+[ext_resource type="Texture2D" uid="uid://bgn1pkc3pxqxx" path="res://src/assets/ui/main_menu_bg.jpg" id="2_main_menu_bg"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
+bg_color = Color(0.15, 0.35, 0.15, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.6, 0.2, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
+bg_color = Color(0.4, 0.7, 0.4, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.8, 0.3, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="MainMenu" type="Control" unique_id=1984830092]
 layout_mode = 3
@@ -19,6 +44,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("2_main_menu_bg")
 expand_mode = 1
 stretch_mode = 6
 
@@ -57,22 +83,42 @@ theme_override_constants/separation = 15
 [node name="NewGameBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=105595717]
 layout_mode = 2
 text = "New Game"
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 
 [node name="LoadGameBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=543210388]
 layout_mode = 2
 text = "Load Game"
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 
 [node name="MultiplayerBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=878124448]
 layout_mode = 2
 text = "Multiplayer"
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 
 [node name="SettingsBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1386263875]
 layout_mode = 2
 text = "Settings"
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 
 [node name="QuitBtn" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=621706321]
 layout_mode = 2
 text = "Quit"
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 
 [node name="VersionLabel" type="Label" parent="VBoxContainer" unique_id=1806554257]
 layout_mode = 2
