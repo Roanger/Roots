@@ -462,6 +462,9 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 
 	terrain_container.add_child(mesh_instance)
 	mesh_instance.set_meta("chunk_data", chunk)
+	
+	# Create water mesh for water biomes
+	_create_water_mesh(chunk, mesh_instance)
 
 	var obj_rng = RandomNumberGenerator.new()
 	obj_rng.seed = hash(chunk.chunk_position) + 7919
@@ -1070,6 +1073,62 @@ func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float,
 	harvestable.add_child(collision_shape)
 	node.add_child(harvestable)
 
+func _create_water_mesh(chunk: ChunkData, parent: Node) -> void:
+	## Creates an animated water mesh for water biome cells
+	var water_level := 16.0
+	if noise_util and noise_util.has_method("get_water_level"):
+		water_level = noise_util.get_water_level()
+	
+	var verts := PackedVector3Array()
+	var indices := PackedInt32Array()
+	var vi := 0
+	var has_water := false
+	
+	for z in range(chunk.size):
+		for x in range(chunk.size):
+			if chunk.get_biome(x, z) != 0:  # Not water biome
+				continue
+			
+			has_water = true
+			# Create a quad at water level
+			var v00 = Vector3(x, water_level, z)
+			var v10 = Vector3(x + 1, water_level, z)
+			var v01 = Vector3(x, water_level, z + 1)
+			var v11 = Vector3(x + 1, water_level, z + 1)
+			
+			# Triangle 1
+			verts.append(v00); verts.append(v10); verts.append(v01)
+			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
+			vi += 3
+			
+			# Triangle 2
+			verts.append(v10); verts.append(v11); verts.append(v01)
+			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
+			vi += 3
+	
+	if not has_water:
+		return
+	
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_INDEX] = indices
+	
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	
+	var water_instance := MeshInstance3D.new()
+	water_instance.name = "WaterMesh"
+	water_instance.mesh = mesh
+	water_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	# Apply water shader
+	var shader_material := ShaderMaterial.new()
+	shader_material.shader = preload("res://src/shaders/water_shader.gdshader")
+	water_instance.material_override = shader_material
+	
+	parent.add_child(water_instance)
+
 func _get_biome_color(biome: int) -> Color:
 	match biome:
 		0: return Color(0.18, 0.28, 0.65)  # Water (deeper blue)
@@ -1237,6 +1296,7 @@ func _rebuild_chunk_mesh(chunk: ChunkData) -> void:
 	var children_to_keep: Array[Node] = []
 	for child in old_mesh.get_children():
 		if child is StaticBody3D: continue # Don't keep the old collision body
+		if child.name == "WaterMesh": continue # Water mesh will be recreated
 		children_to_keep.append(child)
 		old_mesh.remove_child(child)
 	old_mesh.queue_free()
@@ -1247,6 +1307,10 @@ func _rebuild_chunk_mesh(chunk: ChunkData) -> void:
 	_build_heightmap_mesh_into(chunk, mesh_instance)
 	terrain_container.add_child(mesh_instance)
 	mesh_instance.set_meta("chunk_data", chunk)
+	
+	# Recreate water mesh
+	_create_water_mesh(chunk, mesh_instance)
+	
 	for child in children_to_keep:
 		mesh_instance.add_child(child)
 	
