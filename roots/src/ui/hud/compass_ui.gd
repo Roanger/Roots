@@ -17,6 +17,8 @@ class_name CompassUI
 
 var camera: Camera3D = null
 var current_yaw: float = 0.0
+var _waypoints: Array = []
+var _player: Node3D = null
 
 # Direction markers: degree -> label
 var direction_labels: Dictionary = {
@@ -36,6 +38,15 @@ func _ready() -> void:
 
 func set_camera(cam: Camera3D) -> void:
 	camera = cam
+
+func set_player(p: Node3D) -> void:
+	_player = p
+
+func set_waypoints(waypoints: Array) -> void:
+	_waypoints = waypoints
+
+func clear_waypoints() -> void:
+	_waypoints.clear()
 
 func _process(_delta: float) -> void:
 	if camera and is_instance_valid(camera):
@@ -162,3 +173,46 @@ func _draw() -> void:
 		Vector2(center_x + tri_size, tri_top),
 	])
 	draw_colored_polygon(tri_points, center_tick_color)
+
+	# Quest waypoint markers
+	if _waypoints.is_empty() or not _player or not is_instance_valid(_player):
+		return
+	var ppd_wp = compass_width / 120.0
+	var player_pos = _player.global_position
+	var font_wp = ThemeDB.fallback_font
+	var wp_font_size = 10
+	for wp in _waypoints:
+		var target_pos: Vector3 = wp.get("position", Vector3.ZERO)
+		if target_pos == Vector3.ZERO:
+			continue
+		var dx = target_pos.x - player_pos.x
+		var dz = target_pos.z - player_pos.z
+		if dx == 0.0 and dz == 0.0:
+			continue
+		var bearing = fmod(rad_to_deg(atan2(dx, -dz)) + 360.0, 360.0)
+		var rel_angle = bearing - current_yaw
+		while rel_angle > 180.0: rel_angle -= 360.0
+		while rel_angle < -180.0: rel_angle += 360.0
+		var wp_color: Color = wp.get("color", Color(1.0, 0.8, 0.2, 1.0))
+		var wp_label: String = wp.get("label", "")
+		if abs(rel_angle) <= 60.0:
+			var x = center_x + rel_angle * ppd_wp
+			var marker_y = top_y + compass_height + 3.0
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(x, marker_y),
+				Vector2(x - 5, marker_y + 7),
+				Vector2(x + 5, marker_y + 7),
+			]), wp_color)
+			if not wp_label.is_empty():
+				var short_label = wp_label.substr(0, min(wp_label.length(), 12))
+				var text_size = font_wp.get_string_size(short_label, HORIZONTAL_ALIGNMENT_CENTER, -1, wp_font_size)
+				draw_string(font_wp, Vector2(x - text_size.x / 2.0, marker_y + 20), short_label, HORIZONTAL_ALIGNMENT_CENTER, -1, wp_font_size, wp_color)
+		else:
+			var edge_x = bar_right if rel_angle > 0 else bar_left
+			var arrow_dir = 1.0 if rel_angle > 0 else -1.0
+			var arrow_y = top_y + compass_height / 2.0
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(edge_x, arrow_y),
+				Vector2(edge_x - arrow_dir * 8, arrow_y - 5),
+				Vector2(edge_x - arrow_dir * 8, arrow_y + 5),
+			]), wp_color)

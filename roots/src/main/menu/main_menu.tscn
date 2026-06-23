@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cu7r4u32j4wxr" path="res://src/main/menu/main_menu.gd" id="1_main_menu"]
 [ext_resource type="Texture2D" uid="uid://bgn1pkc3pxqxx" path="res://src/assets/ui/main_menu_bg.jpg" id="2_main_menu_bg"]
+[ext_resource type="Script" path="res://src/main/menu/settings_menu.gd" id="3_settings"]
+[ext_resource type="Script" path="res://src/main/menu/multiplayer_menu.gd" id="4_multiplayer"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
 bg_color = Color(0.15, 0.35, 0.15, 0.8)
@@ -148,22 +150,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="Label" type="Label" parent="MultiplayerMenu" unique_id=2023315082]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -20.0
-offset_right = 100.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Multiplayer Coming Soon"
-horizontal_alignment = 1
+script = ExtResource("4_multiplayer")
 
 [node name="SettingsMenu" type="Control" parent="." unique_id=2058629643]
 visible = false
@@ -173,19 +160,4 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="Label" type="Label" parent="SettingsMenu" unique_id=1631491726]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -20.0
-offset_right = 100.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Settings Coming Soon"
-horizontal_alignment = 1
+script = ExtResource("3_settings")

@@ -145,14 +145,30 @@ func has_object_at(world_pos: Vector3, radius: float = 0.5) -> bool:
 	return false
 
 # ── Serialization ─────────────────────────────────────────────────────────────
+func _vec3_to_dict(v: Vector3) -> Dictionary:
+	return {"x": v.x, "y": v.y, "z": v.z}
+
+func _dict_to_vec3(d) -> Vector3:
+	if d is Dictionary:
+		return Vector3(d.x, d.y, d.z)
+	if d is Vector3:
+		return d
+	return Vector3.ZERO
+
 func serialize() -> Dictionary:
+	var trees: Array = []
+	for pos in tree_positions:
+		trees.append(_vec3_to_dict(pos))
+	var rocks: Array = []
+	for pos in rock_positions:
+		rocks.append(_vec3_to_dict(pos))
 	return {
 		"chunk_position": {"x": chunk_position.x, "y": chunk_position.y},
 		"size": size,
 		"heights": Array(heights),
 		"biomes": Array(biomes),
-		"tree_positions": tree_positions,
-		"rock_positions": rock_positions,
+		"tree_positions": trees,
+		"rock_positions": rocks,
 		"prop_positions": prop_positions,
 		"tile_modifications": tile_modifications,
 		"timestamp": Time.get_unix_time_from_system()
@@ -177,13 +193,16 @@ func deserialize(data: Dictionary) -> void:
 	if data.has("tree_positions"):
 		tree_positions = []
 		for pos in data.tree_positions:
-			tree_positions.append(Vector3(pos.x, pos.y, pos.z))
+			tree_positions.append(_dict_to_vec3(pos))
 	if data.has("rock_positions"):
 		rock_positions = []
 		for pos in data.rock_positions:
-			rock_positions.append(Vector3(pos.x, pos.y, pos.z))
+			rock_positions.append(_dict_to_vec3(pos))
 	if data.has("prop_positions"):
-		prop_positions = data.prop_positions
+		prop_positions = []
+		for prop in data.prop_positions:
+			if prop is Dictionary:
+				prop_positions.append(prop)
 	if data.has("tile_modifications"):
 		tile_modifications = data.tile_modifications
 	is_modified = false

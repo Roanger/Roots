@@ -13,8 +13,7 @@ enum PlayerState {
 	JUMPING,
 	INTERACTING,
 	USING_TOOL,
-	CROUCHING,
-	FIRST_PERSON
+	CROUCHING
 }
 
 # Player stats
@@ -38,7 +37,6 @@ var base_run_speed: float = 8.0
 @export var crouch_speed: float = 3.0
 @export var jump_force: float = 8.0
 @export var gravity: float = 20.0
-@export var mouse_sensitivity: float = 0.002
 @export var ground_acceleration: float = 10.0
 @export var air_acceleration: float = 2.0
 
@@ -281,18 +279,9 @@ func _jump() -> void:
 
 func _toggle_crouch() -> void:
 	is_crouching = not is_crouching
-	
-	# Camera height is handled by CameraController
-	# Adjust first person height in camera controller instead of tweening here
 	if camera_controller:
-		if is_crouching:
-			camera_controller.first_person_height = 1.0
-		else:
-			camera_controller.first_person_height = 1.7
-	
+		camera_controller.first_person_height = 1.0 if is_crouching else 1.7
 	_set_state(PlayerState.CROUCHING if is_crouching else PlayerState.IDLE)
-
-# First person camera is always active - no toggle needed
 
 func _interact() -> void:
 	if raycast.is_colliding():
@@ -420,15 +409,15 @@ func _swing_tool() -> void:
 					_show_tool_feedback("Tilled soil!")
 				else:
 					_show_tool_feedback("Can't till here.")
-			elif tool_type == "shovel":
-				# Shovel flattens terrain for building/farming
-				if chunk_manager.has_method("flatten_terrain_at") and chunk_manager.flatten_terrain_at(terrain_pos):
-					var skill_mgr = get_node_or_null("/root/SkillManager")
-					if skill_mgr:
-						skill_mgr.grant_action_xp("dig")
-					_show_tool_feedback("Flattened!")
-				else:
-					_show_tool_feedback("Can't flatten here.")
+		elif tool_type == "shovel":
+			# Shovel digs a bowl-shaped depression
+			if chunk_manager.has_method("dig_terrain_at") and chunk_manager.dig_terrain_at(terrain_pos):
+				var skill_mgr = get_node_or_null("/root/SkillManager")
+				if skill_mgr:
+					skill_mgr.grant_action_xp("dig")
+				_show_tool_feedback("Dug!")
+			else:
+				_show_tool_feedback("Can't dig here.")
 
 func _get_terrain_look_position() -> Vector3:
 	if not camera or not chunk_manager:
@@ -550,18 +539,28 @@ func _set_state(new_state: PlayerState) -> void:
 		emit_signal("state_changed", new_state)
 
 func set_fov(fov: float) -> void:
-	camera.fov = fov
+	if camera_controller and camera_controller.has_method("set_base_fov"):
+		camera_controller.set_base_fov(fov)
+	elif camera:
+		camera.fov = fov
 
-func set_mouse_sensitivity(sensitivity: float) -> void:
-	mouse_sensitivity = sensitivity
+func set_mouse_sensitivity(user_value: float) -> void:
 	if camera_controller:
-		camera_controller.set_mouse_sensitivity(sensitivity)
+		camera_controller.set_mouse_sensitivity(user_value * 0.004)
+
+func set_invert_y(invert: bool) -> void:
+	if camera_controller and camera_controller.has_method("set_invert_y"):
+		camera_controller.set_invert_y(invert)
 
 func capture_mouse() -> void:
 	mouse_captured = true
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	if camera_controller:
-		camera_controller.set_mouse_sensitivity(mouse_sensitivity)
+	var settings = get_node_or_null("/root/Settings")
+	if settings:
+		var sens = settings.get_setting("controls", "mouse_sensitivity", 0.5)
+		set_mouse_sensitivity(float(sens))
+		var invert = settings.get_setting("controls", "invert_y", false)
+		set_invert_y(bool(invert))
 
 func release_mouse() -> void:
 	mouse_captured = false
@@ -1040,6 +1039,10 @@ func _place_object() -> void:
 	
 	get_tree().current_scene.add_child(obj)
 	_show_tool_feedback("Placed %s" % item_data.item_name)
+
+	# Claim post special handling — mark territory
+	if item_data.item_id == "claim_post" and get_tree().current_scene.has_method("_on_claim_post_placed"):
+		get_tree().current_scene._on_claim_post_placed(place_pos)
 	
 	# Check if we still have more of this item; if not, destroy ghost
 	var remaining = inventory.get_item_count(item_data.item_id) if inventory else 0

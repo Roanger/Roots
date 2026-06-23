@@ -117,6 +117,7 @@ func load_game(filepath: String = "") -> bool:
 				push_error("No save files found")
 				return false
 	
+	current_save_path = filepath
 	load_started.emit()
 	var success = false
 	if game_manager:

@@ -6,7 +6,7 @@ class_name BaseNPC
 
 const NPCDataScript = preload("res://src/entities/npcs/npc_data.gd")
 
-enum AIState { IDLE, WANDER, TALKING }
+enum AIState { IDLE, WANDER, TALKING, SLEEPING, GOING_TO_TARGET }
 
 var npc_data = null  # NPCData
 
@@ -26,6 +26,14 @@ var _quest_particles: GPUParticles3D = null
 var _has_quest: bool = false
 var _glow_time: float = 0.0
 
+# Schedule system
+var home_position: Vector3 = Vector3.ZERO
+var work_position: Vector3 = Vector3.ZERO
+var _schedule: Array = []
+var _schedule_idx: int = -1
+var _current_activity: String = "idle"
+var _schedule_check_timer: float = 0.0
+
 signal dialogue_requested(npc: BaseNPC, player: Node3D)
 signal shop_requested(npc: BaseNPC, player: Node3D)
 
@@ -37,6 +45,7 @@ func _ready() -> void:
 	_spawn_position = global_position
 	_idle_timer = _rng.randf_range(2.0, 5.0)
 	_build_visual()
+	_init_schedule()
 
 func setup(data) -> void:
 	npc_data = data
@@ -117,6 +126,7 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 20.0 * delta
 	_update_quest_glow(delta)
+	_check_schedule()
 
 	match ai_state:
 		AIState.IDLE:
@@ -125,6 +135,10 @@ func _physics_process(delta: float) -> void:
 			_process_wander(delta)
 		AIState.TALKING:
 			_process_talking(delta)
+		AIState.SLEEPING:
+			_process_sleeping(delta)
+		AIState.GOING_TO_TARGET:
+			_process_going_to_target(delta)
 
 	move_and_slide()
 
@@ -176,12 +190,91 @@ func _face_direction(dir: Vector3) -> void:
 		var target_angle = atan2(dir.x, dir.z)
 		rotation.y = lerp_angle(rotation.y, target_angle, 0.12)
 
+# ── Schedule System ─────────────────────────────────────────────────────────
+
+func _init_schedule() -> void:
+	if npc_data and npc_data.schedule.size() > 0:
+		_schedule = npc_data.schedule.duplicate()
+		_schedule.sort_custom(func(a, b): return a.get("hour", 0.0) < b.get("hour", 0.0))
+	_update_schedule_for_hour()
+
+func _check_schedule() -> void:
+	if _schedule.is_empty() or ai_state == AIState.TALKING:
+		return
+	_schedule_check_timer += get_physics_process_delta_time()
+	if _schedule_check_timer < 2.0:
+		return
+	_schedule_check_timer = 0.0
+	_update_schedule_for_hour()
+
+func _update_schedule_for_hour() -> void:
+	var gm = get_node_or_null("/root/GameManager")
+	if not gm:
+		return
+	var hour: float = gm.current_hour
+
+	var best_idx := -1
+	for i in range(_schedule.size()):
+		var entry_hour: float = _schedule[i].get("hour", 0.0)
+		if hour >= entry_hour:
+			best_idx = i
+	if best_idx < 0:
+		best_idx = _schedule.size() - 1
+	# If same schedule index, no change needed
+	if best_idx == _schedule_idx:
+		return
+
+	_schedule_idx = best_idx
+	var entry = _schedule[_schedule_idx]
+	_current_activity = entry.get("activity", "idle")
+	var target: Vector3 = entry.get("target_pos", _spawn_position)
+	target.y = global_position.y
+
+	var dist := global_position.distance_to(target)
+	if dist < 0.8:
+		_arrived_at_target()
+	else:
+		_wander_target = target
+		ai_state = AIState.GOING_TO_TARGET
+
+func _arrived_at_target() -> void:
+	match _current_activity:
+		"sleep":
+			ai_state = AIState.SLEEPING
+		_:
+			_spawn_position = global_position
+			ai_state = AIState.IDLE
+			_idle_timer = _rng.randf_range(2.0, 5.0)
+
+func _process_sleeping(_delta: float) -> void:
+	velocity.x = 0
+	velocity.z = 0
+
+func _process_going_to_target(_delta: float) -> void:
+	var dir = (_wander_target - global_position)
+	dir.y = 0
+	var dist = dir.length()
+	if dist < 0.6:
+		_arrived_at_target()
+		return
+	var spd = npc_data.move_speed if npc_data else 1.0
+	dir = dir.normalized()
+	velocity.x = dir.x * spd
+	velocity.z = dir.z * spd
+	_face_direction(dir)
+
 # ── Interaction ─────────────────────────────────────────────────────────────
 
 func on_interact(player: Node3D) -> void:
 	## Called when the player presses E while looking at this NPC.
 	if ai_state == AIState.TALKING:
 		return  # Already in conversation
+
+	# Sleeping NPCs are unresponsive
+	if ai_state == AIState.SLEEPING:
+		var sleep_messages := ["Zzz...", "Fast asleep.", "Shh, sleeping..."]
+		_show_floating_text(sleep_messages[_rng.randi() % sleep_messages.size()], Color(0.5, 0.5, 0.8))
+		return
 
 	_talk_target = player
 	ai_state = AIState.TALKING
@@ -311,5 +404,8 @@ func get_target_type() -> int:
 	return ToolAffinity.TargetType.BUILDING
 
 func on_hit(_player: Node3D, _tool_type: String, _power: float = 1.0) -> void:
-	# NPCs can't be damaged — just show a reaction
+	# NPCs can't be damaged — show reaction and penalize reputation
 	_show_floating_text("Hey! Watch it!", Color(1.0, 0.4, 0.4))
+	var main_world = get_node_or_null("/root/MainWorld")
+	if main_world and main_world.has_method("modify_reputation") and npc_data:
+		main_world.modify_reputation(npc_data.npc_id, -5)

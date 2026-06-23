@@ -14,7 +14,8 @@ enum TargetType {
 	ENEMY,          # Combat targets
 	BUILDING,       # Player-built structures
 	CRAFTING_STATION, # Workbenches, forges, etc.
-	HERB            # Harvestable herbs, mushrooms, flowers
+	HERB,            # Harvestable herbs, mushrooms, flowers
+	FISHING_SPOT     # Water fishing spots
 }
 
 # Effectiveness multipliers: tool_type -> { target_type -> multiplier }
@@ -65,6 +66,9 @@ const AFFINITY_TABLE: Dictionary = {
 		TargetType.TALL_GRASS: 1.0,
 		TargetType.ENEMY: 0.5,
 		TargetType.HERB: 1.0,
+	},
+	"fishing_rod": {
+		TargetType.FISHING_SPOT: 1.0,
 	},
 	# Weapon types
 	"sword": {
@@ -133,6 +137,8 @@ static func get_ineffective_message(tool_type: String, target_type: int) -> Stri
 			return "Use a weapon to fight."
 		TargetType.HERB:
 			return "Use a sickle or knife to gather this."
+		TargetType.FISHING_SPOT:
+			return "Use a fishing rod to fish here."
 		_:
 			return "This tool doesn't work here."
 

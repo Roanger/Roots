@@ -86,7 +86,7 @@ graph TD
 **Goal:** Core player movement and basic world
 
 #### 1.1 Project Setup
-- [ ] Configure Godot project settings for optimal performance
+- [x] Configure Godot project settings for optimal performance
 - [x] Set up version control (git ignore, branching strategy)
 - [x] Create project folder structure
 - [x] Document coding standards and conventions
@@ -99,10 +99,10 @@ graph TD
 - [x] Implement collision detection with Jolt Physics
 
 #### 1.3 Camera System
-- [ ] Create third-person camera with orbit controls *(removed for now; first-person only)*
-- [ ] Add camera smoothing and zoom functionality
-- [x] Implement first-person toggle
-- [ ] Add collision-based camera clipping
+- [~] Create third-person camera with orbit controls *(removed for now; first-person only)*
+- [x] Add camera smoothing and zoom functionality
+- [x] Implement first-person toggle *(always first-person; toggle removed)*
+- [x] Add collision-based camera clipping *(upward raycast for low ceilings; player body excluded)*
 
 #### 1.4 Basic World Generation
 - [x] Set up terrain system with chunk loading
@@ -123,9 +123,9 @@ graph TD
 
 #### 1.6 GD-Sync Integration
 - [x] Set up GD-Sync configuration
-- [ ] Implement basic lobby creation/joining
-- [ ] Test local multiplayer connection
-- [ ] Configure cloud settings
+- [x] Implement basic lobby creation/joining
+- [x] Test local multiplayer connection *(single-process verified; two-process requires cloud keys)*
+- [ ] Configure cloud settings *(requires gd-sync.com account + API keys)*
 
 ---
 
@@ -263,16 +263,19 @@ graph TD
 - [x] Design biome types (plains, forest, desert, mountain, swamp, coastal)
 - [x] Implement biome-specific terrain generation
 - [x] Create biome transitions
-- [ ] Design biome-specific resources
-- [ ] Add biome climate effects
+- [x] Design biome-specific resources (tree/rock loot per biome, herb drops per biome)
+  - Trees: Taiga drops sap + more wood, Mountains/Snow less wood, Jungle denser wood
+  - Rocks: Mountains/Highland more ore, Taiga/Snow coal-heavy, Plains stone-only, Beach copper
+  - Herbs: Swamp mushrooms rarer, Meadow flowers more lavender, Jungle ferns more mint
+- [x] Add biome climate effects — subtle fog color per biome (water=blue mist, jungle=dark green, snow=bright white, etc.), blends 15% into current fog, updates as player moves between biomes
 
 #### 4.2 NPC System
 - [x] Design NPC structure and behaviors (NPCData resource: role, identity, model, dialogue tree, shop inventory, quest refs)
 - [x] Create villager AI (BaseNPC: IDLE/WANDER/TALKING states, terrain snapping, on_interact → dialogue)
-- [ ] Implement NPC schedules
+- [x] Implement NPC schedules (BaseNPC: SLEEPING/GOING_TO_TARGET states, time-based daily routines via schedule array; 8 NPCs with wake/work/socialize/sleep cycles; sleeping NPCs show "Zzz" on interact)
 - [x] Design merchant system (ShopUI: item list with buy buttons, gold_coin currency, stock management)
 - [x] Add quest givers (NPC quest glow system, dialogue-driven quest accept/turnin)
-- [ ] Implement reputation system
+- [x] Implement reputation system — per-NPC reputation (-100..100), +20 on quest turn-in, -5 on hit; price modifier in shops (Honored=30% off, Hostile=50% markup); saved in world_data
 - [x] 8 village NPCs: Elara (Shopkeeper), Bram (Innkeeper), Tormund (Blacksmith), Marta (Baker), Aldric (Mayor/Quest Giver), Sage Willow (Herbalist), Old Hank (Farmer), Captain Rolf (Guard)
 - [x] DialogueUI (bottom panel: NPC name, rich text, choice buttons, actions: shop/close/quest/next)
 - [x] KayKit Adventurers 3D models (Barbarian, Knight, Mage, Ranger, Rogue, Rogue_Hooded)
@@ -280,15 +283,15 @@ graph TD
 - [x] Town Builder system (Medieval Village MegaKit modular buildings for village layout)
 
 #### 4.3 Settlement System
-- [x] **[REWRITE]** Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel flattens/digs)
+- [x] **[REWRITE]** Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel digs bowl depression)
 - [x] **[REWRITE]** TileMod types tracking (TILLED, DUG, PATH, FOUNDATION)
 - [x] **[REWRITE]** Dynamic FarmPlot spawning on tilled terrain
 - [x] **[REWRITE]** Terrain visual feedback (vertex color changes for modified cells)
-- [x] **[REWRITE]** Save/load terrain modifications per chunk
-- [~] Shovel digging visuals — *In Progress: bowl depression works, further polish needed*
-- [ ] Design plot claiming
+- [x] **[REWRITE]** Save/load terrain modifications per chunk (per-chunk JSON at `user://saves/world_<seed>/chunks/`)
+- [x] Shovel digging visuals — *Complete: cosine-falloff bowl depression, TileMod.DUG, idempotent, object/biome checks*
+- [x] Design plot claiming — Claim Post placeable (Workbench recipe: 3 logs + 5 stone + 2 rope), spawns 8 boundary posts in 8m radius circle, claim data persisted in world_data
 - [ ] Implement housing placement
-- [ ] Create decoration system
+- [x] Create decoration system — added flower pot, wooden chair, small table with hand-craftable recipes and placeable via existing placement system
 - [ ] Design community buildings
 - [ ] Add player-specific land permissions
 
@@ -305,19 +308,28 @@ graph TD
 - [x] Quest flow gating: only "welcome" quest available at start, others unlock after welcome is turned in
 - [x] HUD Quest Tracker UI (top-right, shows tracked quest names + objective progress)
 - [x] NPC dialogue-driven quest accept and turn-in with reward granting
-- [ ] Quest notification popups (quest accepted, quest complete, quest turned in)
-- [ ] Quest compass/waypoint markers
+- [x] Quest notification popups (quest accepted, quest complete, quest turned in)
+- [x] Quest compass/waypoint markers
 - [ ] More quest content and chains
 
 #### 4.4 Wildlife System
-- [ ] Design animal spawn tables per biome
+- [x] Design animal spawn tables per biome (Plains/Meadow for farm animals, Forest/Meadow for deer, Plains/Forest/Meadow for rabbits)
+- [x] Implement biome-aware animal spawning (replaced hardcoded positions with biome queries via chunk_manager.get_biome_at())
 - [ ] Implement animal behaviors (grazing, fleeing, hunting)
-- [ ] Create fish spawning and fishing
+- [x] Create fish spawning and fishing
+  - `fishing_spot.gd`: StaticBody3D placed at water surface with collision, timed catch (3.5s), loot table (raw_fish, salmon, pufferfish), cooldown
+  - `basic_fishing_rod` tool (Workbench recipe: 3 sticks + 2 string)
+  - `FISHING_SPOT` target type + `fishing_rod` affinity in ToolAffinity
+  - Items: `raw_fish`, `salmon`, `pufferfish`, `cooked_fish`, `grilled_salmon`
+  - Recipes: craft fishing rod, cook fish, grill salmon
+  - Spawned every 2nd cell in water biome (8% chance per cell) during chunk generation
 - [ ] Add wildlife interactions
 - [ ] Design seasonal animal migrations
 
 #### 4.5 Environmental Systems
-- [ ] Implement weather system (rain, sun, storms, snow)
+- [x] Implement weather system (rain, storms, snow, clear)
+  - WeatherManager autoload (season-based probability, smooth transitions, save/load)
+  - WeatherEffects (GPUParticles3D rain/snow, fog/cloud modulation per weather type)
 - [x] Create day/night cycle (sun rotation, light energy/color transitions, ambient/fog darkening)
 - [x] BinbunSky shader integration (procedural clouds, sun disc, stars, automatic day/night/sunset via LIGHT0_DIRECTION)
 - [x] In-game clock UI below minimap (time, day of week, season, sun/moon icon)
@@ -641,12 +653,19 @@ For solo development, prioritize these skills:
     - ~~Re-integrate farm plot tilling and object placement~~ ✓
     - ~~Fix chunk seam stitching~~ ✓
     - ~~Fix WorldItem collision (not pushed by player)~~ ✓
-    - **Shovel digging visuals** — In Progress (bowl shape works, polish needed) ⚠️
+    - ~~Shovel digging visuals~~ ✓ — *Complete: cosine-falloff bowl depression (0.6m center, blended edges), TileMod.DUG, idempotent, object/biome checks, save/load per chunk*
 15. ~~**Phase 4.2: NPC System** — Villagers, merchants, quests~~ ✓
-16. **Next:** Continue digging polish, then Phase 1 remaining (camera, GD-Sync lobby, project settings)
+16. ~~**Phase 4.5: Weather System** — WeatherManager autoload, rain/snow GPUParticles3D, fog/cloud modulation, save/load~~ ✓
+17. ~~**Phase 4.4: Wildlife & Fishing** — Biome-aware animal spawning, fishing spot system, fishing rod tool, fish items/recipes~~ ✓
+18. ~~**Phase 4.1: Biome Resources** — Biome-specific tree/rock/herb loot tables per biome~~ ✓
+19. ~~**Phase 4.2: NPC Schedules** — Daily routines with SLEEPING/GOING_TO_TARGET states, time-driven movement between work/socialize/home positions~~ ✓
+20. ~~**Phase 4.3: Settlement** — Claim Post placeable, placed object save/load~~ ✓
+21. ~~**Phase 4.1: Biome Climate** — Subtle fog color per biome, blends as player moves~~ ✓
+22. ~~**Phase 4.2: Reputation** — Per-NPC reputation, quest/hit modifiers, shop price multipliers~~ ✓
+23. **Next:** Phase 4 remaining — housing/decorations/community buildings (4.3), quest content (4.6), animal behaviors (4.4), environmental hazards (4.5).
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Feb 2026 – **Smooth Heightmap Terrain Rewrite complete.** All voxel systems stripped. 2D heightmap generation with `ConcavePolygonShape3D` physics collision. Player, AI (animals, enemies, NPCs), and WorldItems all use standard Godot physics (`move_and_slide`, `RigidBody3D`). Chunk seam stitching implemented (edge vertices sample noise for seamless boundaries). Hoe tilling + FarmPlot spawning re-integrated. Shovel digging functional (3×3 bowl depression + DUG vertex color) but visual polish still in progress. WorldItem loot pickup fixed (not pushed by player). NPC system complete (8 village NPCs, dialogue, shops, quests). Full gameplay loop: explore → farm → cook → breed animals → fight. Next: digging polish, then camera/GD-Sync/project settings.*
+*Last updated: Jun 2026 – **Quest polish + Weather + Wildlife/Fishing + Biome Resources + NPC Schedules + Settlement + Biome Climate + Reputation complete.** Notification popup system + compass quest waypoint markers. Weather system: WeatherManager autoload, WeatherEffects (rain/snow GPUParticles3D, fog/cloud modulation). Wildlife/Fishing: biome-aware animal spawning (Plains/Meadow for farm animals), FishingSpot (timed catch 3.5s, loot table, cooldown), fishing rod tool (Workbench recipe), fish items (raw_fish, salmon, pufferfish, cooked_fish, grilled_salmon) + cooking recipes. Biome Resources: biome-specific tree loot (Taiga → sap, Jungle → denser wood, Mountains/Snow → less wood), rock loot (Mountains → more ore, Plains → stone-only, Beach → copper), herb drops (Swamp → rarer mushrooms, Meadow → more lavender, Jungle → more mint). NPC Schedules: BaseNPC SLEEPING/GOING_TO_TARGET states, time-based daily routines via schedule array (wake/work/socialize/sleep cycles per role). Settlement: Claim Post placeable + boundary post visuals, placed object save/load persistence, claim data saved to world_data. Biome Climate: subtle fog color per biome (water=blue mist, jungle=dark green, snow=bright white, etc.), blends into current fog. Reputation: per-NPC reputation (-100..100), +20 on quest turn-in, -5 on hit; price modifier in shops (Honored=30% off, Hostile=50% markup); saved in world_data. Next: Phase 4 remaining — housing, decorations, community buildings, quest content, animal behaviors, environmental hazards.*

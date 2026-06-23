@@ -297,6 +297,42 @@ func _init_recipes() -> void:
 		"basic_dagger", 1, 4.0, "blacksmithing", 10.0
 	))
 	
+	# ===== SETTLEMENT =====
+	_register_recipe(_make_recipe(
+		"craft_claim_post", "Claim Post", "Mark your territory with a claim post.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 3}, {"item_id": "stone", "amount": 5}, {"item_id": "rope", "amount": 2}],
+		"claim_post", 1, 4.0, "crafting", 10.0
+	))
+
+	# ===== DECORATIONS (Hand) =====
+	_register_recipe(_make_recipe(
+		"craft_flower_pot", "Flower Pot", "A charming pot with wildflowers.",
+		CraftingRecipe.RecipeCategory.MISC, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "dirt", "amount": 2}, {"item_id": "fiber", "amount": 2}],
+		"flower_pot", 1, 2.0, "crafting", 3.0
+	))
+	_register_recipe(_make_recipe(
+		"craft_chair", "Wooden Chair", "A simple wooden chair for your home.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "wood_log", "amount": 2}],
+		"chair_wood", 1, 2.0, "crafting", 4.0
+	))
+	_register_recipe(_make_recipe(
+		"craft_table", "Small Table", "A small wooden table for your home.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.HAND,
+		[{"item_id": "wood_plank", "amount": 3}],
+		"table_small", 1, 2.5, "crafting", 5.0
+	))
+
+	# ===== FISHING =====
+	_register_recipe(_make_recipe(
+		"craft_fishing_rod", "Fishing Rod", "A simple fishing rod for catching fish.",
+		CraftingRecipe.RecipeCategory.TOOLS, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "stick", "amount": 3}, {"item_id": "string", "amount": 2}],
+		"basic_fishing_rod", 1, 3.0, "crafting", 5.0
+	))
+
 	# ===== BUILDING (Hand) =====
 	
 	# Wooden Fence
@@ -478,6 +514,20 @@ func _init_recipes() -> void:
 		"mushroom_tea", 1, 5.0, "cooking", 15.0
 	))
 	
+	# Fish cooking
+	_register_recipe(_make_recipe(
+		"cook_raw_fish", "Cooked Fish", "Grill a fresh fish over the fire.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "raw_fish", "amount": 1}],
+		"cooked_fish", 1, 3.0, "cooking", 8.0
+	))
+	_register_recipe(_make_recipe(
+		"cook_salmon", "Grilled Salmon", "Grill a plump salmon to perfection.",
+		CraftingRecipe.RecipeCategory.FOOD, CraftingRecipe.CraftingStation.COOKING_FIRE,
+		[{"item_id": "salmon", "amount": 1}],
+		"grilled_salmon", 1, 4.0, "cooking", 12.0
+	))
+
 	# ===== BUILDING (Workbench) =====
 	
 	# Wooden Fence - 2 planks + 1 string

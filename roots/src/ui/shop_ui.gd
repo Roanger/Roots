@@ -7,6 +7,7 @@ class_name ShopUI
 var _npc: Node = null  # BaseNPC
 var _player: Node3D = null
 var _shop_items: Array = []
+var _price_modifier: float = 1.0
 
 # UI elements
 var _panel: PanelContainer = null
@@ -116,6 +117,11 @@ func open(npc: Node, player: Node3D) -> void:
 	if npc.npc_data:
 		_title_label.text = npc.npc_data.display_name + "'s Shop"
 		_shop_items = npc.npc_data.shop_inventory
+		# Calculate reputation price modifier
+		_price_modifier = 1.0
+		var main_world = get_node_or_null("/root/MainWorld")
+		if main_world and main_world.has_method("get_reputation_price_modifier"):
+			_price_modifier = main_world.get_reputation_price_modifier(npc.npc_data.npc_id)
 	else:
 		_title_label.text = "Shop"
 		_shop_items = []
@@ -146,7 +152,8 @@ func _refresh_items() -> void:
 
 	for shop_entry in _shop_items:
 		var item_id: String = shop_entry.get("item_id", "")
-		var buy_price: int = shop_entry.get("buy_price", 10)
+		var base_price: int = shop_entry.get("buy_price", 10)
+		var effective_price: int = maxi(1, roundi(base_price * _price_modifier))
 		var stock: int = shop_entry.get("stock", -1)  # -1 = unlimited
 
 		# Get item display name from database
@@ -171,9 +178,12 @@ func _refresh_items() -> void:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(name_label)
 
-		# Price
+		# Price (show base if modified)
 		var price_label = Label.new()
-		price_label.text = "%d g" % buy_price
+		if abs(_price_modifier - 1.0) > 0.01:
+			price_label.text = "%d g" % effective_price
+		else:
+			price_label.text = "%d g" % base_price
 		price_label.add_theme_font_size_override("font_size", 15)
 		price_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 		price_label.custom_minimum_size.x = 60
@@ -184,26 +194,27 @@ func _refresh_items() -> void:
 		buy_btn.text = "Buy"
 		buy_btn.add_theme_font_size_override("font_size", 13)
 		buy_btn.custom_minimum_size.x = 70
-		buy_btn.disabled = (gold < buy_price) or (stock == 0)
-		buy_btn.pressed.connect(_on_buy.bind(shop_entry))
+		buy_btn.disabled = (gold < effective_price) or (stock == 0)
+		buy_btn.pressed.connect(_on_buy.bind(shop_entry, effective_price))
 		row.add_child(buy_btn)
 
 		_items_container.add_child(row)
 
-func _on_buy(shop_entry: Dictionary) -> void:
+func _on_buy(shop_entry: Dictionary, effective_price: int = -1) -> void:
 	var item_id: String = shop_entry.get("item_id", "")
-	var buy_price: int = shop_entry.get("buy_price", 10)
 	var stock: int = shop_entry.get("stock", -1)
+	if effective_price < 0:
+		effective_price = maxi(1, roundi(shop_entry.get("buy_price", 10) * _price_modifier))
 
 	var gold = _get_player_gold()
-	if gold < buy_price:
+	if gold < effective_price:
 		return
 	if stock == 0:
 		return
 
 	# Deduct gold
 	if _player and _player.get("inventory"):
-		_player.inventory.remove_item("gold_coin", buy_price)
+		_player.inventory.remove_item("gold_coin", effective_price)
 
 	# Reduce stock if not unlimited
 	if stock > 0:
@@ -217,7 +228,7 @@ func _on_buy(shop_entry: Dictionary) -> void:
 			_player.inventory.add_item(item_data, 1)
 
 	_refresh_items()
-	print("[Shop] Player bought %s for %d gold" % [item_id, buy_price])
+	print("[Shop] Player bought %s for %d gold" % [item_id, effective_price])
 
 func _get_player_gold() -> int:
 	if _player and _player.get("inventory"):

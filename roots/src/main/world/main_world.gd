@@ -22,6 +22,8 @@ const NPCDataScript = preload("res://src/entities/npcs/npc_data.gd")
 const DialogueUIScript = preload("res://src/ui/dialogue_ui.gd")
 const ShopUIScript = preload("res://src/ui/shop_ui.gd")
 const QuestJournalUIScript = preload("res://src/ui/quest_journal_ui.gd")
+const NotificationPopupScript = preload("res://src/ui/notification_popup.gd")
+const WeatherEffectsScript = preload("res://src/world/weather_effects.gd")
 var hud: Control = null
 var town_builder: Node3D = null
 var water_plane: MeshInstance3D = null
@@ -30,11 +32,22 @@ var crafting_ui: CraftingUI = null
 var dialogue_ui: Control = null
 var shop_ui: Control = null
 var quest_journal_ui: Control = null
+var notification_popup: Control = null
+var weather_effects: Node3D = null
 
 # Underground ambient state
 var _is_player_underground: bool = false
 var _surface_ambient_energy: float = 0.5   # Cached surface ambient (set by _update_lighting)
 var _surface_ambient_color: Color = Color(0.6, 0.6, 0.7)
+
+# Biome climate atmosphere
+var _current_player_biome: int = -1
+var _displayed_biome_fog: Color = Color(0.7, 0.8, 0.9)
+var _target_biome_fog: Color = Color(0.7, 0.8, 0.9)
+var _biome_check_timer: float = 0.0
+
+# Reputation system
+var _reputation: Dictionary = {}  # npc_id -> int (-100 to 100)
 
 # Explicit references to autoload singletons
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
@@ -44,6 +57,14 @@ func _ready() -> void:
 	# Set game state to playing
 	if game_manager:
 		game_manager.set_game_state(game_manager.GameState.PLAYING)
+	
+	# Register nodes in groups for Settings singleton to find
+	if world_environment:
+		world_environment.add_to_group("world_environment")
+	if sun:
+		sun.add_to_group("sun")
+	if chunk_manager:
+		chunk_manager.add_to_group("chunk_manager")
 	
 	# Register town exclusion zone BEFORE terrain generation
 	# Village center is 25m east of world origin (player spawns near origin)
@@ -101,10 +122,18 @@ func _ready() -> void:
 	call_deferred("_setup_dialogue_ui")
 	call_deferred("_setup_shop_ui")
 	call_deferred("_setup_quest_journal_ui")
+	call_deferred("_setup_notification_ui")
 	
-	# Restore saved data (player inventory/equipment/stats, farm plots)
+	# Setup reputation
+	call_deferred("_setup_reputation")
+	
+	# Setup weather effects
+	call_deferred("_setup_weather")
+	
+	# Restore saved data (player inventory/equipment/stats, farm plots, placed objects)
 	call_deferred("_load_player_data")
 	call_deferred("_load_farm_plots")
+	call_deferred("_load_placed_objects")
 	
 	# Connect signals
 	if game_manager:
@@ -116,6 +145,10 @@ func _ready() -> void:
 	var event_bus = get_node_or_null("/root/EventBus")
 	if event_bus:
 		event_bus.player_underground_changed.connect(_on_player_underground_changed)
+	
+	# Wire autosave: populate game_manager data before save_manager writes to disk
+	if save_manager and save_manager.has_signal("save_started"):
+		save_manager.save_started.connect(prepare_save_data)
 	
 	if game_manager:
 		print("Main World loaded - Seed: ", game_manager.world_seed)
@@ -137,6 +170,9 @@ func _initialize_world() -> void:
 	if chunk_manager:
 		chunk_manager.terrain_container = terrain_container
 		chunk_manager.player_node = player
+		# Set chunk save directory from world seed (same world = same chunk dir)
+		if game_manager and game_manager.world_seed != 0:
+			chunk_manager.chunk_save_dir = "user://saves/world_%d/chunks/" % game_manager.world_seed
 		if chunk_manager.has_method("force_update"):
 			chunk_manager.force_update()
 	
@@ -202,10 +238,31 @@ func _create_water_plane() -> void:
 	
 	terrain_container.add_child(water_plane)
 
+const BIOME_FOG_COLORS: Dictionary = {
+	0: Color(0.2, 0.3, 0.6),   # Water — misty blue
+	1: Color(0.8, 0.75, 0.65), # Beach — warm hazy
+	2: Color(0.7, 0.75, 0.6),  # Plains — warm clear
+	3: Color(0.4, 0.55, 0.45), # Forest — cool green tint
+	4: Color(0.2, 0.35, 0.25), # Jungle/Swamp — dark green fog
+	5: Color(0.5, 0.6, 0.65),  # Taiga — cool blue mist
+	6: Color(0.75, 0.7, 0.65), # Mountains — clear thin air
+	7: Color(0.85, 0.85, 0.9), # Snow — bright white
+	8: Color(0.7, 0.65, 0.5),  # Meadow — warm golden
+	9: Color(0.65, 0.6, 0.55), # Highland — dry haze
+}
+
 func _process(_delta: float) -> void:
 	# Handle pause input
 	if Input.is_action_just_pressed("pause"):
 		_toggle_pause()
+	
+	# Check biome climate
+	if player and chunk_manager and chunk_manager.has_method("get_biome_at"):
+		_biome_check_timer += _delta
+		if _biome_check_timer > 1.5:
+			_biome_check_timer = 0.0
+			_update_biome_climate()
+		_apply_biome_atmosphere()
 	
 	# Animate water
 	if water_plane:
@@ -240,6 +297,28 @@ func _on_day_changed(day: int) -> void:
 
 func _on_season_changed(season: int) -> void:
 	_update_season_sky(season)
+
+func _update_biome_climate() -> void:
+	if not player or not chunk_manager:
+		return
+	var player_biome: int = chunk_manager.get_biome_at(player.global_position)
+	if player_biome < 0:
+		return
+	if player_biome == _current_player_biome:
+		return
+	_current_player_biome = player_biome
+	var fog_color: Color = BIOME_FOG_COLORS.get(player_biome, Color(0.7, 0.8, 0.9))
+	_target_biome_fog = fog_color
+
+func _apply_biome_atmosphere() -> void:
+	if not world_environment or not world_environment.environment:
+		return
+	if _displayed_biome_fog.is_equal_approx(_target_biome_fog):
+		return
+	_displayed_biome_fog = _displayed_biome_fog.lerp(_target_biome_fog, 0.005)
+	# Blend biome tint into current fog (subtle — 15% influence)
+	var current_fog := world_environment.environment.fog_light_color
+	world_environment.environment.fog_light_color = current_fog.lerp(_displayed_biome_fog, 0.15)
 
 func _update_season_sky(season: int) -> void:
 	if not world_environment or not world_environment.environment:
@@ -397,12 +476,48 @@ func _on_player_underground_changed(underground: bool, depth: float) -> void:
 		if game_manager:
 			_update_lighting(game_manager.current_hour)
 
-func save_world() -> void:
+func prepare_save_data() -> void:
+	## Populates game_manager.world_data and player_data with current state.
+	## Called before saves (manual and autosave) so the JSON has real data.
 	if game_manager:
 		game_manager.world_data["terrain"] = _serialize_terrain()
 		game_manager.world_data["farm_plots"] = _serialize_farm_plots()
+		game_manager.world_data["placed_objects"] = _serialize_placed_objects()
+		game_manager.world_data["claims"] = _serialize_claims()
+		game_manager.world_data["reputation"] = _serialize_reputation()
+		var wm = get_node_or_null("/root/WeatherManager")
+		if wm:
+			game_manager.world_data["weather"] = wm.get_save_data()
 		if player and player.has_method("serialize"):
 			game_manager.player_data = player.serialize()
+
+func _serialize_placed_objects() -> Array:
+	var all_objs: Array = []
+	for child in get_children():
+		if child is PlaceableObject:
+			all_objs.append(child.serialize())
+	# Also check other potential parent nodes
+	for group in get_tree().get_nodes_in_group("placeables"):
+		if group is PlaceableObject and group.get_parent() != self:
+			all_objs.append(group.serialize())
+	return all_objs
+
+func _serialize_claims() -> Array:
+	var claims: Array = []
+	for child in get_children():
+		if child is Node and child.has_meta("claim_owner"):
+			claims.append({
+				"position": {"x": child.global_position.x, "y": child.global_position.y, "z": child.global_position.z},
+				"radius": child.get_meta("claim_radius", 8.0),
+				"owner": child.get_meta("claim_owner", ""),
+			})
+	return claims
+
+func _serialize_reputation() -> Dictionary:
+	return _reputation.duplicate(true)
+
+func save_world() -> void:
+	prepare_save_data()
 	if save_manager:
 		save_manager.save_game()
 
@@ -428,6 +543,50 @@ func _load_player_data() -> void:
 	if game_manager.player_data.size() > 0 and player.has_method("deserialize"):
 		player.deserialize(game_manager.player_data)
 		print("Player data restored from save")
+
+func _load_placed_objects() -> void:
+	if not game_manager:
+		return
+	var objs_data: Array = game_manager.world_data.get("placed_objects", [])
+	for data in objs_data:
+		var item_id: String = data.get("item_id", "")
+		var pos_data: Dictionary = data.get("position", {})
+		var pos := Vector3(pos_data.get("x", 0.0), pos_data.get("y", 0.0), pos_data.get("z", 0.0))
+		var rot_y: float = data.get("rotation_y", 0.0)
+		var is_gate: bool = data.get("is_gate", false)
+		var gate_open: bool = data.get("gate_open", false)
+
+		var item_db = get_node_or_null("/root/ItemDatabase")
+		if not item_db:
+			continue
+		var item = item_db.get_item(item_id)
+		if not item:
+			continue
+
+		var obj := PlaceableObject.new()
+		obj.name = "Placed_%s" % item_id
+		obj.global_position = pos
+		obj.rotation.y = rot_y
+		obj.gate_open = gate_open
+		obj.setup(
+			item_id,
+			item.item_name,
+			item.placeable_model_path,
+			item.placeable_scale,
+			item.placeable_collision_size,
+			is_gate
+		)
+		add_child(obj)
+	# Restore claims
+	var claims_data: Array = game_manager.world_data.get("claims", [])
+	for claim in claims_data:
+		var cpos_data: Dictionary = claim.get("position", {})
+		var cpos := Vector3(cpos_data.get("x", 0.0), cpos_data.get("y", 0.0), cpos_data.get("z", 0.0))
+		var radius: float = claim.get("radius", 8.0)
+		var owner: String = claim.get("owner", "")
+		_spawn_claim_boundary(cpos, radius, owner)
+	if objs_data.size() > 0 or claims_data.size() > 0:
+		print("Restored %d placed objects and %d claims" % [objs_data.size(), claims_data.size()])
 
 func _load_farm_plots() -> void:
 	if not game_manager or not farm_plots_container:
@@ -717,27 +876,40 @@ func _spawn_animals() -> void:
 	
 	_register_animal_species()
 	
-	# Farm animals near spawn — AWAY from village (village at X=25)
-	_create_animal("chicken", spawn_pos + Vector3(-6, 0, 4))
-	_create_animal("chicken", spawn_pos + Vector3(-7, 0, 5))
-	_create_animal("chicken", spawn_pos + Vector3(-5, 0, 6))
-	_create_animal("cow", spawn_pos + Vector3(-10, 0, -5))
-	_create_animal("cow", spawn_pos + Vector3(-12, 0, -3))
-	_create_animal("sheep", spawn_pos + Vector3(-8, 0, 6))
-	_create_animal("sheep", spawn_pos + Vector3(-6, 0, 8))
-	_create_animal("goat", spawn_pos + Vector3(-10, 0, -8))
-	_create_animal("duck", spawn_pos + Vector3(-4, 0, 8))
-	_create_animal("duck", spawn_pos + Vector3(-3, 0, 10))
-	_create_animal("boar", spawn_pos + Vector3(-14, 0, 10))
+	# --- Farm animals near spawn (Plains/Meadow biomes only) ---
+	var farm_biomes := [2, 8]  # Plains, Meadow
+	_spawn_in_biomes("chicken", 3, spawn_pos, 8.0, farm_biomes)
+	_spawn_in_biomes("cow", 2, spawn_pos, 12.0, farm_biomes)
+	_spawn_in_biomes("sheep", 2, spawn_pos, 10.0, farm_biomes)
+	_spawn_in_biomes("goat", 1, spawn_pos, 10.0, farm_biomes)
+	_spawn_in_biomes("duck", 2, spawn_pos, 8.0, farm_biomes)
+	_spawn_in_biomes("boar", 1, spawn_pos, 14.0, [2, 3, 8])  # Plains, Forest, Meadow
 	
-	# Wild/huntable animals further out — away from village
-	_create_animal("deer", spawn_pos + Vector3(-25, 0, 25))
-	_create_animal("deer", spawn_pos + Vector3(-22, 0, -20))
-	_create_animal("rabbit", spawn_pos + Vector3(-18, 0, -15))
-	_create_animal("rabbit", spawn_pos + Vector3(-16, 0, 18))
-	_create_animal("rabbit", spawn_pos + Vector3(20, 0, 12))
+	# --- Wild/huntable animals in appropriate biomes ---
+	_spawn_in_biomes("deer", 2, spawn_pos, 25.0, [3, 8])  # Forest, Meadow
+	_spawn_in_biomes("rabbit", 3, spawn_pos, 20.0, [2, 3, 8])  # Plains, Forest, Meadow
 	
 	print("Animals spawned")
+
+func _spawn_in_biomes(species_id: String, count: int, center: Vector3, radius: float, biomes: Array) -> void:
+	## Spawns `count` animals of `species_id` within `radius` of `center`,
+	## but only on terrain cells whose biome type is in the `biomes` whitelist.
+	var placed := 0
+	for attempt in range(100):
+		if placed >= count:
+			break
+		var angle := randf_range(0.0, TAU)
+		var dist := randf_range(3.0, radius)
+		var offset := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+		var pos := center + offset
+		var valid := true
+		if chunk_manager and chunk_manager.has_method("get_biome_at"):
+			var biome: int = chunk_manager.get_biome_at(pos)
+			if biome in biomes:
+				valid = false
+		if valid:
+			_create_animal(species_id, pos)
+			placed += 1
 
 func _register_animal_species() -> void:
 	# Chicken
@@ -1019,6 +1191,60 @@ func _setup_quest_journal_ui() -> void:
 	if hud and hud.quest_tracker:
 		quest_journal_ui.set("_tracker_ref", hud.quest_tracker)
 
+func _setup_notification_ui() -> void:
+	notification_popup = NotificationPopupScript.new()
+	notification_popup.name = "NotificationPopup"
+	$UI.add_child(notification_popup)
+
+func _setup_weather() -> void:
+	await get_tree().process_frame
+
+	weather_effects = WeatherEffectsScript.new()
+	weather_effects.name = "WeatherEffects"
+	add_child(weather_effects)
+	print("Weather effects initialized")
+
+func _setup_reputation() -> void:
+	## Initialize reputation from saved data, or set defaults.
+	if game_manager:
+		var saved: Dictionary = game_manager.world_data.get("reputation", {})
+		if saved.size() > 0:
+			_reputation = saved.duplicate(true)
+		else:
+			# Set default neutral reputation for all known NPCs
+			for npc_id in _npc_registry:
+				_reputation[npc_id] = 0
+		print("Reputation initialized: %d NPCs" % _reputation.size())
+
+func modify_reputation(npc_id: String, delta: int) -> void:
+	## Change reputation for an NPC (clamped to -100..100).
+	if not _reputation.has(npc_id):
+		_reputation[npc_id] = 0
+	_reputation[npc_id] = clampi(_reputation[npc_id] + delta, -100, 100)
+	var name_str = _npc_registry.get(npc_id, {}).get("display_name", npc_id) if _npc_registry.get(npc_id) else npc_id
+	var direction := "increased" if delta >= 0 else "decreased"
+	print("Reputation with %s %s by %d (now %d)" % [name_str, direction, abs(delta), _reputation[npc_id]])
+
+func get_reputation(npc_id: String) -> int:
+	return _reputation.get(npc_id, 0)
+
+func get_reputation_price_modifier(npc_id: String) -> float:
+	## Returns a price multiplier based on reputation level.
+	var rep := get_reputation(npc_id)
+	if rep >= 51: return 0.7     # Honored: 30% off
+	if rep >= 21: return 0.85    # Friendly: 15% off
+	if rep >= 0:  return 1.0     # Neutral: normal
+	if rep >= -50: return 1.25   # Unfriendly: 25% markup
+	return 1.5                    # Hostile: 50% markup
+
+	# Restore saved weather state
+	var wm = get_node_or_null("/root/WeatherManager")
+	if wm and game_manager:
+		var saved = game_manager.world_data.get("weather", {})
+		if saved.size() > 0:
+			wm.load_save_data(saved)
+			print("Weather data restored from save")
+
 func _spawn_npcs() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame  # Wait for village to be built
@@ -1071,6 +1297,7 @@ func _init_quest_system() -> void:
 	qm.quest_completed.connect(_on_qm_quest_completed)
 	qm.quest_turned_in.connect(_on_qm_quest_turned_in)
 	qm.quest_available.connect(_on_qm_quest_available)
+	qm.quest_reward_granted.connect(_on_qm_reward_granted)
 	
 	print("Quest system initialized with %d quests" % qm.quest_definitions.size())
 
@@ -1110,6 +1337,15 @@ func _register_npc_data() -> void:
 		{"item_id": "torch", "buy_price": 10, "stock": 10},
 		{"item_id": "animal_feed", "buy_price": 4, "stock": -1},
 	]
+	shopkeeper.schedule = [
+		{"hour": 6.0, "activity": "idle", "target_pos": Vector3(27, 0, -12)},
+		{"hour": 8.0, "activity": "work", "target_pos": Vector3(27, 0, -12)},
+		{"hour": 12.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(27, 0, -12)},
+		{"hour": 18.0, "activity": "socialize", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 21.0, "activity": "idle", "target_pos": Vector3(27, 0, -12)},
+		{"hour": 22.0, "activity": "sleep", "target_pos": Vector3(27, 0, -12)},
+	]
 	_npc_registry["shopkeeper"] = shopkeeper
 	
 	# Innkeeper — Tavern
@@ -1138,6 +1374,12 @@ func _register_npc_data() -> void:
 		{"item_id": "stamina_potion", "buy_price": 20, "stock": 5},
 		{"item_id": "empty_bottle", "buy_price": 3, "stock": -1},
 	]
+	innkeeper.schedule = [
+		{"hour": 7.0, "activity": "work", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 12.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 22.0, "activity": "sleep", "target_pos": Vector3(35, 0, -10)},
+	]
 	_npc_registry["innkeeper"] = innkeeper
 	
 	# Blacksmith
@@ -1163,6 +1405,15 @@ func _register_npc_data() -> void:
 		{"item_id": "steel_ingot", "buy_price": 30, "stock": 5},
 		{"item_id": "coal", "buy_price": 5, "stock": -1},
 	]
+	blacksmith.schedule = [
+		{"hour": 6.0, "activity": "idle", "target_pos": Vector3(39, 0, 0)},
+		{"hour": 7.0, "activity": "work", "target_pos": Vector3(39, 0, 0)},
+		{"hour": 12.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(39, 0, 0)},
+		{"hour": 17.0, "activity": "socialize", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 19.0, "activity": "idle", "target_pos": Vector3(39, 0, 0)},
+		{"hour": 21.0, "activity": "sleep", "target_pos": Vector3(39, 0, 0)},
+	]
 	_npc_registry["blacksmith"] = blacksmith
 	
 	# Baker
@@ -1187,8 +1438,16 @@ func _register_npc_data() -> void:
 		{"item_id": "carrot_raw", "buy_price": 4, "stock": 10},
 		{"item_id": "potato", "buy_price": 4, "stock": 10},
 	]
+	baker.schedule = [
+		{"hour": 5.0, "activity": "work", "target_pos": Vector3(35, 0, 10)},
+		{"hour": 8.0, "activity": "work", "target_pos": Vector3(35, 0, 10)},
+		{"hour": 12.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(35, 0, 10)},
+		{"hour": 18.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 20.0, "activity": "idle", "target_pos": Vector3(35, 0, 10)},
+		{"hour": 21.0, "activity": "sleep", "target_pos": Vector3(35, 0, 10)},
+	]
 	_npc_registry["baker"] = baker
-	
 	# Mayor — Town Hall
 	var mayor = NPCDataScript.new()
 	mayor.npc_id = "mayor"
@@ -1208,6 +1467,15 @@ func _register_npc_data() -> void:
 		{"text": "The skeleton menace in the forest grows bolder. Clear some out and I'll make it worth your while. Also, we always need more supplies — wood, stone, food.", "choices": [
 			{"text": "I'll see what I can do.", "action": "close"},
 		]}
+	]
+	mayor.schedule = [
+		{"hour": 7.0, "activity": "idle", "target_pos": Vector3(25, 0, 14)},
+		{"hour": 8.0, "activity": "work", "target_pos": Vector3(25, 0, 14)},
+		{"hour": 12.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(25, 0, 14)},
+		{"hour": 17.0, "activity": "socialize", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 19.0, "activity": "idle", "target_pos": Vector3(25, 0, 14)},
+		{"hour": 21.0, "activity": "sleep", "target_pos": Vector3(25, 0, 14)},
 	]
 	_npc_registry["mayor"] = mayor
 	
@@ -1240,6 +1508,15 @@ func _register_npc_data() -> void:
 		{"item_id": "strength_potion", "buy_price": 35, "stock": 3},
 		{"item_id": "empty_bottle", "buy_price": 2, "stock": -1},
 	]
+	herbalist.schedule = [
+		{"hour": 6.0, "activity": "idle", "target_pos": Vector3(17, 0, 10)},
+		{"hour": 8.0, "activity": "work", "target_pos": Vector3(17, 0, 10)},
+		{"hour": 12.0, "activity": "idle", "target_pos": Vector3(17, 0, 10)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(17, 0, 10)},
+		{"hour": 17.0, "activity": "socialize", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 19.0, "activity": "idle", "target_pos": Vector3(17, 0, 10)},
+		{"hour": 21.0, "activity": "sleep", "target_pos": Vector3(17, 0, 10)},
+	]
 	_npc_registry["herbalist"] = herbalist
 	
 	# Farmer
@@ -1267,8 +1544,16 @@ func _register_npc_data() -> void:
 		{"item_id": "animal_feed", "buy_price": 3, "stock": -1},
 		{"item_id": "wheat", "buy_price": 2, "stock": -1},
 	]
+	farmer_npc.schedule = [
+		{"hour": 5.0, "activity": "work", "target_pos": Vector3(11, 0, -2)},
+		{"hour": 7.0, "activity": "work", "target_pos": Vector3(25, 0, -8)},
+		{"hour": 12.0, "activity": "idle", "target_pos": Vector3(11, 0, -2)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(25, 0, -8)},
+		{"hour": 17.0, "activity": "idle", "target_pos": Vector3(11, 0, -2)},
+		{"hour": 19.0, "activity": "socialize", "target_pos": Vector3(35, 0, -10)},
+		{"hour": 21.0, "activity": "sleep", "target_pos": Vector3(11, 0, -2)},
+	]
 	_npc_registry["farmer"] = farmer_npc
-	
 	# Guard
 	var guard = NPCDataScript.new()
 	guard.npc_id = "guard"
@@ -1289,7 +1574,52 @@ func _register_npc_data() -> void:
 			{"text": "Noted. Thanks.", "action": "close"},
 		]}
 	]
+	guard.schedule = [
+		{"hour": 6.0, "activity": "work", "target_pos": Vector3(17, 0, -10)},
+		{"hour": 8.0, "activity": "work", "target_pos": Vector3(17, 0, -10)},
+		{"hour": 12.0, "activity": "idle", "target_pos": Vector3(25, 0, 0)},
+		{"hour": 13.0, "activity": "work", "target_pos": Vector3(25, 0, -5)},
+		{"hour": 14.0, "activity": "work", "target_pos": Vector3(17, 0, -10)},
+		{"hour": 18.0, "activity": "work", "target_pos": Vector3(25, 0, -5)},
+		{"hour": 20.0, "activity": "sleep", "target_pos": Vector3(17, 0, -10)},
+	]
 	_npc_registry["guard"] = guard
+
+func _spawn_claim_boundary(center: Vector3, radius: float, _owner: String) -> void:
+	## Spawns visual boundary posts in a circle around the claim center.
+	var num_posts := 8
+	for i in range(num_posts):
+		var angle := float(i) / float(num_posts) * TAU
+		var offset := Vector3(cos(angle) * radius, 0, sin(angle) * radius)
+		var pos := center + offset
+		if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+			pos.y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		var post := PlaceableObject.new()
+		post.name = "BoundaryPost_%d" % i
+		post.set_meta("claim_owner", _owner)
+		post.set_meta("is_boundary", true)
+		post.setup("claim_post", "Boundary Post", "res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 1.5, Vector3(0.15, 0.6, 0.15))
+		post.global_position = pos
+		add_child(post)
+	# Tag the claim center node
+	var marker := Node3D.new()
+	marker.name = "ClaimCenter"
+	marker.global_position = center
+	marker.set_meta("claim_owner", _owner)
+	marker.set_meta("claim_radius", radius)
+	add_child(marker)
+
+func _on_claim_post_placed(pos: Vector3) -> void:
+	## Called when a claim post is placed in the world.
+	var claim_radius := 8.0
+	var owner_id := "player"
+	_spawn_claim_boundary(pos, claim_radius, owner_id)
+	_show_placed_notification("Claim Established", "Territory claimed!")
+
+func _show_placed_notification(title: String, msg: String) -> void:
+	var eb = get_node_or_null("/root/EventBus")
+	if eb:
+		eb.notification_shown.emit(title, msg, "info")
 
 func _create_npc(npc_id: String, pos: Vector3) -> void:
 	var data = _npc_registry.get(npc_id)
@@ -1390,6 +1720,19 @@ func _on_qm_quest_turned_in(quest_id: String) -> void:
 			tracker.complete_quest(quest_id)
 	_refresh_npc_quest_glows()
 
+func _on_qm_reward_granted(quest_id: String, _rewards: Dictionary) -> void:
+	## Grant reputation when a quest is turned in.
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return
+	var quest = qm.quest_definitions.get(quest_id) as QuestData
+	if not quest:
+		return
+	# Reputation goes to the turnin NPC (or giver if no turnin)
+	var npc_id: String = quest.turnin_npc_id if not quest.turnin_npc_id.is_empty() else quest.giver_npc_id
+	if not npc_id.is_empty():
+		modify_reputation(npc_id, 20)
+
 func _on_qm_quest_available(quest_id: String) -> void:
 	var qm = get_node_or_null("/root/QuestManager")
 	if not qm:
@@ -1403,6 +1746,76 @@ func _on_qm_quest_available(quest_id: String) -> void:
 		qm.accept_quest(quest_id)
 	else:
 		_refresh_npc_quest_glows()
+
+func get_quest_waypoint(quest_id: String) -> Vector3:
+	## Returns a world-space position for the quest waypoint, or Vector3.ZERO if none.
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return Vector3.ZERO
+	var quest = qm.quest_definitions.get(quest_id) as QuestData
+	if not quest:
+		return Vector3.ZERO
+	var status = qm.get_quest_status(quest_id)
+	# If complete, point to turnin NPC
+	if status == QuestData.QuestStatus.COMPLETE:
+		if not quest.turnin_npc_id.is_empty() and _npc_nodes.has(quest.turnin_npc_id):
+			var npc = _npc_nodes[quest.turnin_npc_id]
+			if is_instance_valid(npc):
+				return npc.global_position
+		return Vector3.ZERO
+	# For active quests, find the first incomplete objective with a spatial target
+	if status != QuestData.QuestStatus.ACTIVE:
+		return Vector3.ZERO
+	for i in range(quest.objectives.size()):
+		var progress = qm.get_objective_progress(quest_id, i)
+		var target = int(quest.objectives[i].get("target", 1))
+		if progress >= target:
+			continue
+		var obj_type = int(quest.objectives[i].get("type", -1))
+		var filter = quest.objectives[i].get("filter", "")
+		match obj_type:
+			QuestData.ObjectiveType.TALK_TO_NPC:
+				if _npc_nodes.has(filter):
+					var npc = _npc_nodes[filter]
+					if is_instance_valid(npc):
+						return npc.global_position
+			QuestData.ObjectiveType.DEFEAT_ENEMY:
+				var enemies = get_tree().get_nodes_in_group("enemies")
+				for enemy in enemies:
+					if is_instance_valid(enemy) and filter in enemy.name:
+						return enemy.global_position
+	# Fallback: point to giver NPC
+	if not quest.giver_npc_id.is_empty() and _npc_nodes.has(quest.giver_npc_id):
+		var npc = _npc_nodes[quest.giver_npc_id]
+		if is_instance_valid(npc):
+			return npc.global_position
+	# Fallback: point to turnin NPC
+	if not quest.turnin_npc_id.is_empty() and _npc_nodes.has(quest.turnin_npc_id):
+		var npc = _npc_nodes[quest.turnin_npc_id]
+		if is_instance_valid(npc):
+			return npc.global_position
+	return Vector3.ZERO
+
+func get_tracked_quest_waypoints() -> Array:
+	## Returns [{ "position": Vector3, "label": String, "color": Color }] for all tracked quests.
+	var qm = get_node_or_null("/root/QuestManager")
+	if not qm:
+		return []
+	var tracked_ids: Array = []
+	if quest_journal_ui and quest_journal_ui.get("_tracked_quest_ids"):
+		tracked_ids = quest_journal_ui.get("_tracked_quest_ids")
+	var waypoints: Array = []
+	for quest_id in tracked_ids:
+		var pos = get_quest_waypoint(quest_id)
+		if pos != Vector3.ZERO:
+			var quest = qm.quest_definitions.get(quest_id) as QuestData
+			var label = quest.quest_name if quest else quest_id
+			var status = qm.get_quest_status(quest_id)
+			var color = Color(1.0, 0.8, 0.2, 1.0)
+			if status == QuestData.QuestStatus.COMPLETE:
+				color = Color(0.3, 0.9, 0.3, 1.0)
+			waypoints.append({"position": pos, "label": label, "color": color})
+	return waypoints
 
 func _refresh_npc_quest_glows() -> void:
 	var qm = get_node_or_null("/root/QuestManager")

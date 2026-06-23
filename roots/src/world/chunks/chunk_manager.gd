@@ -2,6 +2,7 @@ extends Node
 ## Manages chunk loading/unloading based on player position
 
 const HarvestableResource = preload("res://src/world/harvestable_resource.gd")
+const FishingSpot = preload("res://src/world/fishing_spot.gd")
 
 signal chunk_loaded(chunk_pos: Vector2i)
 signal chunk_unloaded(chunk_pos: Vector2i)
@@ -11,6 +12,8 @@ signal chunk_mesh_updated(chunk_pos: Vector2i)
 @export var view_distance: int = 6  # Voxel chunks are expensive — keep this low
 @export var generate_objects: bool = true
 @export var save_chunks: bool = true
+
+var chunk_save_dir: String = ""  # Set by main_world from world seed; e.g. "user://saves/world_<seed>/chunks/"
 
 var loaded_chunks: Dictionary = {}  # Vector2i -> ChunkData
 var chunk_cache: Dictionary = {}  # For pending chunk generation
@@ -358,6 +361,11 @@ func _get_exclusion_height(world_x: float, world_z: float, zones: Array = [], nu
 	return -1.0
 
 func _generate_chunk_data(chunk_pos: Vector2i, local_noise = null, excl_zones: Array = []) -> ChunkData:
+	# Try loading a saved chunk from disk first (restores heights + tile mods + objects)
+	var saved_chunk = _load_chunk_from_disk(chunk_pos)
+	if saved_chunk:
+		return saved_chunk
+
 	var nu = local_noise if local_noise != null else noise_util
 	var _excl = excl_zones if excl_zones.size() > 0 else exclusion_zones
 	var chunk = ChunkData.new()
@@ -454,7 +462,6 @@ func _create_chunk_mesh(chunk: ChunkData) -> void:
 		var material = StandardMaterial3D.new()
 		material.vertex_color_use_as_albedo = true
 		material.roughness = 0.9
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		mesh_instance.material_override = material
 	else:
@@ -600,7 +607,6 @@ func _build_heightmap_mesh_into(chunk: ChunkData, mesh_instance: MeshInstance3D)
 	var material = StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
 	material.roughness = 0.9
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh_instance.material_override = material
 
@@ -615,7 +621,10 @@ func _create_chunk_objects(chunk: ChunkData, parent: Node, rng: RandomNumberGene
 	# Create rock instances (scale and tilt variation)
 	for rock_pos in chunk.rock_positions:
 		var local_pos = rock_pos - chunk.world_position
-		var rock = _create_rock_mesh(local_pos, rng)
+		var rlx = clampi(int(local_pos.x), 0, chunk.size)
+		var rlz = clampi(int(local_pos.z), 0, chunk.size)
+		var rock_biome = chunk.get_biome(rlx, rlz)
+		var rock = _create_rock_mesh(local_pos, rng, rock_biome)
 		if rock:
 			parent.add_child(rock)
 	
@@ -625,6 +634,89 @@ func _create_chunk_objects(chunk: ChunkData, parent: Node, rng: RandomNumberGene
 	_create_bush_patches(chunk, parent)
 	# Biome-specific decorations
 	_create_biome_decorations(chunk, parent)
+
+func _create_fishing_spots(chunk: ChunkData, parent: Node, rng: RandomNumberGenerator) -> void:
+	if not generate_objects:
+		return
+	var water_level := 16.0
+	if noise_util and noise_util.has_method("get_water_level"):
+		water_level = noise_util.get_water_level()
+	for z in range(0, chunk.size, 2):
+		for x in range(0, chunk.size, 2):
+			if chunk.get_biome(x, z) != 0:
+				continue
+			if rng.randf() > 0.08:
+				continue
+			var world_x = chunk.world_position.x + x + 0.5
+			var world_z = chunk.world_position.z + z + 0.5
+			if is_in_exclusion_zone(world_x, world_z):
+				continue
+			var spot := FishingSpot.new()
+			spot.name = "FishingSpot"
+			spot.position = Vector3(x + 0.5, water_level, z + 0.5)
+			spot.set_default_loot()
+			parent.add_child(spot)
+
+func _get_tree_loot_for_biome(biome: int, rng: RandomNumberGenerator) -> Array:
+	match biome:
+		5:  # Taiga - pine trees: more wood + sap
+			return [
+				{"item_id": "wood_log", "min_amount": 3, "max_amount": 6, "chance": 1.0},
+				{"item_id": "stick", "min_amount": 1, "max_amount": 2, "chance": 0.5},
+				{"item_id": "sap", "min_amount": 1, "max_amount": 2, "chance": 0.4},
+			]
+		6, 7:  # Mountains/Snow - stunted trees: less wood, no sticks
+			return [
+				{"item_id": "wood_log", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+			]
+		9:  # Highland - sparse trees: moderate wood, few sticks
+			return [
+				{"item_id": "wood_log", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+				{"item_id": "stick", "min_amount": 1, "max_amount": 2, "chance": 0.4},
+			]
+		4:  # Jungle/Swamp - dense trees: more wood, more sticks
+			return [
+				{"item_id": "wood_log", "min_amount": 3, "max_amount": 5, "chance": 1.0},
+				{"item_id": "stick", "min_amount": 2, "max_amount": 4, "chance": 0.8},
+			]
+		_:  # Plains(2), Forest(3), Meadow(8) and others: standard
+			return [
+				{"item_id": "wood_log", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+				{"item_id": "stick", "min_amount": 1, "max_amount": 3, "chance": 0.7},
+			]
+
+func _get_rock_loot_for_biome(biome: int, rng: RandomNumberGenerator) -> Array:
+	match biome:
+		6, 9:  # Mountains, Highland: more ore
+			return [
+				{"item_id": "stone", "min_amount": 3, "max_amount": 6, "chance": 1.0},
+				{"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.5},
+				{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.4},
+				{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.3},
+				{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.1},
+			]
+		5, 7:  # Taiga, Snow: coal-heavy
+			return [
+				{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+				{"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.6},
+				{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15},
+			]
+		2:  # Plains: stone only
+			return [
+				{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+			]
+		1:  # Beach: stone + some copper
+			return [
+				{"item_id": "stone", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+				{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.2},
+			]
+		_:  # Forest(3), Jungle(4), Meadow(8): standard
+			return [
+				{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+				{"item_id": "coal", "min_amount": 1, "max_amount": 2, "chance": 0.3},
+				{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.2},
+				{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.15},
+			]
 
 func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
 	var lx = clampi(int(pos.x), 0, chunk.size)
@@ -662,11 +754,11 @@ func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerato
 			scenes = _tree_scenes
 	
 	if scenes.is_empty():
-		return _create_tree_mesh_procedural(pos)
+		return _create_tree_mesh_procedural(pos, biome)
 	var scene: PackedScene = scenes[rng.randi() % scenes.size()]
 	var tree_container: Node3D = scene.instantiate() as Node3D
 	if not tree_container:
-		return _create_tree_mesh_procedural(pos)
+		return _create_tree_mesh_procedural(pos, biome)
 	tree_container.name = "Tree"
 	tree_container.position = pos
 	tree_container.rotation.y = rng.randf_range(0.0, TAU)
@@ -683,10 +775,7 @@ func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerato
 	harvestable.resource_type = ToolAffinity.TargetType.TREE
 	harvestable.max_health = 15.0
 	harvestable.xp_action_id = "chop_tree"
-	harvestable.loot_table = [
-		{"item_id": "wood_log", "min_amount": 2, "max_amount": 4, "chance": 1.0},
-		{"item_id": "stick", "min_amount": 1, "max_amount": 3, "chance": 0.7},
-	]
+	harvestable.loot_table = _get_tree_loot_for_biome(biome, rng)
 	var collision_shape = CollisionShape3D.new()
 	var trunk_shape = CylinderShape3D.new()
 	trunk_shape.radius = 0.5 * scale_factor
@@ -697,7 +786,9 @@ func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerato
 	tree_container.add_child(harvestable)
 	return tree_container
 
-func _create_tree_mesh_procedural(pos: Vector3) -> Node3D:
+func _create_tree_mesh_procedural(pos: Vector3, biome: int = 2, rng: RandomNumberGenerator = null) -> Node3D:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
 	var tree_container = Node3D.new()
 	tree_container.name = "Tree"
 	tree_container.position = pos
@@ -731,10 +822,7 @@ func _create_tree_mesh_procedural(pos: Vector3) -> Node3D:
 	harvestable.resource_type = ToolAffinity.TargetType.TREE
 	harvestable.max_health = 10.0
 	harvestable.xp_action_id = "chop_tree"
-	harvestable.loot_table = [
-		{"item_id": "wood_log", "min_amount": 1, "max_amount": 3, "chance": 1.0},
-		{"item_id": "stick", "min_amount": 1, "max_amount": 2, "chance": 0.6},
-	]
+	harvestable.loot_table = _get_tree_loot_for_biome(biome, rng)
 	var collision_shape = CollisionShape3D.new()
 	var trunk_shape = CylinderShape3D.new()
 	trunk_shape.radius = 0.3
@@ -745,13 +833,13 @@ func _create_tree_mesh_procedural(pos: Vector3) -> Node3D:
 	tree_container.add_child(harvestable)
 	return tree_container
 
-func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
+func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator, biome: int = 2) -> Node3D:
 	if _rock_scenes.is_empty():
-		return _create_rock_mesh_procedural(pos)
+		return _create_rock_mesh_procedural(pos, biome)
 	var scene: PackedScene = _rock_scenes[rng.randi() % _rock_scenes.size()]
 	var rock_container: Node3D = scene.instantiate() as Node3D
 	if not rock_container:
-		return _create_rock_mesh_procedural(pos)
+		return _create_rock_mesh_procedural(pos, biome)
 	rock_container.name = "Rock"
 	rock_container.position = pos
 	rock_container.rotation.y = rng.randf_range(0.0, TAU)
@@ -767,12 +855,7 @@ func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
 	harvestable.resource_type = ToolAffinity.TargetType.ROCK
 	harvestable.max_health = 20.0
 	harvestable.xp_action_id = "mine_ore"
-	harvestable.loot_table = [
-		{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0},
-		{"item_id": "coal", "min_amount": 1, "max_amount": 2, "chance": 0.3},
-		{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.2},
-		{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.15},
-	]
+	harvestable.loot_table = _get_rock_loot_for_biome(biome, rng)
 	var collision_shape = CollisionShape3D.new()
 	var sphere_shape = SphereShape3D.new()
 	sphere_shape.radius = radius
@@ -781,7 +864,7 @@ func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
 	rock_container.add_child(harvestable)
 	return rock_container
 
-func _create_rock_mesh_procedural(pos: Vector3) -> Node3D:
+func _create_rock_mesh_procedural(pos: Vector3, biome: int = 2) -> Node3D:
 	var rock_container = Node3D.new()
 	rock_container.name = "Rock"
 	rock_container.position = pos
@@ -803,10 +886,8 @@ func _create_rock_mesh_procedural(pos: Vector3) -> Node3D:
 	harvestable.resource_type = ToolAffinity.TargetType.ROCK
 	harvestable.max_health = 12.0
 	harvestable.xp_action_id = "mine_ore"
-	harvestable.loot_table = [
-		{"item_id": "stone", "min_amount": 1, "max_amount": 3, "chance": 1.0},
-		{"item_id": "coal", "min_amount": 1, "max_amount": 1, "chance": 0.25},
-	]
+	var rng_loot := RandomNumberGenerator.new()
+	harvestable.loot_table = _get_rock_loot_for_biome(biome, rng_loot)
 	var collision_shape = CollisionShape3D.new()
 	var sphere_shape = SphereShape3D.new()
 	sphere_shape.radius = radius
@@ -1013,11 +1094,11 @@ func _create_biome_decorations(chunk: ChunkData, parent: Node) -> void:
 		
 		# Add harvestable collision to herbs (not pebbles)
 		if node_name in ["Mushroom", "Flower", "Fern", "Clover"]:
-			_add_herb_harvestable(node, node_name, scale_factor, rng)
+			_add_herb_harvestable(node, node_name, scale_factor, rng, biome)
 		
 		parent.add_child(node)
 
-func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float, rng: RandomNumberGenerator) -> void:
+func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float, rng: RandomNumberGenerator, biome: int = -1) -> void:
 	var harvestable = HarvestableResource.new()
 	harvestable.name = "Collision"
 	harvestable.collision_layer = 2
@@ -1028,7 +1109,11 @@ func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float,
 	match herb_type:
 		"Mushroom":
 			harvestable.xp_action_id = "pick_mushroom"
-			if rng.randf() < 0.15:
+			# Swamp/jungle mushrooms have higher rare chance
+			var rare_chance := 0.15
+			if biome == 4:
+				rare_chance = 0.3
+			if rng.randf() < rare_chance:
 				harvestable.loot_table = [
 					{"item_id": "golden_mushroom", "min_amount": 1, "max_amount": 1, "chance": 1.0},
 				]
@@ -1039,31 +1124,59 @@ func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float,
 		"Flower":
 			harvestable.xp_action_id = "forage_item"
 			var flower_roll = rng.randf()
-			if flower_roll < 0.4:
+			if biome == 8 or biome == 2:  # Meadow/Plains: more lavender, less nightshade
+				if flower_roll < 0.5:
+					harvestable.loot_table = [
+						{"item_id": "lavender", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					]
+				elif flower_roll < 0.8:
+					harvestable.loot_table = [
+						{"item_id": "chamomile", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					]
+				else:
+					harvestable.loot_table = [
+						{"item_id": "wild_clover", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					]
+			else:  # Forest/Jungle: more chamomile, nightshade possible
+				if flower_roll < 0.3:
+					harvestable.loot_table = [
+						{"item_id": "lavender", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					]
+				elif flower_roll < 0.6:
+					harvestable.loot_table = [
+						{"item_id": "chamomile", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					]
+				else:
+					harvestable.loot_table = [
+						{"item_id": "nightshade", "min_amount": 1, "max_amount": 1, "chance": 0.5},
+						{"item_id": "lavender", "min_amount": 1, "max_amount": 1, "chance": 0.5},
+					]
+		"Fern":
+			harvestable.xp_action_id = "forage_item"
+			# Jungle/swamp ferns yield more mint
+			if biome == 4:
 				harvestable.loot_table = [
-					{"item_id": "lavender", "min_amount": 1, "max_amount": 2, "chance": 1.0},
-				]
-			elif flower_roll < 0.7:
-				harvestable.loot_table = [
-					{"item_id": "chamomile", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					{"item_id": "fern_frond", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+					{"item_id": "mint_leaf", "min_amount": 1, "max_amount": 2, "chance": 0.6},
 				]
 			else:
 				harvestable.loot_table = [
-					{"item_id": "nightshade", "min_amount": 1, "max_amount": 1, "chance": 0.5},
-					{"item_id": "lavender", "min_amount": 1, "max_amount": 1, "chance": 0.5},
+					{"item_id": "fern_frond", "min_amount": 1, "max_amount": 2, "chance": 1.0},
+					{"item_id": "mint_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.3},
 				]
-		"Fern":
-			harvestable.xp_action_id = "forage_item"
-			harvestable.loot_table = [
-				{"item_id": "fern_frond", "min_amount": 1, "max_amount": 2, "chance": 1.0},
-				{"item_id": "mint_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.3},
-			]
 		"Clover":
 			harvestable.xp_action_id = "forage_item"
-			harvestable.loot_table = [
-				{"item_id": "wild_clover", "min_amount": 1, "max_amount": 3, "chance": 1.0},
-				{"item_id": "sage_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.2},
-			]
+			# Meadow clovers have higher sage chance
+			if biome == 8:
+				harvestable.loot_table = [
+					{"item_id": "wild_clover", "min_amount": 2, "max_amount": 4, "chance": 1.0},
+					{"item_id": "sage_leaf", "min_amount": 1, "max_amount": 2, "chance": 0.4},
+				]
+			else:
+				harvestable.loot_table = [
+					{"item_id": "wild_clover", "min_amount": 1, "max_amount": 3, "chance": 1.0},
+					{"item_id": "sage_leaf", "min_amount": 1, "max_amount": 1, "chance": 0.2},
+				]
 	
 	var collision_shape = CollisionShape3D.new()
 	var shape = SphereShape3D.new()
@@ -1177,10 +1290,47 @@ func _unload_chunk(chunk_pos: Vector2i) -> void:
 	emit_signal("chunk_unloaded", chunk_pos)
 
 func _save_chunk(chunk: ChunkData) -> void:
-	# Save chunk data to disk or cloud
-	var _chunk_data = chunk.serialize()
-	# TODO: Implement actual saving
-	print("Saving chunk: ", chunk.chunk_position)
+	if chunk_save_dir == "":
+		return
+	_ensure_chunk_save_dir()
+	var filename = "chunk_%d_%d.json" % [chunk.chunk_position.x, chunk.chunk_position.y]
+	var filepath = chunk_save_dir + filename
+	var chunk_data = chunk.serialize()
+	var json_string = JSON.stringify(chunk_data, "\t")
+	var file = FileAccess.open(filepath, FileAccess.WRITE)
+	if file:
+		file.store_string(json_string)
+		file.close()
+		chunk.is_modified = false
+	else:
+		push_error("Failed to save chunk to: " + filepath)
+
+func _ensure_chunk_save_dir() -> void:
+	if chunk_save_dir == "":
+		return
+	if not DirAccess.dir_exists_absolute(chunk_save_dir):
+		DirAccess.make_dir_recursive_absolute(chunk_save_dir)
+
+func _load_chunk_from_disk(chunk_pos: Vector2i) -> ChunkData:
+	if chunk_save_dir == "":
+		return null
+	var filename = "chunk_%d_%d.json" % [chunk_pos.x, chunk_pos.y]
+	var filepath = chunk_save_dir + filename
+	if not FileAccess.file_exists(filepath):
+		return null
+	var file = FileAccess.open(filepath, FileAccess.READ)
+	if not file:
+		return null
+	var json_string = file.get_as_text()
+	file.close()
+	var json = JSON.new()
+	var error = json.parse(json_string)
+	if error != OK:
+		push_error("Failed to parse chunk file: " + filepath)
+		return null
+	var chunk = ChunkData.new()
+	chunk.deserialize(json.data)
+	return chunk
 
 func get_chunk_at_position(world_pos: Vector3) -> ChunkData:
 	var chunk_x = int(floor(world_pos.x / chunk_size))
@@ -1195,8 +1345,27 @@ func get_terrain_height(world_pos: Vector3) -> float:
 		return chunk.get_world_height(world_pos.x, world_pos.z)
 	return 0.0
 
+func get_biome_at(world_pos: Vector3) -> int:
+	## Returns biome type at a world position, or -1 if unavailable.
+	if noise_util and noise_util.has_method("get_biome_type"):
+		return noise_util.get_biome_type(world_pos.x, world_pos.z)
+	return -1
+
 func set_view_distance(new_distance: int) -> void:
 	view_distance = max(1, new_distance)
+
+func is_in_any_claim_zone(world_pos: Vector3) -> bool:
+	## Returns true if world_pos falls within any established claim zone.
+	var main_world = get_node_or_null("/root/MainWorld")
+	if not main_world:
+		return false
+	for child in main_world.get_children():
+		if child.has_meta("claim_radius"):
+			var center = child.global_position
+			var radius = child.get_meta("claim_radius", 8.0)
+			if world_pos.distance_to(center) <= radius:
+				return true
+	return false
 
 func force_update() -> void:
 	# Queue all visible chunks for async streaming
@@ -1400,43 +1569,58 @@ func _exit_tree() -> void:
 	
 	clear_all_chunks()
 
-func flatten_terrain_at(world_pos: Vector3) -> bool:
-	## Called by player shovel swing. Flattens a 3x3 area to the max height.
+const DIG_DEPTH: float = 0.6
+const DIG_RADIUS: int = 1
+
+func dig_terrain_at(world_pos: Vector3) -> bool:
+	## Called by player shovel swing. Digs a bowl-shaped depression in a 3x3 area.
+	## Center is lowered by DIG_DEPTH; cosine falloff blends edges to unchanged terrain.
 	## Works in world space so it correctly crosses chunk boundaries.
 	var center_info = world_to_chunk_local(world_pos)
 	var center_chunk = loaded_chunks.get(center_info.chunk_pos, null) as ChunkData
 	if not center_chunk:
 		return false
 
-	# Don't flatten on water/beach biomes
-	var center_biome = center_chunk.get_biome(center_info.local_x, center_info.local_z)
-	if center_biome == 0 or center_biome == 1:
+	# Idempotency: skip if center is already dug
+	if center_chunk.get_tile_mod(center_info.local_x, center_info.local_z) == ChunkData.TileMod.DUG:
 		return false
 
 	var base_wx := int(floor(world_pos.x))
 	var base_wz := int(floor(world_pos.z))
 
-	# Pass 1: find max height across all 9 cells in world space
-	var max_h := -INF
-	for dz in range(-1, 2):
-		for dx in range(-1, 2):
+	# Pass 1: validate all 9 cells — reject water/beach biome and objects
+	for dz in range(-DIG_RADIUS, DIG_RADIUS + 1):
+		for dx in range(-DIG_RADIUS, DIG_RADIUS + 1):
 			var sample = world_to_chunk_local(Vector3(base_wx + dx, 0, base_wz + dz))
 			var c = loaded_chunks.get(sample.chunk_pos, null) as ChunkData
-			if c:
-				max_h = maxf(max_h, c.get_height(sample.local_x, sample.local_z))
+			if not c:
+				return false
+			var biome = c.get_biome(sample.local_x, sample.local_z)
+			if biome == 0 or biome == 1:  # Water or Beach
+				return false
+			var cell_world = Vector3(
+				c.world_position.x + sample.local_x + 0.5,
+				c.get_surface_world_y(sample.local_x, sample.local_z),
+				c.world_position.z + sample.local_z + 0.5
+			)
+			if c.has_object_at(cell_world, 0.8):
+				return false
 
-	if max_h == -INF:
-		return false
-
-	# Pass 2: set all 9 cells to max height, track which chunks need rebuilding
+	# Pass 2: apply cosine-falloff bowl depression, mark DUG, track dirty chunks
+	var max_dist := sqrt(2.0)  # corner distance
 	var dirty_chunks: Dictionary = {}
-	for dz in range(-1, 2):
-		for dx in range(-1, 2):
+	for dz in range(-DIG_RADIUS, DIG_RADIUS + 1):
+		for dx in range(-DIG_RADIUS, DIG_RADIUS + 1):
+			var dist = sqrt(float(dx * dx + dz * dz))
+			var depth_factor = cos(dist / max_dist * PI / 2.0)
+			if depth_factor < 0.08:
+				continue  # corners barely change — leave untouched
 			var sample = world_to_chunk_local(Vector3(base_wx + dx, 0, base_wz + dz))
 			var c = loaded_chunks.get(sample.chunk_pos, null) as ChunkData
 			if c:
-				c.set_height(sample.local_x, sample.local_z, max_h)
-				c.set_tile_mod(sample.local_x, sample.local_z, ChunkData.TileMod.PATH)
+				var old_h = c.get_height(sample.local_x, sample.local_z)
+				c.set_height(sample.local_x, sample.local_z, old_h - DIG_DEPTH * depth_factor)
+				c.set_tile_mod(sample.local_x, sample.local_z, ChunkData.TileMod.DUG)
 				dirty_chunks[sample.chunk_pos] = c
 
 	for c in dirty_chunks.values():

@@ -190,6 +190,25 @@ func _initialize_items() -> void:
 	dagger_weapon.icon = _load_icon("res://Weapon & Tool/Knife.png")
 	_register_item(dagger_weapon)
 	
+	# ===== Fishing =====
+	var fishing_rod = _create_tool("basic_fishing_rod", "Fishing Rod", "A simple fishing rod for catching fish.", 40, "fishing_rod", 1, 60)
+	fishing_rod.icon = _load_icon("res://Weapon & Tool/Shovel.png")
+	_register_item(fishing_rod)
+
+	var raw_fish = _create_food("raw_fish", "Raw Fish", "A fresh catch from the water.", 8, 8.0, 0.0, 3.0)
+	raw_fish.icon = _load_icon("res://Food/Meat.png")
+	_register_item(raw_fish)
+
+	var salmon = _create_food("salmon", "Salmon", "A plump salmon.", 15, 10.0, 0.0, 5.0)
+	salmon.icon = _load_icon("res://Food/Meat.png")
+	salmon.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(salmon)
+
+	var pufferfish = _create_material("pufferfish", "Pufferfish", "A toxic pufferfish. Handle with care.", 20, 10)
+	pufferfish.icon = _load_icon("res://Monster Part/Egg.png")
+	pufferfish.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(pufferfish)
+
 	# ===== Crafting Materials =====
 	
 	# Wood
@@ -466,6 +485,18 @@ func _initialize_items() -> void:
 	apple_pie.icon = _load_icon("res://Food/Bread.png")
 	_register_item(apple_pie)
 	
+	# Fish cooking
+	var cooked_fish = _create_cooked_food("cooked_fish", "Cooked Fish", "A perfectly grilled fish.", 18, 20.0, 10.0, 10.0,
+		[{"type": "heal", "value": 15.0, "duration": 10.0}] as Array[Dictionary])
+	cooked_fish.icon = _load_icon("res://Food/Meat.png")
+	_register_item(cooked_fish)
+
+	var grilled_salmon = _create_cooked_food("grilled_salmon", "Grilled Salmon", "Rich grilled salmon with a smoky flavor.", 30, 35.0, 15.0, 15.0,
+		[{"type": "well_fed", "value": 1.1, "duration": 60.0}] as Array[Dictionary])
+	grilled_salmon.icon = _load_icon("res://Food/Meat.png")
+	grilled_salmon.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(grilled_salmon)
+
 	# Fruit (raw consumable)
 	var apple = _create_food("apple", "Apple", "A crisp apple. Light snack.", 5, 10.0, 5.0, 5.0)
 	apple.icon = _load_icon("res://Food/Apple.png")
@@ -526,6 +557,13 @@ func _initialize_items() -> void:
 		Vector3(0.8, 0.4, 0.8))
 	campfire.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(campfire)
+
+	var claim_post = _create_placeable("claim_post", "Claim Post", "Mark your territory. Only you can build within the claim zone.", 30,
+		"res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 2.0,
+		Vector3(0.3, 1.2, 0.3))
+	claim_post.icon = _load_icon("res://Weapon & Tool/Shovel.png")
+	claim_post.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(claim_post)
 	
 	var sitting_log = _create_placeable("sitting_log", "Sitting Log", "A log to sit on by the fire.", 8,
 		"res://modular_terrain_collection/Hilly_Prop_Camp_Sitting_Log.obj", 2.0,
@@ -533,6 +571,14 @@ func _initialize_items() -> void:
 	sitting_log.icon = _load_icon("res://Material/Wood Log.png")
 	_register_item(sitting_log)
 	
+	# ===== Decoration Placeables =====
+	_register_item(_create_placeable("flower_pot", "Flower Pot", "A charming pot with wildflowers.", 6,
+		"", 1.0, Vector3(0.3, 0.3, 0.3)))
+	_register_item(_create_placeable("chair_wood", "Wooden Chair", "A simple wooden chair.", 10,
+		"", 1.0, Vector3(0.5, 0.6, 0.5)))
+	_register_item(_create_placeable("table_small", "Small Table", "A small wooden table.", 15,
+		"", 1.0, Vector3(0.8, 0.6, 0.6)))
+
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()
 	

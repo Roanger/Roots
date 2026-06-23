@@ -1,0 +1,50 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "docs/coding_standards.md",
+    "plans/roots_game_plan.md"
+  ],
+  "mcp": {
+    "godot-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@satelliteoflove/godot-mcp"],
+      "enabled": true,
+      "environment": {
+        "GODOT_MCP_USAGE_LOG": "0",
+        "GODOT_MCP_VERBOSE": "0"
+      }
+    }
+  },
+  "permission": {
+    "bash": {
+      "git *": "allow",
+      "godot *": "allow",
+      "npx *": "allow",
+      "npm *": "allow",
+      "rg *": "allow",
+      "*": "ask"
+    },
+    "godot-mcp_godot_node_read": "allow",
+    "godot-mcp_godot_editor_read": "allow",
+    "godot-mcp_godot_project": "allow",
+    "godot-mcp_godot_animation_read": "allow",
+    "godot-mcp_godot_tilemap_read": "allow",
+    "godot-mcp_godot_gridmap_read": "allow",
+    "godot-mcp_godot_resource": "allow",
+    "godot-mcp_godot_scene3d": "allow",
+    "godot-mcp_godot_docs": "allow",
+    "godot-mcp_godot_profiler": "allow",
+    "godot-mcp_godot_runtime_state": "allow",
+    "godot-mcp_godot_game_time": "allow",
+    "godot-mcp_godot_validate_meshes": "allow",
+    "godot-mcp_godot_scene": "ask",
+    "godot-mcp_godot_node_edit": "ask",
+    "godot-mcp_godot_editor_edit": "ask",
+    "godot-mcp_godot_animation_edit": "ask",
+    "godot-mcp_godot_tilemap_edit": "ask",
+    "godot-mcp_godot_gridmap_edit": "ask",
+    "godot-mcp_godot_input": "ask",
+    "godot-mcp_godot_exec": "ask"
+  }
+}

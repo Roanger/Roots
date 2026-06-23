@@ -35,3 +35,8 @@ enum NPCRole { MERCHANT, BLACKSMITH, INNKEEPER, HERBALIST, FARMER, GUARD, QUEST_
 
 # Quest references — quest IDs this NPC can give
 @export var quest_ids: Array = []
+
+# Daily schedule: each entry is { "hour": float, "activity": String, "target_pos": Vector3 }
+# Activities: "sleep", "work", "socialize", "idle"
+# At the given hour, NPC moves to target_pos and performs the activity.
+@export var schedule: Array = []

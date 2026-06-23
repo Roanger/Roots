@@ -161,11 +161,9 @@ func apply_general_setting(key: String, value: Variant) -> void:
 		"vsync":
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if value else DisplayServer.VSYNC_DISABLED)
 		"show_fps":
-			# Will be handled by FPS display component
-			pass
+			_toggle_fps_display(bool(value))
 		"ui_scale":
-			# Will be handled by UI scaling system
-			pass
+			get_tree().root.content_scale_factor = float(value) if value > 0 else 1.0
 
 func apply_graphics_setting(key: String, value: Variant) -> void:
 	match key:
@@ -174,16 +172,20 @@ func apply_graphics_setting(key: String, value: Variant) -> void:
 		"anti_aliasing":
 			get_viewport().set_msaa_3d(value)
 		"shadow_quality":
-			# Will be handled by shadow system
-			pass
+			_apply_shadow_quality(int(value))
 		"bloom":
-			# Will be handled by WorldEnvironment
-			pass
+			_apply_environment_property("glow_enabled", bool(value))
+		"ambient_occlusion":
+			_apply_environment_property("ssao_enabled", bool(value))
 		"field_of_view":
 			if game_manager and game_manager.is_playing() and game_manager.current_state == game_manager.GameState.PLAYING:
 				var player = get_tree().get_first_node_in_group("player")
 				if player and player.has_method("set_fov"):
 					player.set_fov(value)
+		"chunk_view_distance":
+			var cm = get_tree().get_first_node_in_group("chunk_manager")
+			if cm and cm.has_method("set_view_distance"):
+				cm.set_view_distance(int(value))
 
 func apply_quality_preset(preset: int) -> void:
 	var quality_settings = {
@@ -225,8 +227,34 @@ func apply_audio_setting(key: String, value: Variant) -> void:
 				AudioServer.set_bus_volume_db(ambient_idx, linear_to_db(value) if value > 0 else -80)
 
 func apply_controls_setting(key: String, value: Variant) -> void:
-	# Controls are applied directly from settings when needed
-	pass
+	match key:
+		"mouse_sensitivity":
+			var player = get_tree().get_first_node_in_group("player")
+			if player and player.has_method("set_mouse_sensitivity"):
+				player.set_mouse_sensitivity(float(value))
+		"invert_y":
+			var player = get_tree().get_first_node_in_group("player")
+			if player and player.has_method("set_invert_y"):
+				player.set_invert_y(bool(value))
+
+func _apply_shadow_quality(quality: int) -> void:
+	var shadow_sizes: Array[int] = [0, 1024, 2048, 4096, 8192]
+	var size: int = shadow_sizes[clampi(quality, 0, shadow_sizes.size() - 1)]
+	ProjectSettings.set_setting("rendering/directional_shadow/size", size)
+	ProjectSettings.set_setting("rendering/shadow_atlas/size", size)
+	var sun := get_tree().get_first_node_in_group("sun")
+	if sun:
+		sun.shadow_enabled = quality > 0
+
+func _apply_environment_property(prop: String, value: Variant) -> void:
+	var env_node := get_tree().get_first_node_in_group("world_environment")
+	if env_node and env_node.environment:
+		env_node.environment.set(prop, value)
+
+func _toggle_fps_display(show: bool) -> void:
+	var hud := get_tree().get_first_node_in_group("hud")
+	if hud and hud.has_method("set_fps_visible"):
+		hud.set_fps_visible(show)
 
 func reset_to_defaults() -> void:
 	settings = defaults.duplicate(true)
