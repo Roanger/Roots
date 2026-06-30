@@ -77,12 +77,20 @@ var farming: PlayerFarming = null
 
 # First-person tool display
 var tool_holder: Node3D = null
+var offhand_holder: Node3D = null
 var _tool_use_cooldown: float = 0.0
 var _tool_use_cooldown_max: float = 0.5  # Seconds between swings
 
 # Terrain modification highlight
 var _terrain_highlight: MeshInstance3D = null
 var _highlight_visible: bool = false
+
+	# Character model
+var _character_model: Node3D = null
+var _character_anim: AnimationPlayer = null
+var _camera_socket: Node3D = null
+const CHARACTER_MODEL_SCALE: float = 0.5
+const EYE_HEIGHT_RATIO: float = 0.85
 
 # Underground tracking
 var is_underground: bool = false
@@ -123,6 +131,7 @@ func _ready() -> void:
 	
 	# Initialize equipment
 	equipment = Equipment.new()
+	equipment.equipment_changed.connect(_on_equipment_changed)
 	
 	# Initialize farming component
 	farming = PlayerFarming.new()
@@ -135,6 +144,9 @@ func _ready() -> void:
 		tool_holder = ToolHolder.new()
 		tool_holder.name = "ToolHolder"
 		camera.add_child(tool_holder)
+		offhand_holder = preload("res://src/player/offhand_holder.gd").new()
+		offhand_holder.name = "OffhandHolder"
+		camera.add_child(offhand_holder)
 	
 	# Create terrain highlight indicator (wireframe quad for hoe/shovel aiming)
 	_terrain_highlight = MeshInstance3D.new()
@@ -149,6 +161,145 @@ func _ready() -> void:
 	_terrain_highlight.material_override = mat
 	_terrain_highlight.visible = false
 	get_tree().current_scene.call_deferred("add_child", _terrain_highlight)
+	
+	_load_character_model()
+
+func _load_character_model() -> void:
+	var gm = get_node_or_null("/root/GameManager")
+	if not gm or gm.selected_character_path.is_empty():
+		return
+	# Clean up previous model/socket before loading a new one
+	if _camera_socket and is_instance_valid(_camera_socket):
+		_camera_socket.queue_free()
+		_camera_socket = null
+	if _character_model and is_instance_valid(_character_model):
+		_character_model.queue_free()
+		_character_model = null
+	var scene = load(gm.selected_character_path) as PackedScene
+	if not scene:
+		push_warning("PlayerController: Failed to load character model: " + gm.selected_character_path)
+		return
+	_character_model = scene.instantiate() as Node3D
+	if not _character_model:
+		return
+	_character_model.scale = Vector3.ONE * CHARACTER_MODEL_SCALE
+	_character_model.position = Vector3.ZERO
+	add_child(_character_model)
+	# Hide the capsule mesh since we have a real model now
+	var capsule = get_node_or_null("MeshInstance3D")
+	if capsule:
+		capsule.visible = false
+	# Find AnimationPlayer for walk/idle
+	_character_anim = _find_anim_player(_character_model)
+	if _character_anim:
+		_character_anim.play("Idle")
+
+	# Position camera at the model's eye level and make it follow the model
+	_setup_camera_socket()
+
+func _find_anim_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var result = _find_anim_player(child)
+		if result:
+			return result
+	return null
+
+func _setup_camera_socket() -> void:
+	if not _character_model or not camera_controller:
+		return
+
+	_camera_socket = _find_head_socket()
+	if not _camera_socket:
+		_camera_socket = _create_aabb_socket()
+	if _camera_socket:
+		camera_controller.set_height_target(_camera_socket)
+
+func _find_head_socket() -> Node3D:
+	var skeleton := _find_skeleton(_character_model)
+	if not skeleton:
+		return null
+	var head_names := ["Head", "head", "mixamorig:Head", "spine.006", "head_top", "HeadTop", "Jaw", "jaw"]
+	var head_idx := -1
+	for name in head_names:
+		head_idx = skeleton.find_bone(name)
+		if head_idx >= 0:
+			break
+	if head_idx < 0:
+		return null
+	var attachment := BoneAttachment3D.new()
+	attachment.name = "CameraSocket"
+	attachment.bone_name = skeleton.get_bone_name(head_idx)
+	skeleton.add_child(attachment)
+	var marker := Marker3D.new()
+	marker.name = "EyeOffset"
+	marker.position = Vector3(0, 0.05, 0.25)
+	attachment.add_child(marker)
+	return marker
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node as Skeleton3D
+	for child in node.get_children():
+		var result := _find_skeleton(child)
+		if result:
+			return result
+	return null
+
+func _create_aabb_socket() -> Node3D:
+	var aabb := _get_combined_aabb(_character_model)
+	if aabb.size.length_squared() <= 0.001:
+		return null
+	var local_min_y := aabb.position.y - _character_model.global_position.y
+	var eye_height := local_min_y + aabb.size.y * EYE_HEIGHT_RATIO
+	var socket := Marker3D.new()
+	socket.name = "CameraSocket"
+	socket.position = Vector3(0, eye_height, 0.25)
+	_character_model.add_child(socket)
+	return socket
+
+func _get_combined_aabb(node: Node) -> AABB:
+	var result := AABB()
+	var first := true
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			var mesh_inst := child as MeshInstance3D
+			var mesh_aabb := mesh_inst.get_aabb()
+			if mesh_aabb.size.length_squared() <= 0.001:
+				continue
+			mesh_aabb = mesh_inst.global_transform * mesh_aabb
+			if first:
+				result = mesh_aabb
+				first = false
+			else:
+				result = result.merge(mesh_aabb)
+		var child_aabb := _get_combined_aabb(child)
+		if child_aabb.size.length_squared() > 0.001:
+			if first:
+				result = child_aabb
+				first = false
+			else:
+				result = result.merge(child_aabb)
+	return result
+
+func _update_player_animation() -> void:
+	if not _character_anim or not is_instance_valid(_character_anim):
+		return
+	var moving = velocity.length() > 0.5
+	var sprinting = moving and is_sprinting
+	var desired = "Run" if sprinting else ("Walk" if moving else "Idle")
+	if _character_anim.current_animation != desired:
+		_character_anim.play(desired)
+	if moving:
+		var spd = run_speed if sprinting else move_speed
+		_character_anim.speed_scale = clampf(spd / 5.0, 0.5, 2.0)
+
+func _update_model_rotation() -> void:
+	if not _character_model or not camera_controller:
+		return
+	_character_model.rotation.y = camera_controller.rotation.y
+
 
 func _input(event: InputEvent) -> void:
 	# Camera is handled by CameraController
@@ -264,6 +415,8 @@ func _move_character(delta: float) -> void:
 	
 	# Move character using Godot physics
 	move_and_slide()
+	_update_player_animation()
+	_update_model_rotation()
 	
 	# Update ground state tracking
 	is_on_ground = is_on_floor()
@@ -587,6 +740,15 @@ func update_held_tool(item: InventoryItem) -> void:
 	tool_holder.unequip_tool()
 	current_tool = ""
 
+func _on_equipment_changed(slot_name: String) -> void:
+	if not offhand_holder or slot_name != "Offhand":
+		return
+	var item = equipment.get_equipped_item(Equipment.EquipmentSlot.OFFHAND)
+	if item and not item.is_empty() and item.item_data:
+		offhand_holder.equip_offhand(item.item_data)
+	else:
+		offhand_holder.unequip_offhand()
+
 func get_look_direction() -> Vector3:
 	if camera_controller:
 		return camera_controller.get_look_direction()
@@ -597,6 +759,11 @@ func get_look_position() -> Vector3:
 
 func get_terrain_height() -> float:
 	return terrain_height
+
+func get_raycast_target() -> Node:
+	if raycast and raycast.is_colliding():
+		return raycast.get_collider()
+	return null
 
 func set_chunk_manager(manager: Node) -> void:
 	chunk_manager = manager
@@ -881,7 +1048,7 @@ func get_stamina_percent() -> float:
 func _update_placement_preview() -> void:
 	# Check if the held item is placeable
 	var held = _get_held_item_data()
-	var is_placeable = held and held.item_type == ItemData.ItemType.PLACEABLE and held.placeable_model_path != ""
+	var is_placeable = held and held.item_type == ItemData.ItemType.PLACEABLE
 	
 	if not is_placeable:
 		_destroy_placement_ghost()
@@ -956,14 +1123,16 @@ func _create_placement_ghost(item_data: ItemData) -> void:
 			model_node = mesh_inst
 		
 		if model_node:
-			if item_data.placeable_is_gate and model_node is MeshInstance3D:
+			if item_data.placeable_is_gate:
 				# Match the pivot offset used in PlaceableObject so preview aligns with placed object
 				var pivot = Node3D.new()
-				var aabb = (model_node as MeshInstance3D).mesh.get_aabb()
-				var max_x = aabb.position.x + aabb.size.x
-				model_node.position.x = -max_x * item_data.placeable_scale
-				var center_z = aabb.position.z + aabb.size.z * 0.5
-				model_node.position.z = -center_z * item_data.placeable_scale
+				var mesh_inst := _find_first_mesh_instance(model_node)
+				if mesh_inst and mesh_inst.mesh:
+					var aabb = mesh_inst.mesh.get_aabb()
+					var max_x = aabb.position.x + aabb.size.x
+					model_node.position.x = -max_x * item_data.placeable_scale
+					var center_z = aabb.position.z + aabb.size.z * 0.5
+					model_node.position.z = -center_z * item_data.placeable_scale
 				pivot.add_child(model_node)
 				_placement_ghost.add_child(pivot)
 			else:
@@ -995,6 +1164,15 @@ func _tint_ghost(color: Color) -> void:
 		return
 	_apply_ghost_material(_placement_ghost, color)
 
+func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for child in node.get_children():
+		var found := _find_first_mesh_instance(child)
+		if found:
+			return found
+	return null
+
 func _apply_ghost_material(node: Node, color: Color) -> void:
 	if node is MeshInstance3D:
 		var mat = StandardMaterial3D.new()
@@ -1021,8 +1199,12 @@ func _place_object() -> void:
 			_show_tool_feedback("No %s in inventory!" % item_data.item_name)
 			return
 	
-	# Create the actual PlaceableObject
-	var obj = PlaceableObject.new()
+	# Create the actual PlaceableObject (or CommunityCenterObject for the community center)
+	var obj: PlaceableObject
+	if item_data.item_id == "community_center":
+		obj = CommunityCenterObject.new()
+	else:
+		obj = PlaceableObject.new()
 	obj.name = "Placed_%s" % item_data.item_id
 	obj.global_position = place_pos
 	obj.rotation.y = place_rot

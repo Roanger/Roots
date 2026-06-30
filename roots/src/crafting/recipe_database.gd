@@ -593,3 +593,11 @@ func _init_recipes() -> void:
 		[{"item_id": "wood_log", "amount": 2}],
 		"sitting_log", 1, 2.0, "lumberjack", 4.0
 	))
+
+	# Community Center — requires lots of resources
+	_register_recipe(_make_recipe(
+		"craft_community_center", "Community Center", "Build a community center with shared storage.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 15}, {"item_id": "wood_plank", "amount": 12}, {"item_id": "iron_ingot", "amount": 4}, {"item_id": "rope", "amount": 3}, {"item_id": "stone", "amount": 10}],
+		"community_center", 1, 15.0, "crafting", 40.0
+	))

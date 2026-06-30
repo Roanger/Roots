@@ -52,8 +52,8 @@ func _on_new_game_pressed() -> void:
 func _start_new_game() -> void:
 	if game_manager:
 		game_manager.reset_game()
-	# Load main world
-	get_tree().change_scene_to_file("res://src/main/world/main_world.tscn")
+	# Go to character selection screen
+	get_tree().change_scene_to_file("res://src/main/menu/character_select.tscn")
 
 func _on_load_game_pressed() -> void:
 	_update_menu_state("load")

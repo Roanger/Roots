@@ -136,3 +136,17 @@ horizontal_alignment = 1
 [node name="WeaponSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/WeaponContainer" instance=ExtResource("2_equip_slot")]
 slot_type = 7
 slot_label = "Weapon"
+
+[node name="OffhandContainer" type="VBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OffhandLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/OffhandContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Offhand"
+horizontal_alignment = 1
+
+[node name="OffhandSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/OffhandContainer" instance=ExtResource("2_equip_slot")]
+slot_type = 8
+slot_label = "Offhand"

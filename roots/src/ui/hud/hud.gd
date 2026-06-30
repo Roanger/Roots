@@ -19,6 +19,7 @@ var compass: Control = null
 var clock: Control = null
 var buff_display: Control = null
 var quest_tracker: Control = null
+var interaction_label: Label = null
 
 func _ready() -> void:
 	add_to_group("hud")
@@ -111,6 +112,27 @@ func initialize(p_player: Node) -> void:
 	quest_tracker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(quest_tracker)
 	
+	# Create interaction prompt label at bottom center
+	interaction_label = Label.new()
+	interaction_label.name = "InteractionLabel"
+	interaction_label.anchor_left = 0.0
+	interaction_label.anchor_right = 1.0
+	interaction_label.anchor_top = 0.6
+	interaction_label.anchor_bottom = 0.6
+	interaction_label.offset_top = -20.0
+	interaction_label.offset_bottom = 20.0
+	interaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	interaction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	interaction_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	interaction_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	interaction_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	interaction_label.add_theme_constant_override("shadow_offset_x", 2)
+	interaction_label.add_theme_constant_override("shadow_offset_y", 2)
+	interaction_label.add_theme_font_size_override("font_size", 20)
+	interaction_label.visible = false
+	interaction_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(interaction_label)
+
 	visible = true
 	print("HUD initialized")
 
@@ -131,6 +153,9 @@ func _process(delta: float) -> void:
 		var main_world = player.get_parent()
 		if main_world and main_world.has_method("get_tracked_quest_waypoints"):
 			compass.set_waypoints(main_world.get_tracked_quest_waypoints())
+	
+	# Update interaction prompt
+	_update_interaction_prompt()
 
 func _on_health_changed(current: float, maximum: float) -> void:
 	_update_health_bar(current, maximum)
@@ -174,3 +199,18 @@ func _create_fps_label(show: bool) -> void:
 func set_fps_visible(show: bool) -> void:
 	if _fps_label:
 		_fps_label.visible = show
+
+func _update_interaction_prompt() -> void:
+	if not interaction_label or not player:
+		return
+	if not player.has_method("get_raycast_target"):
+		interaction_label.visible = false
+		return
+	var target = player.get_raycast_target()
+	if target and is_instance_valid(target) and target.has_method("get_interaction_text"):
+		var text = target.get_interaction_text()
+		if text != "":
+			interaction_label.text = "[E] " + text
+			interaction_label.visible = true
+			return
+	interaction_label.visible = false

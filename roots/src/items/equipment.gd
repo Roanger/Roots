@@ -14,7 +14,8 @@ enum EquipmentSlot {
 	TOOL_1,
 	TOOL_2,
 	TOOL_3,
-	WEAPON
+	WEAPON,
+	OFFHAND
 }
 
 var equipped_items: Dictionary = {}
@@ -29,6 +30,7 @@ func _init() -> void:
 	equipped_items[EquipmentSlot.TOOL_2] = null
 	equipped_items[EquipmentSlot.TOOL_3] = null
 	equipped_items[EquipmentSlot.WEAPON] = null
+	equipped_items[EquipmentSlot.OFFHAND] = null
 
 func get_slot_name(slot: int) -> String:
 	match slot:
@@ -40,6 +42,7 @@ func get_slot_name(slot: int) -> String:
 		EquipmentSlot.TOOL_2: return "Tool 2"
 		EquipmentSlot.TOOL_3: return "Tool 3"
 		EquipmentSlot.WEAPON: return "Weapon"
+		EquipmentSlot.OFFHAND: return "Offhand"
 		_: return "Unknown"
 
 func equip_item(item: InventoryItem, slot: int) -> bool:
@@ -86,6 +89,8 @@ func _can_equip_in_slot(item_data: ItemData, slot: int) -> bool:
 			return item_data.item_type == ItemData.ItemType.TOOL
 		EquipmentSlot.WEAPON:
 			return item_data.item_type == ItemData.ItemType.WEAPON
+		EquipmentSlot.OFFHAND:
+			return item_data.is_offhand
 		_:
 			return false
 

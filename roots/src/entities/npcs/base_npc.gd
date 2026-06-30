@@ -18,6 +18,7 @@ var _idle_timer: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _model_node: Node3D = null
 var _mesh: MeshInstance3D = null
+var _anim_player: AnimationPlayer = null
 var _name_label: Label3D = null
 var _title_label: Label3D = null
 var _talk_target: Node3D = null  # Player we're talking to
@@ -107,6 +108,9 @@ func _build_model_visual() -> void:
 	_model_node.rotation = Vector3.ZERO
 	_model_node.scale = Vector3.ONE * (npc_data.model_scale if npc_data else 1.0)
 	add_child(_model_node)
+	_anim_player = _find_anim_player(_model_node)
+	if _anim_player:
+		_anim_player.play("Idle")
 
 func _build_placeholder_visual() -> void:
 	_mesh = MeshInstance3D.new()
@@ -119,6 +123,26 @@ func _build_placeholder_visual() -> void:
 	_mesh.material_override = mat
 	_mesh.position.y = capsule.height * 0.5
 	add_child(_mesh)
+
+func _find_anim_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var result = _find_anim_player(child)
+		if result:
+			return result
+	return null
+
+func _update_animation() -> void:
+	if not _anim_player or not is_instance_valid(_anim_player):
+		return
+	var moving = velocity.length() > 0.5
+	var desired = "Walk" if moving else "Idle"
+	if _anim_player.current_animation != desired:
+		_anim_player.play(desired)
+	if moving:
+		var spd = npc_data.move_speed if npc_data else 1.0
+		_anim_player.speed_scale = clampf(spd / 1.5, 0.5, 2.0)
 
 # ── Physics ─────────────────────────────────────────────────────────────────
 
@@ -141,6 +165,7 @@ func _physics_process(delta: float) -> void:
 			_process_going_to_target(delta)
 
 	move_and_slide()
+	_update_animation()
 
 # ── AI States ───────────────────────────────────────────────────────────────
 

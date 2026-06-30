@@ -35,6 +35,7 @@ const TIME_SCALE: float = 1.0 # Can be adjusted for faster/slower time
 var world_seed: int = 0
 var is_multiplayer: bool = false
 var local_player_id: int = 1
+var selected_character_path: String = ""
 
 # Game data
 var player_data: Dictionary = {}
@@ -122,7 +123,8 @@ func save_game(filepath: String) -> bool:
 			"current_day": current_day,
 			"current_hour": current_hour,
 			"current_season": current_season,
-			"world_seed": world_seed
+			"world_seed": world_seed,
+			"selected_character_path": selected_character_path
 		},
 		"player_data": player_data,
 		"world_data": world_data
@@ -163,6 +165,7 @@ func load_game(filepath: String) -> bool:
 		current_hour = save_data.get("game_state", {}).get("current_hour", 6.0)
 		current_season = save_data.get("game_state", {}).get("current_season", Season.SPRING)
 		world_seed = save_data.get("game_state", {}).get("world_seed", randi())
+		selected_character_path = save_data.get("game_state", {}).get("selected_character_path", "")
 		player_data = save_data.get("player_data", {})
 		world_data = save_data.get("world_data", {})
 		

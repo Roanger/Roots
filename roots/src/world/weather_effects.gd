@@ -127,11 +127,13 @@ func _apply_environment() -> void:
 
 	if not env.sky or not env.sky.sky_material:
 		return
-	env.sky.sky_material.set_shader_parameter("cloud_density", _displayed_cloud_density)
+	var sky_mat = env.sky.sky_material
+	if sky_mat is ShaderMaterial:
+		sky_mat.set_shader_parameter("cloud_density", _displayed_cloud_density)
 
-	var storm_color := Color(0.55, 0.55, 0.6, 1.0)
-	var cloud_color := _base_cloud_color.lerp(storm_color, _current_intensity * 0.4)
-	env.sky.sky_material.set_shader_parameter("cloud_color", cloud_color)
+		var storm_color := Color(0.55, 0.55, 0.6, 1.0)
+		var cloud_color := _base_cloud_color.lerp(storm_color, _current_intensity * 0.4)
+		sky_mat.set_shader_parameter("cloud_color", cloud_color)
 
 func _create_rain_particles() -> void:
 	rain_particles = GPUParticles3D.new()

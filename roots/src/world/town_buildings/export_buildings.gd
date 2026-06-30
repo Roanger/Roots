@@ -7,7 +7,7 @@ extends EditorScript
 ## After editing, TownBuilder will automatically load your saved scenes instead
 ## of assembling from code.
 
-const GLTF_BASE = "res://Medieval Village MegaKit[Standard]/glTF/"
+const GLTF_BASE = "res://assets/Medieval Village MegaKit[Standard]/glTF/"
 const WALL_H: float = 3.12
 const GRID: float = 2.0
 const H: float = 1.0
@@ -58,8 +58,8 @@ func _export_small_house() -> void:
 	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(GRID * 2, 0, GRID * 2), PI)
 	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
 	
-	# Roof
-	_add_piece(building, "Roof_RoundTiles_4x6.gltf", Vector3(GRID, WALL_H, GRID))
+	# Roof (eaves sit at wall top)
+	_add_piece(building, "Roof_RoundTiles_4x4.gltf", Vector3(GRID, WALL_H + 0.515, GRID))
 	
 	# Door
 	_add_piece(building, "Door_1_Round.gltf", Vector3(H, 0, GRID * 2), PI)
@@ -83,22 +83,22 @@ func _export_large_house() -> void:
 			_add_piece(building, "Floor_WoodDark.gltf", Vector3(x * GRID + H, 0, z * GRID + H))
 	
 	# Back wall (Z = 0)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(H, 0, 0))
-	_add_piece(building, "Wall_UnevenBrick_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(GRID * 2 + H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2 + H, 0, 0))
 	
 	# Front wall (Z = 4m)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(H, 0, GRID * 2), PI)
-	_add_piece(building, "Wall_UnevenBrick_Door_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
-	_add_piece(building, "Wall_UnevenBrick_Window_Wide_Flat.gltf", Vector3(GRID * 2 + H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Door_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Window_Wide_Flat.gltf", Vector3(GRID * 2 + H, 0, GRID * 2), PI)
 	
 	# Left wall (X = 0)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
-	_add_piece(building, "Wall_UnevenBrick_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
 	
 	# Right wall (X = 6m)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(GRID * 3, 0, GRID * 2 - H), -PI / 2.0)
-	_add_piece(building, "Wall_UnevenBrick_Window_Thin_Round.gltf", Vector3(GRID * 3, 0, GRID - H), -PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 3, 0, GRID * 2 - H), -PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(GRID * 3, 0, GRID - H), -PI / 2.0)
 	
 	# Corners
 	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, 0))
@@ -106,17 +106,17 @@ func _export_large_house() -> void:
 	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(GRID * 3, 0, GRID * 2), PI)
 	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
 	
-	# Roof
-	_add_piece(building, "Roof_RoundTiles_6x6.gltf", Vector3(GRID * 1.5, WALL_H, GRID))
+	# Roof (eaves sit at wall top)
+	_add_piece(building, "Roof_RoundTiles_6x4.gltf", Vector3(GRID * 1.5, WALL_H + 0.782, GRID))
 	
 	# Door
 	_add_piece(building, "Door_2_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
 	
 	# Chimney
-	_add_piece(building, "Prop_Chimney2.gltf", Vector3(GRID * 2.5, WALL_H - 2.84, -0.5))
+	_add_piece(building, "Prop_Chimney2.gltf", Vector3(GRID * 2.5, WALL_H + 1.5, -0.5))
 	
 	# Overhang
-	_add_piece(building, "Overhang_UnevenBrick_Long.gltf", Vector3(GRID * 1.5, WALL_H, GRID * 2))
+	_add_piece(building, "Overhang_Plaster_Long.gltf", Vector3(GRID * 1.5, WALL_H, GRID * 2))
 	
 	# Balcony
 	_add_piece(building, "Balcony_Simple_Straight.gltf", Vector3(GRID * 1.5, WALL_H * 0.65, GRID * 2))
@@ -138,10 +138,10 @@ func _export_market_stall() -> void:
 	_add_piece(stall, "Prop_Crate.gltf", Vector3(0, 0, 0))
 	_add_piece(stall, "Prop_Crate.gltf", Vector3(0.8, 0, 0))
 	
-	# Support posts + roof
-	_add_piece(stall, "Prop_Support.gltf", Vector3(-0.8, 0, 0))
-	_add_piece(stall, "Prop_Support.gltf", Vector3(1.8, 0, 0))
-	_add_piece(stall, "Roof_Wooden_2x1.gltf", Vector3(0.4, 2.2, 0))
+	# Posts + slanted roof
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(-0.8, 0, 0))
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(1.8, 0, 0))
+	_add_piece(stall, "Roof_Wooden_2x1.gltf", Vector3(0.4, 2.5, 0))
 	
 	# Collision
 	_add_building_collision(stall, Vector3(2.0, 1.0, 1.0), Vector3(0.5, 0.5, 0))
@@ -169,7 +169,7 @@ func _export_town_well() -> void:
 	mesh_inst.owner = well
 	
 	# Roof
-	_add_piece(well, "Roof_Wooden_2x1.gltf", Vector3(0, 2.2, 0))
+	_add_piece(well, "Roof_Wooden_2x1.gltf", Vector3(0, 2.5, 0))
 	
 	# Support posts
 	_add_piece(well, "Prop_Support.gltf", Vector3(-0.8, 0, 0))
@@ -197,21 +197,19 @@ func _export_town_well() -> void:
 # ─── Helpers ───
 
 func _add_piece(parent: Node3D, gltf_name: String, local_pos: Vector3, rot_y: float = 0.0) -> void:
-	var path = GLTF_BASE + gltf_name
-	if not ResourceLoader.exists(path):
-		push_warning("Export: glTF not found: " + path)
-		return
-	var scene = load(path) as PackedScene
+	var scene = load(GLTF_BASE + gltf_name) as PackedScene
 	if not scene:
+		push_warning("ExportBuildings: missing piece: " + gltf_name)
 		return
 	var inst = scene.instantiate() as Node3D
-	if inst:
-		inst.position = local_pos
-		if rot_y != 0.0:
-			inst.rotation.y = rot_y
-		parent.add_child(inst)
-		# Set owner recursively so all nodes are saved in the .tscn
-		_set_owner_recursive(inst, parent)
+	if not inst:
+		return
+	inst.name = gltf_name.get_basename()
+	inst.position = local_pos
+	if rot_y != 0.0:
+		inst.rotation.y = rot_y
+	parent.add_child(inst)
+	inst.owner = parent
 
 func _set_owner_recursive(node: Node, owner: Node) -> void:
 	node.owner = owner

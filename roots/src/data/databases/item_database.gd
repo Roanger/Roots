@@ -57,136 +57,136 @@ func _initialize_items() -> void:
 	# Tools (icons from Weapon & Tool pack, 3D models from KayKit RPGToolsBits)
 	var hoe_tool = _create_tool("basic_hoe", "Basic Hoe", "For tilling soil.", 100, "hoe", 1, 100)
 	hoe_tool.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	hoe_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	hoe_tool.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	_register_item(hoe_tool)
 	var shovel_tool = _create_tool("basic_shovel", "Basic Shovel", "For digging and moving soil.", 80, "shovel", 1, 80)
 	shovel_tool.icon = _load_icon("res://Weapon & Tool/Shovel.png")
-	shovel_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/shovel.fbx"
+	shovel_tool.world_model_path = "res://assets/gltf-tools/shovel.gltf"
 	_register_item(shovel_tool)
 	var watering_tool = _create_tool("basic_watering_can", "Watering Can", "For watering crops.", 150, "watering_can", 1, 150)
-	watering_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/bucket_metal.fbx"
+	watering_tool.world_model_path = "res://assets/gltf-tools/bucket_metal.gltf"
 	_register_item(watering_tool)
 	var sickle_tool = _create_tool("basic_sickle", "Basic Sickle", "For harvesting crops.", 120, "sickle", 1, 120)
 	sickle_tool.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	sickle_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/knife.fbx"
+	sickle_tool.world_model_path = "res://assets/gltf-tools/knife.gltf"
 	_register_item(sickle_tool)
 	var axe_tool = _create_tool("basic_axe", "Basic Axe", "For chopping trees.", 150, "axe", 1, 100)
 	axe_tool.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	axe_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/axe.fbx"
+	axe_tool.world_model_path = "res://assets/gltf-tools/axe.gltf"
 	_register_item(axe_tool)
 	var pickaxe_tool = _create_tool("basic_pickaxe", "Basic Pickaxe", "For mining rocks.", 150, "pickaxe", 1, 100)
 	pickaxe_tool.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	pickaxe_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	pickaxe_tool.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	_register_item(pickaxe_tool)
 	# Extra tools
 	var hammer_tool = _create_tool("basic_hammer", "Hammer", "For crafting and building.", 120, "hammer", 1, 100)
 	hammer_tool.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	hammer_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/hammer.fbx"
+	hammer_tool.world_model_path = "res://assets/gltf-tools/hammer.gltf"
 	_register_item(hammer_tool)
 	var saw_tool = _create_tool("basic_saw", "Saw", "For cutting wood.", 100, "saw", 1, 80)
-	saw_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/saw.fbx"
+	saw_tool.world_model_path = "res://assets/gltf-tools/saw.gltf"
 	_register_item(saw_tool)
 	var chisel_tool = _create_tool("basic_chisel", "Chisel", "For fine crafting work.", 90, "chisel", 1, 60)
-	chisel_tool.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/chisel.fbx"
+	chisel_tool.world_model_path = "res://assets/gltf-tools/chisel.gltf"
 	_register_item(chisel_tool)
 	
 	# ===== Tiered Tools =====
 	# Bronze tier (power 2, durability 150)
 	var bronze_hoe = _create_tool("bronze_hoe", "Bronze Hoe", "A copper-alloy hoe, better than wood.", 180, "hoe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	bronze_hoe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	bronze_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	bronze_hoe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_hoe)
 	var bronze_axe = _create_tool("bronze_axe", "Bronze Axe", "A copper-alloy axe for chopping.", 200, "axe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	bronze_axe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/axe.fbx"
+	bronze_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
 	bronze_axe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_axe)
 	var bronze_pickaxe = _create_tool("bronze_pickaxe", "Bronze Pickaxe", "A copper-alloy pickaxe for mining.", 200, "pickaxe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	bronze_pickaxe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	bronze_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	bronze_pickaxe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_pickaxe)
 	var bronze_sickle = _create_tool("bronze_sickle", "Bronze Sickle", "A copper-alloy sickle for harvesting.", 180, "sickle", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	bronze_sickle.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/knife.fbx"
+	bronze_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
 	bronze_sickle.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_sickle)
 	
 	# Iron tier (power 3, durability 200)
 	var iron_hoe = _create_tool("iron_hoe", "Iron Hoe", "A sturdy iron hoe.", 300, "hoe", 3, 200, ItemData.ToolTier.IRON)
 	iron_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	iron_hoe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	iron_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	iron_hoe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_hoe)
 	var iron_axe = _create_tool("iron_axe", "Iron Axe", "A sharp iron axe.", 350, "axe", 3, 200, ItemData.ToolTier.IRON)
 	iron_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	iron_axe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/axe.fbx"
+	iron_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
 	iron_axe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_axe)
 	var iron_pickaxe = _create_tool("iron_pickaxe", "Iron Pickaxe", "A strong iron pickaxe.", 350, "pickaxe", 3, 200, ItemData.ToolTier.IRON)
 	iron_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	iron_pickaxe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	iron_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	iron_pickaxe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_pickaxe)
 	var iron_sickle = _create_tool("iron_sickle", "Iron Sickle", "A sharp iron sickle.", 300, "sickle", 3, 200, ItemData.ToolTier.IRON)
 	iron_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	iron_sickle.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/knife.fbx"
+	iron_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
 	iron_sickle.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_sickle)
 	
 	# Steel tier (power 5, durability 300)
 	var steel_hoe = _create_tool("steel_hoe", "Steel Hoe", "A refined steel hoe.", 500, "hoe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	steel_hoe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	steel_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	steel_hoe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_hoe)
 	var steel_axe = _create_tool("steel_axe", "Steel Axe", "A powerful steel axe.", 600, "axe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	steel_axe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/axe.fbx"
+	steel_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
 	steel_axe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_axe)
 	var steel_pickaxe = _create_tool("steel_pickaxe", "Steel Pickaxe", "A powerful steel pickaxe.", 600, "pickaxe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	steel_pickaxe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	steel_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	steel_pickaxe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_pickaxe)
 	var steel_sickle = _create_tool("steel_sickle", "Steel Sickle", "A keen steel sickle.", 500, "sickle", 5, 300, ItemData.ToolTier.STEEL)
 	steel_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	steel_sickle.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/knife.fbx"
+	steel_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
 	steel_sickle.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_sickle)
 	
 	# Mythril tier (power 8, durability 500)
 	var mythril_hoe = _create_tool("mythril_hoe", "Mythril Hoe", "A legendary hoe of mythril.", 1000, "hoe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	mythril_hoe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	mythril_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	mythril_hoe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_hoe)
 	var mythril_axe = _create_tool("mythril_axe", "Mythril Axe", "A legendary axe of mythril.", 1200, "axe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	mythril_axe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/axe.fbx"
+	mythril_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
 	mythril_axe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_axe)
 	var mythril_pickaxe = _create_tool("mythril_pickaxe", "Mythril Pickaxe", "A legendary pickaxe of mythril.", 1200, "pickaxe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	mythril_pickaxe.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/pickaxe.fbx"
+	mythril_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
 	mythril_pickaxe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_pickaxe)
 	var mythril_sickle = _create_tool("mythril_sickle", "Mythril Sickle", "A legendary sickle of mythril.", 1000, "sickle", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	mythril_sickle.world_model_path = "res://KayKit_RPGToolsBits_1.0_FREE/Assets/fbx/knife.fbx"
+	mythril_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
 	mythril_sickle.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_sickle)
 	
 	# Weapons (3D models from KayKit Adventurers pack)
-	var sword_weapon = _create_weapon("basic_sword", "Iron Sword", "A sturdy one-handed sword.", 200, 10, 80, "sword", "res://KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.gltf")
+	var sword_weapon = _create_weapon("basic_sword", "Iron Sword", "A sturdy one-handed sword.", 200, 10, 80, "sword", "res://assets/rpg_pack/Sword.blend")
 	sword_weapon.icon = _load_icon("res://Weapon & Tool/Silver Sword.png")
 	_register_item(sword_weapon)
-	var axe_weapon = _create_weapon("basic_axe_weapon", "Battle Axe", "A one-handed battle axe.", 180, 12, 70, "battle_axe", "res://KayKit_Adventurers_2.0_FREE/Assets/gltf/axe_1handed.gltf")
+	var axe_weapon = _create_weapon("basic_axe_weapon", "Battle Axe", "A one-handed battle axe.", 180, 12, 70, "battle_axe", "res://assets/rpg_pack/Axe_Double.blend")
 	axe_weapon.icon = _load_icon("res://Weapon & Tool/Axe.png")
 	_register_item(axe_weapon)
-	var dagger_weapon = _create_weapon("basic_dagger", "Dagger", "A quick and light dagger.", 100, 6, 50, "dagger", "res://KayKit_Adventurers_2.0_FREE/Assets/gltf/dagger.gltf")
+	var dagger_weapon = _create_weapon("basic_dagger", "Dagger", "A quick and light dagger.", 100, 6, 50, "dagger", "res://assets/rpg_pack/Dagger.blend")
 	dagger_weapon.icon = _load_icon("res://Weapon & Tool/Knife.png")
 	_register_item(dagger_weapon)
 	
@@ -214,11 +214,11 @@ func _initialize_items() -> void:
 	# Wood
 	var wood_log = _create_material("wood_log", "Wood Log", "A raw log from a tree.", 5, 50)
 	wood_log.icon = _load_icon("res://Material/Wood Log.png")
-	wood_log.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Wood_Log_A.fbx"
+	wood_log.world_model_path = "res://assets/Ultimate_Trees/WoodLog.blend"
 	_register_item(wood_log)
 	var wood_plank = _create_material("wood_plank", "Wooden Plank", "A plank of processed wood.", 3, 50)
 	wood_plank.icon = _load_icon("res://Material/Wooden Plank.png")
-	wood_plank.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Wood_Plank_A.fbx"
+	wood_plank.world_model_path = "res://assets/Ultimate_Trees/WoodLog.blend"
 	_register_item(wood_plank)
 	var stick = _create_material("stick", "Stick", "A simple wooden stick.", 1, 99)
 	stick.icon = _load_icon("res://Material/Wooden Plank.png")
@@ -232,11 +232,11 @@ func _initialize_items() -> void:
 	# Stone
 	var stone = _create_material("stone", "Stone", "A chunk of raw stone.", 3, 50)
 	stone.icon = _load_icon("res://Ore & Gem/Obsidian.png")
-	stone.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Stone_Chunks_Small.fbx"
+	stone.world_model_path = "res://assets/Ultimate_Trees/Rock_1.blend"
 	_register_item(stone)
 	var stone_brick = _create_material("stone_brick", "Stone Brick", "A shaped stone brick.", 8, 50)
 	stone_brick.icon = _load_icon("res://Ore & Gem/Obsidian.png")
-	stone_brick.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Stone_Brick.fbx"
+	stone_brick.world_model_path = "res://assets/Ultimate_Trees/Rock_2.blend"
 	_register_item(stone_brick)
 	
 	# Ores & Ingots
@@ -245,27 +245,27 @@ func _initialize_items() -> void:
 	_register_item(coal)
 	var copper_nugget = _create_material("copper_nugget", "Copper Nugget", "Raw copper ore.", 6, 50)
 	copper_nugget.icon = _load_icon("res://Ore & Gem/Copper Nugget.png")
-	copper_nugget.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Copper_Nugget_Small.fbx"
+	copper_nugget.world_model_path = "res://assets/rpg_pack/Mineral.blend"
 	_register_item(copper_nugget)
 	var copper_ingot = _create_material("copper_ingot", "Copper Ingot", "A smelted copper ingot.", 20, 30)
 	copper_ingot.icon = _load_icon("res://Ore & Gem/Copper Ingot.png")
-	copper_ingot.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Copper_Bar.fbx"
+	copper_ingot.world_model_path = "res://assets/rpg_pack/Gold_Ingots.blend"
 	_register_item(copper_ingot)
 	var iron_nugget = _create_material("iron_nugget", "Iron Nugget", "Raw iron ore.", 8, 50)
 	iron_nugget.icon = _load_icon("res://Ore & Gem/Silver Nugget.png")
-	iron_nugget.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Iron_Nugget_Small.fbx"
+	iron_nugget.world_model_path = "res://assets/rpg_pack/Mineral.blend"
 	_register_item(iron_nugget)
 	var iron_ingot = _create_material("iron_ingot", "Iron Ingot", "A smelted iron ingot.", 30, 30)
 	iron_ingot.icon = _load_icon("res://Ore & Gem/Silver Ingot.png")
-	iron_ingot.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Iron_Bar.fbx"
+	iron_ingot.world_model_path = "res://assets/rpg_pack/Gold_Ingots.blend"
 	_register_item(iron_ingot)
 	var gold_nugget = _create_material("gold_nugget", "Gold Nugget", "Raw gold ore.", 15, 50)
 	gold_nugget.icon = _load_icon("res://Ore & Gem/Gold Nugget.png")
-	gold_nugget.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Gold_Nugget_Small.fbx"
+	gold_nugget.world_model_path = "res://assets/rpg_pack/Coin.blend"
 	_register_item(gold_nugget)
 	var gold_ingot = _create_material("gold_ingot", "Gold Ingot", "A smelted gold ingot.", 50, 30)
 	gold_ingot.icon = _load_icon("res://Ore & Gem/Golden Ingot.png")
-	gold_ingot.world_model_path = "res://KayKit_ResourceBits_1.0_FREE/Assets/fbx/Gold_Bar.fbx"
+	gold_ingot.world_model_path = "res://assets/rpg_pack/Gold_Ingots.blend"
 	_register_item(gold_ingot)
 	var gold_coin = _create_material("gold_coin", "Gold Coin", "Standard currency used for trading.", 1, 999)
 	gold_coin.icon = _load_icon("res://Ore & Gem/Gold Nugget.png")
@@ -306,7 +306,9 @@ func _initialize_items() -> void:
 	var paper = _create_material("paper", "Paper", "A sheet of paper.", 3, 50)
 	paper.icon = _load_icon("res://Material/Paper.png")
 	_register_item(paper)
-	var torch_item = _create_material("torch", "Torch", "A simple torch for light.", 5, 20)
+	var torch_item = _create_tool("torch", "Torch", "A simple torch for light.", 30, "torch", 0, 80)
+	torch_item.world_model_path = "res://assets/gltf-tools/torch.gltf"
+	torch_item.is_offhand = true
 	torch_item.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(torch_item)
 	# Food
@@ -512,20 +514,20 @@ func _initialize_items() -> void:
 	# ===== Placeable Items (Fences, Gates) =====
 	
 	var fence_wood = _create_placeable("fence_wood", "Wooden Fence", "A sturdy wooden fence section.", 8,
-		"res://modular_terrain_collection/Hilly_Prop_Fence_Boards_1.obj", 2.0,
-		Vector3(1.0, 0.8, 0.15))
+		"res://assets/Medieval Village MegaKit[Standard]/glTF/Prop_WoodenFence_Extension1.gltf", 1.0,
+		Vector3(2.0, 0.84, 0.12))
 	fence_wood.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(fence_wood)
-	
+
 	var fence_post = _create_placeable("fence_post", "Fence Post", "A wooden fence post for corners and ends.", 5,
-		"res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 2.0,
-		Vector3(0.2, 1.0, 0.2))
+		"res://assets/Medieval Village MegaKit[Standard]/glTF/Corner_Exterior_Wood.gltf", 0.6,
+		Vector3(0.25, 3.0, 0.25))
 	fence_post.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(fence_post)
-	
+
 	var fence_gate = _create_placeable("fence_gate", "Fence Gate", "A gate that can be opened and closed.", 15,
-		"res://modular_terrain_collection/Hilly_Prop_Fence_Gate_1.obj", 2.0,
-		Vector3(1.0, 0.8, 0.15))
+		"res://assets/Medieval Village MegaKit[Standard]/glTF/Prop_WoodenFence_Single.gltf", 1.0,
+		Vector3(2.0, 0.84, 0.12))
 	fence_gate.icon = _load_icon("res://Material/Wooden Plank.png")
 	fence_gate.placeable_is_gate = true
 	_register_item(fence_gate)
@@ -533,14 +535,14 @@ func _initialize_items() -> void:
 	# ===== Placeable Buildings =====
 	
 	var barn = _create_placeable("barn", "Barn", "A cozy barn to shelter your animals.", 80,
-		"res://Animal QiwiiPack/Animal Models/Barn.fbx", 0.5,
+		"res://assets/Buildings/Blends/Stable.blend", 0.5,
 		Vector3(4.0, 3.0, 4.0))
 	barn.icon = _load_icon("res://Misc/Crate.png")
 	barn.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(barn)
 	
 	var hut = _create_placeable("hut", "Hut", "A small wooden hut for storage or shelter.", 50,
-		"res://Animal QiwiiPack/Animal Models/Hut.fbx", 0.5,
+		"res://assets/Buildings/Blends/House_4.blend", 0.5,
 		Vector3(2.5, 2.5, 2.5))
 	hut.icon = _load_icon("res://Misc/Crate.png")
 	hut.rarity = ItemData.ItemRarity.UNCOMMON
@@ -553,20 +555,20 @@ func _initialize_items() -> void:
 	_register_item(feeding_trough)
 	
 	var campfire = _create_placeable("campfire", "Campfire", "A warm campfire for light and cooking.", 15,
-		"res://modular_terrain_collection/Hilly_Prop_Camp_Campfire.obj", 2.0,
+		"", 2.0,
 		Vector3(0.8, 0.4, 0.8))
 	campfire.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(campfire)
 
 	var claim_post = _create_placeable("claim_post", "Claim Post", "Mark your territory. Only you can build within the claim zone.", 30,
-		"res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 2.0,
+		"res://assets/Ultimate_Trees/WoodLog.blend", 2.0,
 		Vector3(0.3, 1.2, 0.3))
 	claim_post.icon = _load_icon("res://Weapon & Tool/Shovel.png")
 	claim_post.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(claim_post)
 	
 	var sitting_log = _create_placeable("sitting_log", "Sitting Log", "A log to sit on by the fire.", 8,
-		"res://modular_terrain_collection/Hilly_Prop_Camp_Sitting_Log.obj", 2.0,
+		"res://assets/Ultimate_Trees/WoodLog.blend", 2.0,
 		Vector3(1.2, 0.5, 0.5))
 	sitting_log.icon = _load_icon("res://Material/Wood Log.png")
 	_register_item(sitting_log)
@@ -578,6 +580,24 @@ func _initialize_items() -> void:
 		"", 1.0, Vector3(0.5, 0.6, 0.5)))
 	_register_item(_create_placeable("table_small", "Small Table", "A small wooden table.", 15,
 		"", 1.0, Vector3(0.8, 0.6, 0.6)))
+
+	# Community Center — a special placeable with interior and shared storage
+	var community_center = ItemData.new()
+	community_center.item_id = "community_center"
+	community_center.item_name = "Community Center"
+	community_center.description = "A gathering place for the community with shared storage."
+	community_center.item_type = ItemData.ItemType.PLACEABLE
+	community_center.rarity = ItemData.ItemRarity.RARE
+	community_center.base_value = 200
+	community_center.max_stack_size = 1
+	community_center.is_stackable = false
+	community_center.placeable_model_path = "res://assets/Buildings/Blends/Inn.blend"
+	community_center.placeable_scale = 1.0
+	community_center.placeable_collision_size = Vector3(4.0, 3.0, 3.0)
+	community_center.placeable_snap_to_grid = true
+	community_center.placeable_can_rotate = true
+	community_center.icon = _load_icon("res://Misc/Crate.png")
+	_register_item(community_center)
 
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()

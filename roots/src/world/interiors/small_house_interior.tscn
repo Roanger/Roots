@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://b3df4u8q2xq2h"]
+
+[ext_resource type="Script" path="res://src/world/interiors/small_house_interior.gd" id="1_fh3pu"]
+
+[node name="SmallHouseInterior" type="Node3D"]
+script = ExtResource("1_fh3pu")

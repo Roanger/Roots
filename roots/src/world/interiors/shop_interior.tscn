@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://cfmuec815xrbi"]
+
+[ext_resource type="Script" path="res://src/world/interiors/shop_interior.gd" id="1_2hyuo"]
+
+[node name="ShopInterior" type="Node3D"]
+script = ExtResource("1_2hyuo")

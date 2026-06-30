@@ -18,6 +18,7 @@ signal character_closed()
 @onready var tool_2_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer/Tool2Slot
 @onready var tool_3_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/ToolsContainer/Tool3Slot
 @onready var weapon_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/WeaponContainer/WeaponSlot
+@onready var offhand_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/OffhandContainer/OffhandSlot
 
 var equipment: Equipment = null
 var player: Node = null
@@ -48,6 +49,7 @@ func _setup_slots() -> void:
 	slots[Equipment.EquipmentSlot.TOOL_2] = tool_2_slot
 	slots[Equipment.EquipmentSlot.TOOL_3] = tool_3_slot
 	slots[Equipment.EquipmentSlot.WEAPON] = weapon_slot
+	slots[Equipment.EquipmentSlot.OFFHAND] = offhand_slot
 	
 	# Connect slot signals
 	for slot_type in slots.keys():

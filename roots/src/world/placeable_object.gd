@@ -12,11 +12,14 @@ var _model_node: Node3D = null
 var _collision_shape: CollisionShape3D = null
 var _gate_interact_shape: CollisionShape3D = null  # Small shape on hinge post for raycast when gate is open
 var _gate_pivot: Node3D = null  # Pivot node for gate hinge rotation
+var _campfire_light: OmniLight3D = null
 
 func setup(p_item_id: String, p_name: String, model_path: String, model_scale: float, collision_size: Vector3, p_is_gate: bool = false) -> void:
 	item_id = p_item_id
 	object_name = p_name
 	is_gate = p_is_gate
+	
+	var is_gltf := model_path.to_lower().ends_with(".gltf") or model_path.to_lower().ends_with(".glb")
 	
 	# Load and add the 3D model (OBJ files import as ArrayMesh, not PackedScene)
 	if model_path != "":
@@ -25,13 +28,14 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 			if res is PackedScene:
 				_model_node = res.instantiate() as Node3D
 				if _model_node:
-					# FBX models may have baked-in position offsets and rotation — reset them
 					_model_node.position = Vector3.ZERO
 					_model_node.rotation = Vector3.ZERO
-					for child_node in _model_node.get_children():
-						if child_node is Node3D:
-							child_node.position = Vector3.ZERO
-							child_node.rotation = Vector3(-PI / 2.0, 0, 0)
+					# glTF files are already Y-up; only apply the legacy FBX/.blend rotation fix for other formats
+					if not is_gltf:
+						for child_node in _model_node.get_children():
+							if child_node is Node3D:
+								child_node.position = Vector3.ZERO
+								child_node.rotation = Vector3(-PI / 2.0, 0, 0)
 					_model_node.scale = Vector3.ONE * model_scale
 			elif res is Mesh:
 				_model_node = MeshInstance3D.new()
@@ -40,17 +44,13 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 			
 			if _model_node:
 				if p_is_gate:
-					# For gates: pivot at the hinge post (left edge of mesh)
-					# The model is added directly to the scene, and a separate
-					# pivot node is positioned at the hinge edge. The model is
-					# re-parented under the pivot with compensating offset.
+					# For gates: pivot at the hinge post (right edge of mesh)
 					_gate_pivot = Node3D.new()
 					_gate_pivot.name = "GatePivot"
 					add_child(_gate_pivot)
-					# The big hinge post is at the right edge (max X) of the mesh
-					# We position the model so the right edge is at the pivot's origin
-					if _model_node is MeshInstance3D:
-						var aabb = (_model_node as MeshInstance3D).mesh.get_aabb()
+					var mesh_inst := _find_first_mesh_instance(_model_node)
+					if mesh_inst and mesh_inst.mesh:
+						var aabb = mesh_inst.mesh.get_aabb()
 						# max_x = left edge + width; shift mesh left so right edge = 0
 						var max_x = aabb.position.x + aabb.size.x
 						_model_node.position.x = -max_x * model_scale
@@ -87,6 +87,17 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 		_gate_interact_shape.position.y = collision_size.y * model_scale * 0.5
 		add_child(_gate_interact_shape)
 	
+	# Campfire light
+	if item_id == "campfire":
+		_campfire_light = OmniLight3D.new()
+		_campfire_light.omni_range = 8.0
+		_campfire_light.light_color = Color(1.0, 0.55, 0.15)
+		_campfire_light.light_energy = 2.5
+		_campfire_light.omni_attenuation = 0.6
+		_campfire_light.shadow_enabled = false
+		_campfire_light.position.y = collision_size.y * model_scale * 0.5 + 0.2
+		add_child(_campfire_light)
+	
 	# Add to group for save/load and pasture detection
 	add_to_group("placeables")
 	if is_gate:
@@ -94,13 +105,28 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 	else:
 		add_to_group("fences")
 
+func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for child in node.get_children():
+		var found := _find_first_mesh_instance(child)
+		if found:
+			return found
+	return null
+
 func _build_placeholder(collision_size: Vector3) -> void:
 	var mesh_inst = MeshInstance3D.new()
 	var box = BoxMesh.new()
 	box.size = collision_size
 	mesh_inst.mesh = box
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.55, 0.35, 0.15) if not is_gate else Color(0.45, 0.3, 0.12)
+	if item_id == "campfire":
+		mat.albedo_color = Color(0.9, 0.3, 0.05)
+		mat.emission_enabled = true
+		mat.emission = Color(1.0, 0.4, 0.05)
+		mat.emission_energy_multiplier = 1.5
+	else:
+		mat.albedo_color = Color(0.55, 0.35, 0.15) if not is_gate else Color(0.45, 0.3, 0.12)
 	mesh_inst.material_override = mat
 	mesh_inst.position.y = collision_size.y * 0.5
 	add_child(mesh_inst)

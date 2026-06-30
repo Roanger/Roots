@@ -8,6 +8,10 @@
 
 config_version=5
 
+[GD-Sync]
+
+version="0.14"
+
 [application]
 
 config/name="Roots"
@@ -43,10 +47,6 @@ window/vsync/vsync_mode=2
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg", "res://addons/GD-Sync/plugin.cfg")
-
-[filesystem]
-
-import/blender/enabled=false
 
 [godot_mcp]
 

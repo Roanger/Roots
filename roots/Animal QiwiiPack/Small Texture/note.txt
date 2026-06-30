@@ -1,9 +1,0 @@
-
-
-While creating material you are supposed to use RGB 16-bit format on texture for best results.
-
-Texture properties
-
-Texture Type: Sprite (2D and UI)
-Max Size: 32
-Format: RGB 16 bit

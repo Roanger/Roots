@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://7hef7a2gt6h6"]
+
+[ext_resource type="Script" path="res://src/world/interiors/tavern_interior.gd" id="1_76nph"]
+
+[node name="TavernInterior" type="Node3D"]
+script = ExtResource("1_76nph")

@@ -109,10 +109,9 @@ graph TD
 - [x] Implement procedural heightmap generation
 - [x] Create basic grass and ground textures
 - [x] Add simple water plane
-- [x] Implement fog and skybox (BinbunSky shader: procedural clouds, sun disc, stars, day/night auto-blend)
+- [x] Implement fog and skybox (procedural clouds, sun disc, stars, day/night auto-blend)
 - [x] Integrate FBX trees and rocks with scale/rotation variation
 - [x] Biome-based props (e.g. dead trees in Plains/Mountains/Snow)
-- [x] KayKit Forest Nature Pack: 3D grass and bushes
 - [x] **[REWRITE]** Transition from Voxel Terrain to Smooth Heightmap Terrain (better AI nav, building placement, cozy aesthetic) — *Complete Feb 2026. See terrain_rewrite_plan.md*
 
 #### 1.5 Basic UI Framework
@@ -147,7 +146,7 @@ graph TD
 - [x] Define item types (materials, tools, food, seeds, etc.)
 - [x] Implement item durability system
 - [x] Add item quality/rarity system
-- [x] 3D tool/weapon models (KayKit RPGToolsBits + Adventurers packs)
+- [x] 3D tool/weapon models
 - [x] First-person tool holder with walking bob animation
 - [x] Create tool tier system (Wood → Bronze → Iron → Steel → Mythril)
 
@@ -231,17 +230,16 @@ graph TD
 - [x] Create AnimalData resource (species, products, feed, timers, collision, model)
 - [x] Implement 8 animal species: Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit
 - [x] Add animal product items (egg, milk, wool, raw_meat, feathers, venison, rabbit_meat, rabbit_fur, deer_pelt, animal_feed)
-- [x] Wire QiwiiPack 3D models (Chicken, Cow, Sheep White, Pig, Chick) with FBX offset/rotation fixes
+- [x] Wire animal 3D models (Chicken, Cow, Sheep White, Pig, Chick) with FBX offset/rotation fixes
 - [x] Animals produce items on timers (eggs, milk, wool) and drop loot on death
 - [x] Terrain snapping and smooth wander/flee movement
 - [x] Fence/gate placement system (PLACEABLE item type, ghost preview, Q to rotate, left-click to place)
 - [x] PlaceableObject world script (collision blocks animals, gates open/close, hammer to pick up)
 - [x] Fence crafting recipes at Workbench (fence=2 planks+string, post=1 log, gate=3 planks+2 string+iron)
-- [x] Modular terrain collection integrated (Hilly_Prop_Fence OBJ models for fences/gates/posts)
 - [x] Implement animal feeding and care (E-key: hold food → feed, empty hand → pet, floating text feedback)
 - [x] Create breeding system (feed two same-species adults near each other → baby spawns, breed cooldown)
 - [x] Add more building placeables (Barn, Hut, Feeding Trough, Campfire, Sitting Log + crafting recipes)
-- [x] FBX offset fix in PlaceableObject for QiwiiPack building models
+- [x] FBX offset fix in PlaceableObject for building models
 - [ ] Find/add models for goat, deer, rabbit (currently placeholder capsules)
 
 #### 3.6 Militia/Combat
@@ -250,7 +248,7 @@ graph TD
 - [x] Implement enemy AI (BaseEnemy: idle/wander/chase/attack/hurt/dead states)
 - [x] Player damage + death/respawn system
 - [x] Enemy loot drops (WorldItem auto-pickup)
-- [x] Enemy types: Skeleton Minion, Skeleton Rogue, Skeleton Warrior, Skeleton Mage (KayKit 3D models)
+- [x] Enemy types: Skeleton Minion, Skeleton Rogue, Skeleton Warrior, Skeleton Mage
 - [ ] Add combat skill progression (XP wiring exists, needs balancing)
 - [ ] Design defensive structures
 
@@ -278,9 +276,9 @@ graph TD
 - [x] Implement reputation system — per-NPC reputation (-100..100), +20 on quest turn-in, -5 on hit; price modifier in shops (Honored=30% off, Hostile=50% markup); saved in world_data
 - [x] 8 village NPCs: Elara (Shopkeeper), Bram (Innkeeper), Tormund (Blacksmith), Marta (Baker), Aldric (Mayor/Quest Giver), Sage Willow (Herbalist), Old Hank (Farmer), Captain Rolf (Guard)
 - [x] DialogueUI (bottom panel: NPC name, rich text, choice buttons, actions: shop/close/quest/next)
-- [x] KayKit Adventurers 3D models (Barbarian, Knight, Mage, Ranger, Rogue, Rogue_Hooded)
+- [x] NPC 3D character models (Barbarian, Knight, Mage, Ranger, Rogue, Rogue_Hooded)
 - [x] NPC quest glow (yellow glow when NPC has available/turnable quests or active TALK_TO_NPC objectives)
-- [x] Town Builder system (Medieval Village MegaKit modular buildings for village layout)
+- [x] Town Builder system (modular buildings for village layout)
 
 #### 4.3 Settlement System
 - [x] **[REWRITE]** Terrain modification system (hoe tills ground → dark soil + FarmPlot spawn, shovel digs bowl depression)
@@ -288,11 +286,11 @@ graph TD
 - [x] **[REWRITE]** Dynamic FarmPlot spawning on tilled terrain
 - [x] **[REWRITE]** Terrain visual feedback (vertex color changes for modified cells)
 - [x] **[REWRITE]** Save/load terrain modifications per chunk (per-chunk JSON at `user://saves/world_<seed>/chunks/`)
-- [x] Shovel digging visuals — *Complete: cosine-falloff bowl depression, TileMod.DUG, idempotent, object/biome checks*
+- [~] Shovel digging visuals — *Implemented but non-functional in practice; the underlying terrain mesh does not robustly support persistent deformation. Deferred to the future world-generation rewrite.*
 - [x] Design plot claiming — Claim Post placeable (Workbench recipe: 3 logs + 5 stone + 2 rope), spawns 8 boundary posts in 8m radius circle, claim data persisted in world_data
 - [ ] Implement housing placement
 - [x] Create decoration system — added flower pot, wooden chair, small table with hand-craftable recipes and placeable via existing placement system
-- [ ] Design community buildings
+- [x] Design community buildings (BuildingDoor + InteriorManager, 4 interior types, shared storage chest)
 - [ ] Add player-specific land permissions
 
 #### 4.6 Quest System
@@ -315,7 +313,7 @@ graph TD
 #### 4.4 Wildlife System
 - [x] Design animal spawn tables per biome (Plains/Meadow for farm animals, Forest/Meadow for deer, Plains/Forest/Meadow for rabbits)
 - [x] Implement biome-aware animal spawning (replaced hardcoded positions with biome queries via chunk_manager.get_biome_at())
-- [ ] Implement animal behaviors (grazing, fleeing, hunting)
+- [x] Implement animal behaviors (grazing, fleeing, hunting)
 - [x] Create fish spawning and fishing
   - `fishing_spot.gd`: StaticBody3D placed at water surface with collision, timed catch (3.5s), loot table (raw_fish, salmon, pufferfish), cooldown
   - `basic_fishing_rod` tool (Workbench recipe: 3 sticks + 2 string)
@@ -331,7 +329,7 @@ graph TD
   - WeatherManager autoload (season-based probability, smooth transitions, save/load)
   - WeatherEffects (GPUParticles3D rain/snow, fog/cloud modulation per weather type)
 - [x] Create day/night cycle (sun rotation, light energy/color transitions, ambient/fog darkening)
-- [x] BinbunSky shader integration (procedural clouds, sun disc, stars, automatic day/night/sunset via LIGHT0_DIRECTION)
+- [x] Procedural sky shader integration (procedural clouds, sun disc, stars, automatic day/night/sunset via LIGHT0_DIRECTION)
 - [x] In-game clock UI below minimap (time, day of week, season, sun/moon icon)
 - [x] Design seasonal effects (cloud density/color + fog density per season: Summer clear → Winter overcast)
 - [ ] Add environmental hazards
@@ -559,13 +557,25 @@ sequenceDiagram
 - Implement chunk culling for unrendered areas
 - Use instancing for repeated objects (trees, rocks)
 
-### Smooth Heightmap Terrain Rewrite (Planned Feb 2026)
+### Smooth Heightmap Terrain Rewrite (Complete Feb 2026)
 - **Motivation:** Voxel terrain (while optimized) clashes with the smooth low-poly aesthetic, breaks standard AI NavMesh generation, and makes building placement (farmhouses, large plots) extremely difficult. A cozy game requires predictable, rolling terrain.
-- **Architecture:** `ChunkData` will shift from a 3D voxel array (`PackedByteArray`) to a 2D heightmap array (`PackedFloat32Array`).
-- **Mesh Generation:** Chunks will generate a standard grid mesh using `ArrayMesh`.
-- **Physics:** The terrain will use a standard `StaticBody3D` with a `ConcavePolygonShape3D` or `HeightMapShape3D` (Jolt Physics). This allows players and AI to use standard `CharacterBody3D` physics (`move_and_slide`, `is_on_floor`) instead of manual raycast grounding.
-- **Modifications:** Digging will be replaced with localized vertex height adjustments (flattening) or splatmap painting (paths, tilled soil).
-- **Caves:** Will be moved to dedicated instanced scenes rather than seamless holes in the overworld.
+- **Architecture:** `ChunkData` shifted from a 3D voxel array (`PackedByteArray`) to a 2D heightmap array (`PackedFloat32Array`).
+- **Mesh Generation:** Chunks generate a standard grid mesh using `ArrayMesh`.
+- **Physics:** The terrain uses a standard `StaticBody3D` with a `ConcavePolygonShape3D` (Jolt Physics). Players and AI use standard `CharacterBody3D` physics (`move_and_slide`, `is_on_floor`).
+- **Modifications:** Hoe tilling spawns dark-soil `FarmPlot` objects; shovel digging applies a localized cosine-falloff bowl depression with vertex color feedback. Per-chunk JSON at `user://saves/world_<seed>/chunks/`.
+- **Status:** Functional for walking, farming, and placement, but the current heightmap approach is a stepping stone. A full world-simulation rewrite is planned to support swimming, rivers, waterfalls, boats, and caves (see below).
+
+### Future World Generation Rewrite (Post-Milestone 3)
+The current heightmap terrain + chunk water mesh approach works for the current vertical slice, but it cannot support the full game vision. A future rewrite will target:
+- **Hydrology:** Real river networks, lakes, and watersheds that flow downhill and feed water wheels.
+- **Swimming & Buoyancy:** Player/AI physics change when submerged; underwater exploration.
+- **Waterfalls:** Terrain overhangs and vertical water flows.
+- **Boats:** Placeable/craftable water vehicles on rivers and lakes.
+- **Caves:** Mountain regions get procedural or designer-authored cave entrances and interior scenes.
+- **Robust Terrain Modification:** Digging that actually persists as mesh deformation (paths, foundations, irrigation ditches) rather than purely visual vertex painting.
+- **Forest & Grassland Density:** Biome-aware procedural forests with underbrush, clearings, and interactive grass.
+
+*This is acknowledged as a large later-phase effort; current systems are placeholders/prototypes.*
 
 ### Save System
 - **Local Saves:** Player progress, inventory, skills
@@ -642,7 +652,7 @@ For solo development, prioritize these skills:
 8. ~~Phase 3.6: Militia/Combat — Enemy AI, combat system, loot drops~~ ✓
 9. ~~Harvestable world objects — Trees drop wood, rocks drop stone/ore~~ ✓
 10. ~~Phase 3.2: Herb Gathering & Alchemy — Harvestable herbs, alchemy table, 6 potions, buff system~~ ✓
-11. ~~Phase 4.5: Environmental — Day/night cycle, BinbunSky shader, seasonal sky, clock UI~~ ✓
+11. ~~Phase 4.5: Environmental — Day/night cycle, seasonal sky, clock UI~~ ✓
 12. ~~Phase 3.3: Cooking — 14 recipes, food buffs, well_fed system, cooking XP~~ ✓
 13. ~~Phase 3.5: Husbandry — Animal feeding/petting, breeding system, building placeables~~ ✓
 14. ~~**[REWRITE]** Smooth Heightmap Terrain Transition~~ ✓
@@ -653,7 +663,7 @@ For solo development, prioritize these skills:
     - ~~Re-integrate farm plot tilling and object placement~~ ✓
     - ~~Fix chunk seam stitching~~ ✓
     - ~~Fix WorldItem collision (not pushed by player)~~ ✓
-    - ~~Shovel digging visuals~~ ✓ — *Complete: cosine-falloff bowl depression (0.6m center, blended edges), TileMod.DUG, idempotent, object/biome checks, save/load per chunk*
+    - ~~Shovel digging visuals~~ [~] — *Implemented but non-functional in practice; deferred to future world-generation rewrite.*
 15. ~~**Phase 4.2: NPC System** — Villagers, merchants, quests~~ ✓
 16. ~~**Phase 4.5: Weather System** — WeatherManager autoload, rain/snow GPUParticles3D, fog/cloud modulation, save/load~~ ✓
 17. ~~**Phase 4.4: Wildlife & Fishing** — Biome-aware animal spawning, fishing spot system, fishing rod tool, fish items/recipes~~ ✓
@@ -662,10 +672,13 @@ For solo development, prioritize these skills:
 20. ~~**Phase 4.3: Settlement** — Claim Post placeable, placed object save/load~~ ✓
 21. ~~**Phase 4.1: Biome Climate** — Subtle fog color per biome, blends as player moves~~ ✓
 22. ~~**Phase 4.2: Reputation** — Per-NPC reputation, quest/hit modifiers, shop price multipliers~~ ✓
-23. **Next:** Phase 4 remaining — housing/decorations/community buildings (4.3), quest content (4.6), animal behaviors (4.4), environmental hazards (4.5).
+23. ~~**Phase 4.3: Community Buildings** — Door/interior system, 4 interior scenes, interaction prompt, Community Center placeable with shared storage chest, doors on all 8 village buildings.~~ ✓
+24. ~~**Phase 4.4: Animal Behaviors** — Grazing (hunger-reduction on grass biomes, self-feed), Fleeing (auto-detect threats via `detection_range`), Hunting (Wolf predator chases deer/rabbit). Plus dynamic wildlife spawning per chunk (wild animals spawn on chunk load, despawn on unload). Night-time enemy spawning (wave every ~25s, 2-4 enemies, dawn despawn).~~ ✓
+25. **Next (Phase 4 remaining):** housing/decorations (4.3), quest content (4.6), wildlife interactions (4.4), environmental hazards (4.5).
+26. **Future (post-Milestone 3):** Full world-generation rewrite to support hydrology/rivers, swimming, waterfalls, boats, caves, robust digging, and dense forests/grasslands. Current terrain/water systems are placeholders for that rewrite.
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Jun 2026 – **Quest polish + Weather + Wildlife/Fishing + Biome Resources + NPC Schedules + Settlement + Biome Climate + Reputation complete.** Notification popup system + compass quest waypoint markers. Weather system: WeatherManager autoload, WeatherEffects (rain/snow GPUParticles3D, fog/cloud modulation). Wildlife/Fishing: biome-aware animal spawning (Plains/Meadow for farm animals), FishingSpot (timed catch 3.5s, loot table, cooldown), fishing rod tool (Workbench recipe), fish items (raw_fish, salmon, pufferfish, cooked_fish, grilled_salmon) + cooking recipes. Biome Resources: biome-specific tree loot (Taiga → sap, Jungle → denser wood, Mountains/Snow → less wood), rock loot (Mountains → more ore, Plains → stone-only, Beach → copper), herb drops (Swamp → rarer mushrooms, Meadow → more lavender, Jungle → more mint). NPC Schedules: BaseNPC SLEEPING/GOING_TO_TARGET states, time-based daily routines via schedule array (wake/work/socialize/sleep cycles per role). Settlement: Claim Post placeable + boundary post visuals, placed object save/load persistence, claim data saved to world_data. Biome Climate: subtle fog color per biome (water=blue mist, jungle=dark green, snow=bright white, etc.), blends into current fog. Reputation: per-NPC reputation (-100..100), +20 on quest turn-in, -5 on hit; price modifier in shops (Honored=30% off, Hostile=50% markup); saved in world_data. Next: Phase 4 remaining — housing, decorations, community buildings, quest content, animal behaviors, environmental hazards.*
+*Last updated: Jun 2026 – **Water shader v2 + camera/model improvements.** Rewrote water shader with depth-based color/foam, refraction, Fresnel sky reflection, and specular sun sparkle; sun direction/color fed via global shader uniforms. Player camera now tracks the selected character model's head bone for eye-level first-person view and rotates with camera yaw. Added Future World Generation Rewrite section to plan: current heightmap/water systems are acknowledged as placeholders for a later hydrology/rivers/swimming/waterfalls/boats/caves rewrite. Shovel digging marked as deferred to that rewrite.*

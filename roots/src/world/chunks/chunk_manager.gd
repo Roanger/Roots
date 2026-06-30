@@ -73,17 +73,18 @@ func _ready() -> void:
 	
 	# Load tree and rock FBX scenes
 	var tree_paths := [
-		"res://FBX/CommonTree_1.fbx", "res://FBX/CommonTree_2.fbx", "res://FBX/CommonTree_3.fbx",
-		"res://FBX/CommonTree_4.fbx", "res://FBX/CommonTree_5.fbx",
-		"res://FBX/TwistedTree_1.fbx", "res://FBX/TwistedTree_2.fbx", "res://FBX/TwistedTree_3.fbx",
-		"res://FBX/TwistedTree_4.fbx", "res://FBX/TwistedTree_5.fbx"
+		"res://assets/Ultimate_Trees/CommonTree_1.blend", "res://assets/Ultimate_Trees/CommonTree_2.blend", "res://assets/Ultimate_Trees/CommonTree_3.blend",
+		"res://assets/Ultimate_Trees/CommonTree_4.blend", "res://assets/Ultimate_Trees/CommonTree_5.blend",
+		"res://assets/Ultimate_Trees/Willow_1.blend", "res://assets/Ultimate_Trees/Willow_2.blend", "res://assets/Ultimate_Trees/Willow_3.blend",
+		"res://assets/Ultimate_Trees/Willow_4.blend", "res://assets/Ultimate_Trees/Willow_5.blend"
 	]
 	var dead_tree_paths := [
-		"res://FBX/DeadTree_1.fbx", "res://FBX/DeadTree_2.fbx", "res://FBX/DeadTree_3.fbx",
-		"res://FBX/DeadTree_4.fbx", "res://FBX/DeadTree_5.fbx"
+		"res://assets/Trees/DeadTree_1.blend", "res://assets/Trees/DeadTree_2.blend", "res://assets/Trees/DeadTree_3.blend",
+		"res://assets/Trees/DeadTree_4.blend", "res://assets/Trees/DeadTree_5.blend"
 	]
 	var rock_paths := [
-		"res://FBX/Rock_Medium_1.fbx", "res://FBX/Rock_Medium_2.fbx", "res://FBX/Rock_Medium_3.fbx"
+		"res://assets/Ultimate_Trees/Rock_1.blend", "res://assets/Ultimate_Trees/Rock_2.blend", "res://assets/Ultimate_Trees/Rock_3.blend",
+		"res://assets/Ultimate_Trees/Rock_4.blend", "res://assets/Ultimate_Trees/Rock_5.blend"
 	]
 	for path in tree_paths:
 		var scene = load(path) as PackedScene
@@ -99,8 +100,8 @@ func _ready() -> void:
 			_rock_scenes.append(scene)
 	# Pine trees for taiga and mountain biomes
 	var pine_paths := [
-		"res://FBX/Pine_1.fbx", "res://FBX/Pine_2.fbx", "res://FBX/Pine_3.fbx",
-		"res://FBX/Pine_4.fbx", "res://FBX/Pine_5.fbx"
+		"res://assets/Ultimate_Trees/PineTree_1.blend", "res://assets/Ultimate_Trees/PineTree_2.blend", "res://assets/Ultimate_Trees/PineTree_3.blend",
+		"res://assets/Ultimate_Trees/PineTree_4.blend", "res://assets/Ultimate_Trees/PineTree_5.blend"
 	]
 	for path in pine_paths:
 		var scene = load(path) as PackedScene
@@ -108,12 +109,10 @@ func _ready() -> void:
 			_pine_scenes.append(scene)
 	# Pebbles for beach and mountain scatter
 	var pebble_paths := [
-		"res://FBX/Pebble_Round_1.fbx", "res://FBX/Pebble_Round_2.fbx",
-		"res://FBX/Pebble_Round_3.fbx", "res://FBX/Pebble_Round_4.fbx",
-		"res://FBX/Pebble_Round_5.fbx", "res://FBX/Pebble_Square_1.fbx",
-		"res://FBX/Pebble_Square_2.fbx", "res://FBX/Pebble_Square_3.fbx",
-		"res://FBX/Pebble_Square_4.fbx", "res://FBX/Pebble_Square_5.fbx",
-		"res://FBX/Pebble_Square_6.fbx"
+		"res://assets/Ultimate_Trees/Rock_1.blend", "res://assets/Ultimate_Trees/Rock_2.blend",
+		"res://assets/Ultimate_Trees/Rock_3.blend", "res://assets/Ultimate_Trees/Rock_Moss_1.blend",
+		"res://assets/Ultimate_Trees/Rock_Moss_2.blend", "res://assets/Ultimate_Trees/Rock_Snow_1.blend",
+		"res://assets/Ultimate_Trees/Rock_Snow_2.blend"
 	]
 	for path in pebble_paths:
 		var scene = load(path) as PackedScene
@@ -121,61 +120,47 @@ func _ready() -> void:
 			_pebble_scenes.append(scene)
 	# Flowers for meadow and plains
 	var flower_paths := [
-		"res://FBX/Flower_3_Group.fbx", "res://FBX/Flower_3_Single.fbx",
-		"res://FBX/Flower_4_Group.fbx", "res://FBX/Flower_4_Single.fbx"
+		"res://assets/Ultimate_Trees/Flowers.blend", "res://assets/Farm/Flower_1.blend",
+		"res://assets/Farm/Flower_2.blend", "res://assets/Farm/Flower_3.blend"
 	]
 	for path in flower_paths:
 		var scene = load(path) as PackedScene
 		if scene:
 			_flower_scenes.append(scene)
 	# Ferns for forest and jungle undergrowth
-	var fern_paths := ["res://FBX/Fern_1.fbx"]
+	var fern_paths := ["res://assets/Ultimate_Trees/Plant_1.blend", "res://assets/Ultimate_Trees/Plant_2.blend"]
 	for path in fern_paths:
 		var scene = load(path) as PackedScene
 		if scene:
 			_fern_scenes.append(scene)
 	# Mushrooms for forest floor
-	var mushroom_paths := ["res://FBX/Mushroom_Common.fbx", "res://FBX/Mushroom_Laetiporus.fbx"]
+	var mushroom_paths := ["res://assets/Farm/Mushroom_1.blend", "res://assets/Farm/Mushroom_2.blend", "res://assets/Farm/Mushroom_3.blend", "res://assets/Farm/Mushroom_4.blend"]
 	for path in mushroom_paths:
 		var scene = load(path) as PackedScene
 		if scene:
 			_mushroom_scenes.append(scene)
 	# Clovers for plains ground cover
-	var clover_paths := ["res://FBX/Clover_1.fbx", "res://FBX/Clover_2.fbx"]
+	var clover_paths := ["res://assets/Ultimate_Trees/Plant_3.blend", "res://assets/Ultimate_Trees/Plant_4.blend"]
 	for path in clover_paths:
 		var scene = load(path) as PackedScene
 		if scene:
 			_clover_scenes.append(scene)
 	# Common bushes for plains variety
-	var common_bush_paths := ["res://FBX/Bush_Common.fbx", "res://FBX/Bush_Common_Flowers.fbx"]
+	var common_bush_paths := ["res://assets/Ultimate_Trees/Bush_1.blend", "res://assets/Ultimate_Trees/Bush_2.blend", "res://assets/Ultimate_Trees/BushBerries_1.blend", "res://assets/Ultimate_Trees/BushBerries_2.blend"]
 	for path in common_bush_paths:
 		var scene = load(path) as PackedScene
 		if scene:
 			_bush_common_scenes.append(scene)
 	_grass_texture = load("res://Textures/Grass.png") as Texture2D
-	# KayKit Forest Nature Pack: grass and bushes
-	var forest_base = "res://KayKit_Forest_Nature_Pack_1.0_FREE/Assets/fbx(unity)/"
-	var grass_paths := [
-		"Grass_1_A_Color1.fbx", "Grass_1_B_Color1.fbx", "Grass_1_C_Color1.fbx", "Grass_1_D_Color1.fbx",
-		"Grass_2_A_Color1.fbx", "Grass_2_B_Color1.fbx", "Grass_2_C_Color1.fbx", "Grass_2_D_Color1.fbx"
+	var grass_3d_paths := [
+		"res://assets/Ultimate_Trees/Grass.blend", "res://assets/Ultimate_Trees/Grass_2.blend",
+		"res://assets/Ultimate_Trees/Grass_Short.blend"
 	]
-	var bush_paths := [
-		"Bush_1_A_Color1.fbx", "Bush_1_B_Color1.fbx", "Bush_1_C_Color1.fbx", "Bush_1_D_Color1.fbx",
-		"Bush_1_E_Color1.fbx", "Bush_1_F_Color1.fbx", "Bush_1_G_Color1.fbx",
-		"Bush_2_A_Color1.fbx", "Bush_2_B_Color1.fbx", "Bush_2_C_Color1.fbx", "Bush_2_D_Color1.fbx",
-		"Bush_2_E_Color1.fbx", "Bush_2_F_Color1.fbx",
-		"Bush_3_A_Color1.fbx", "Bush_3_B_Color1.fbx", "Bush_3_C_Color1.fbx",
-		"Bush_4_A_Color1.fbx", "Bush_4_B_Color1.fbx", "Bush_4_C_Color1.fbx",
-		"Bush_4_D_Color1.fbx", "Bush_4_E_Color1.fbx", "Bush_4_F_Color1.fbx"
-	]
-	for grass_name in grass_paths:
-		var scene = load(forest_base + grass_name) as PackedScene
+	for path in grass_3d_paths:
+		var scene = load(path) as PackedScene
 		if scene:
 			_forest_grass_scenes.append(scene)
-	for bush_name in bush_paths:
-		var scene = load(forest_base + bush_name) as PackedScene
-		if scene:
-			_bush_scenes.append(scene)
+
 
 func _process(delta: float) -> void:
 	if not player_node:
@@ -762,7 +747,7 @@ func _create_tree_mesh(chunk: ChunkData, pos: Vector3, rng: RandomNumberGenerato
 	tree_container.name = "Tree"
 	tree_container.position = pos
 	tree_container.rotation.y = rng.randf_range(0.0, TAU)
-	var scale_factor := rng.randf_range(0.88, 1.15)
+	var scale_factor := rng.randf_range(1.6, 2.2)
 	# Mountain/snow trees are smaller (stunted)
 	if biome == 6 or biome == 7:
 		scale_factor *= 0.7
@@ -845,7 +830,7 @@ func _create_rock_mesh(pos: Vector3, rng: RandomNumberGenerator, biome: int = 2)
 	rock_container.rotation.y = rng.randf_range(0.0, TAU)
 	rock_container.rotation.x = rng.randf_range(-0.12, 0.12)
 	rock_container.rotation.z = rng.randf_range(-0.12, 0.12)
-	var scale_factor := rng.randf_range(0.82, 1.18)
+	var scale_factor := rng.randf_range(0.5, 1.5)
 	rock_container.scale = Vector3(scale_factor, scale_factor, scale_factor)
 	var radius := 0.5 * scale_factor
 	var harvestable = HarvestableResource.new()
@@ -927,6 +912,9 @@ func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
 				grass_node.rotation.y = rng.randf_range(0.0, TAU)
 				var scale_factor := rng.randf_range(0.85, 1.15)
 				grass_node.scale = Vector3(scale_factor, scale_factor, scale_factor)
+				var grass_mat = StandardMaterial3D.new()
+				grass_mat.albedo_color = Color(0.3, 0.6, 0.2)
+				_set_material_recursive(grass_node, grass_mat)
 				parent.add_child(grass_node)
 			continue
 		# Fallback: quad with texture
@@ -946,6 +934,7 @@ func _create_grass_patches(chunk: ChunkData, parent: Node) -> void:
 		mat.vertex_color_use_as_albedo = false
 		mat.roughness = 0.9
 		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		quad.material_override = mat
 		parent.add_child(quad)
 
@@ -1098,10 +1087,17 @@ func _create_biome_decorations(chunk: ChunkData, parent: Node) -> void:
 		
 		parent.add_child(node)
 
+func _set_material_recursive(node: Node3D, mat: Material) -> void:
+	if node is MeshInstance3D:
+		node.material_override = mat
+	for child in node.get_children():
+		if child is Node3D:
+			_set_material_recursive(child, mat)
+
 func _add_herb_harvestable(node: Node3D, herb_type: String, scale_factor: float, rng: RandomNumberGenerator, biome: int = -1) -> void:
 	var harvestable = HarvestableResource.new()
 	harvestable.name = "Collision"
-	harvestable.collision_layer = 2
+	harvestable.collision_layer = 4
 	harvestable.collision_mask = 0
 	harvestable.resource_type = ToolAffinity.TargetType.HERB
 	harvestable.max_health = 1.0  # Herbs are one-hit with proper tool
@@ -1193,6 +1189,7 @@ func _create_water_mesh(chunk: ChunkData, parent: Node) -> void:
 		water_level = noise_util.get_water_level()
 	
 	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
 	var vi := 0
 	var has_water := false
@@ -1211,11 +1208,13 @@ func _create_water_mesh(chunk: ChunkData, parent: Node) -> void:
 			
 			# Triangle 1
 			verts.append(v00); verts.append(v10); verts.append(v01)
+			normals.append(Vector3.UP); normals.append(Vector3.UP); normals.append(Vector3.UP)
 			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
 			vi += 3
 			
 			# Triangle 2
 			verts.append(v10); verts.append(v11); verts.append(v01)
+			normals.append(Vector3.UP); normals.append(Vector3.UP); normals.append(Vector3.UP)
 			indices.append(vi); indices.append(vi+1); indices.append(vi+2)
 			vi += 3
 	
@@ -1225,6 +1224,7 @@ func _create_water_mesh(chunk: ChunkData, parent: Node) -> void:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices
 	
 	var mesh := ArrayMesh.new()

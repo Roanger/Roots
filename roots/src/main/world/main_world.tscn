@@ -8,11 +8,27 @@
 [ext_resource type="PackedScene" path="res://src/ui/character_ui.tscn" id="6_character"]
 [ext_resource type="PackedScene" path="res://src/ui/hotbar_ui.tscn" id="7_hotbar"]
 [ext_resource type="PackedScene" path="res://src/items/world_item.tscn" id="8_worlditem"]
-[ext_resource type="Sky" uid="uid://ylc885k2nqkl" path="res://assets/BinbunSky/skies/basic/cloudy_sky_01.tres" id="9_sky"]
+[ext_resource type="Shader" path="res://src/shaders/sky_shader.gdshader" id="9_skyshader"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("9_skyshader")
+shader_parameter/sky_top_color = Color(0.2, 0.4, 0.8, 1)
+shader_parameter/sky_horizon_color = Color(0.55, 0.7, 0.9, 1)
+shader_parameter/ground_bottom_color = Color(0.1, 0.1, 0.1, 1)
+shader_parameter/ground_horizon_color = Color(0.55, 0.7, 0.9, 1)
+shader_parameter/sky_energy = 1.0
+shader_parameter/star_visibility = 0.0
+shader_parameter/moon_direction = Vector3(0, 1, 0)
+shader_parameter/moon_size = 0.02
+shader_parameter/star_density = 0.99
+shader_parameter/sun_size = 0.02
+shader_parameter/sun_color = Color(1, 0.95, 0.8, 1)
+
+[sub_resource type="Sky" id="Sky_procedural"]
+sky_material = SubResource("ShaderMaterial_sky")
 
 [sub_resource type="Environment" id="Environment_sky"]
 background_mode = 2
-sky = ExtResource("9_sky")
+sky = SubResource("Sky_procedural")
 ambient_light_source = 3
 ambient_light_color = Color(0.6, 0.6, 0.7, 1)
 ambient_light_energy = 0.5

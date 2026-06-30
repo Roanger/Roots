@@ -64,6 +64,9 @@ enum ToolTier {
 @export var has_durability: bool = false
 @export var max_durability: int = 100
 
+# Offhand
+@export var is_offhand: bool = false  # Can be equipped in the offhand slot
+
 # Food properties
 @export var is_consumable: bool = false
 @export var hunger_restore: float = 0.0

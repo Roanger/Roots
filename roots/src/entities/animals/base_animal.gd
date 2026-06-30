@@ -8,7 +8,7 @@ const WorldItemScene = preload("res://src/items/world_item.tscn")
 const AnimalDataScript = preload("res://src/entities/animals/animal_data.gd")
 
 
-enum AIState { IDLE, WANDER, FLEE, FOLLOW, FEEDING, HURT, DEAD }
+enum AIState { IDLE, WANDER, FLEE, FOLLOW, FEEDING, GRAZING, HUNTING, HURT, DEAD }
 
 # Data reference (typed via preload const to avoid class_name timing issues)
 var animal_data = null  # AnimalData
@@ -40,6 +40,14 @@ var _original_color: Color = Color.WHITE
 var _all_mesh_materials: Array = []
 var _chunk_manager: Node = null
 var _name_label: Label3D = null
+
+# Hunting / predator
+var _prey_target: BaseAnimal = null
+var _attack_timer: float = 0.0
+
+# Grazing
+var _graze_timer: float = 0.0
+var _terrain_biome: int = -1
 
 signal product_ready(animal: BaseAnimal)
 signal animal_died(animal: BaseAnimal)
@@ -176,6 +184,25 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 20.0 * delta
 
+	# Sample terrain biome for grazing decisions
+	if _chunk_manager and _chunk_manager.has_method("get_biome_at"):
+		_terrain_biome = _chunk_manager.get_biome_at(global_position)
+
+	# Threat detection — auto-flee from threats
+	if ai_state not in [AIState.FLEE, AIState.HURT, AIState.DEAD, AIState.HUNTING]:
+		_scan_for_threats()
+
+	# Predator hunting — scan for prey
+	if animal_data and animal_data.is_predator and ai_state not in [AIState.FLEE, AIState.HURT, AIState.DEAD]:
+		if ai_state != AIState.HUNTING:
+			_scan_for_prey()
+		else:
+			# Chase prey during hunt
+			if not is_instance_valid(_prey_target) or _prey_target.ai_state == AIState.DEAD:
+				_prey_target = null
+				ai_state = AIState.IDLE
+				_idle_timer = _rng.randf_range(2.0, 5.0)
+
 	match ai_state:
 		AIState.IDLE:
 			_process_idle(delta)
@@ -187,6 +214,10 @@ func _physics_process(delta: float) -> void:
 			_process_follow(delta)
 		AIState.FEEDING:
 			_process_feeding(delta)
+		AIState.GRAZING:
+			_process_grazing(delta)
+		AIState.HUNTING:
+			_process_hunting(delta)
 		AIState.HURT:
 			_process_hurt(delta)
 		AIState.DEAD:
@@ -199,6 +230,8 @@ func _physics_process(delta: float) -> void:
 	_update_baby(delta)
 	if breed_timer > 0:
 		breed_timer -= delta
+	if _attack_timer > 0:
+		_attack_timer -= delta
 
 	move_and_slide()
 
@@ -209,6 +242,12 @@ func _process_idle(delta: float) -> void:
 	velocity.z = 0
 	_idle_timer -= delta
 	if _idle_timer <= 0:
+		# Tamed animals on grassy terrain may graze instead of wandering
+		if animal_data and animal_data.can_graze and _is_on_grazable_terrain():
+			if _rng.randf() < 0.5:
+				ai_state = AIState.GRAZING
+				_graze_timer = _rng.randf_range(3.0, 6.0)
+				return
 		_pick_wander_target()
 		ai_state = AIState.WANDER
 
@@ -283,6 +322,125 @@ func _process_feeding(delta: float) -> void:
 	if _idle_timer <= 0:
 		ai_state = AIState.IDLE
 		_idle_timer = _rng.randf_range(3.0, 6.0)
+
+func _process_grazing(delta: float) -> void:
+	velocity.x = 0
+	velocity.z = 0
+	# Reduce hunger while grazing
+	if animal_data and animal_data.can_graze and is_tamed:
+		hunger = clampf(hunger - animal_data.graze_hunger_reduction * delta, 0.0, 1.0)
+		# Slight happiness boost from grazing
+		happiness = clampf(happiness + 0.005 * delta, 0.0, 1.0)
+	_graze_timer -= delta
+	if _graze_timer <= 0 or not _is_on_grazable_terrain():
+		ai_state = AIState.IDLE
+		_idle_timer = _rng.randf_range(3.0, 6.0)
+
+func _process_hunting(_delta: float) -> void:
+	if not is_instance_valid(_prey_target) or _prey_target.ai_state == AIState.DEAD:
+		_prey_target = null
+		ai_state = AIState.IDLE
+		_idle_timer = _rng.randf_range(2.0, 5.0)
+		return
+
+	var dir = (_prey_target.global_position - global_position)
+	dir.y = 0
+	var dist = dir.length()
+
+	# Attack if close enough
+	if dist < 1.5 and _attack_timer <= 0:
+		_prey_target.on_hit_by_predator(self)
+		_attack_timer = animal_data.attack_cooldown if animal_data else 3.0
+		# Brief pause after attacking
+		velocity.x = 0
+		velocity.z = 0
+		return
+
+	# Chase the prey
+	if dist > 0.5:
+		var spd = animal_data.move_speed * (animal_data.hunt_speed_mult if animal_data else 1.5)
+		dir = dir.normalized()
+		velocity.x = dir.x * spd
+		velocity.z = dir.z * spd
+		_face_direction(dir)
+	else:
+		velocity.x = 0
+		velocity.z = 0
+
+func _scan_for_threats() -> void:
+	if not animal_data or animal_data.is_predator:
+		return
+	var range_sq = animal_data.detection_range * animal_data.detection_range
+	var nearest_threat: Node3D = null
+	var nearest_dist_sq: float = range_sq + 1.0
+
+	# HUNTABLE animals flee from any player and from predators
+	if animal_data.animal_type == AnimalDataScript.AnimalType.HUNTABLE:
+		for player in get_tree().get_nodes_in_group("players"):
+			if not is_instance_valid(player):
+				continue
+			var d_sq = global_position.distance_squared_to(player.global_position)
+			if d_sq < range_sq and d_sq < nearest_dist_sq:
+				nearest_dist_sq = d_sq
+				nearest_threat = player
+		# Also flee from predators
+		for animal in get_tree().get_nodes_in_group("animals"):
+			if animal == self or not animal is BaseAnimal:
+				continue
+			var other := animal as BaseAnimal
+			if other.animal_data and other.animal_data.is_predator:
+				var d_sq = global_position.distance_squared_to(other.global_position)
+				if d_sq < range_sq and d_sq < nearest_dist_sq:
+					nearest_dist_sq = d_sq
+					nearest_threat = other
+
+	# FARM animals flee from enemies (skeletons etc)
+	if animal_data.animal_type == AnimalDataScript.AnimalType.FARM:
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			if not is_instance_valid(enemy):
+				continue
+			var d_sq = global_position.distance_squared_to(enemy.global_position)
+			if d_sq < range_sq and d_sq < nearest_dist_sq:
+				nearest_dist_sq = d_sq
+				nearest_threat = enemy
+
+	if nearest_threat:
+		_flee_from = nearest_threat
+		_flee_timer = 4.0
+		ai_state = AIState.FLEE
+
+func _scan_for_prey() -> void:
+	if not animal_data or not animal_data.is_predator or not animal_data.prey_species:
+		return
+	var range_sq = animal_data.detection_range * animal_data.detection_range
+	var nearest_prey: BaseAnimal = null
+	var nearest_dist_sq: float = range_sq + 1.0
+
+	for animal in get_tree().get_nodes_in_group("animals"):
+		if animal == self or not animal is BaseAnimal:
+			continue
+		var other := animal as BaseAnimal
+		if not other.animal_data:
+			continue
+		if not other.animal_data.species_id in animal_data.prey_species:
+			continue
+		if other.ai_state == AIState.DEAD:
+			continue
+		var d_sq = global_position.distance_squared_to(other.global_position)
+		if d_sq < range_sq and d_sq < nearest_dist_sq:
+			nearest_dist_sq = d_sq
+			nearest_prey = other
+
+	if nearest_prey:
+		_prey_target = nearest_prey
+		ai_state = AIState.HUNTING
+
+func _is_on_grazable_terrain() -> bool:
+	if not animal_data or not animal_data.can_graze:
+		return false
+	if animal_data.graze_biomes.is_empty():
+		return false
+	return _terrain_biome in animal_data.graze_biomes
 
 func _process_hurt(delta: float) -> void:
 	velocity.x = 0
@@ -464,6 +622,22 @@ func on_hit(player: Node3D, _tool_type: String, power: float = 1.0) -> void:
 	print("[Animal] %s took %.1f damage (%.1f/%.1f HP)" % [
 		animal_data.display_name if animal_data else "Animal",
 		power, current_health, animal_data.max_health if animal_data else 0])
+
+func on_hit_by_predator(predator: Node3D) -> void:
+	## Called when a predator attacks this animal.
+	if ai_state == AIState.DEAD:
+		return
+
+	var dmg = animal_data.attack_damage if animal_data else 5.0
+	current_health -= dmg
+	_flee_from = predator
+	ai_state = AIState.HURT
+	_hurt_timer = 0.3
+
+	_flash_hurt()
+	print("[Animal] %s was attacked by predator! (%.1f/%.1f HP)" % [
+		animal_data.display_name if animal_data else "Animal",
+		current_health, animal_data.max_health if animal_data else 0])
 
 func feed(player: Node3D, item_id: String) -> bool:
 	## Try to feed this animal. Returns true if the animal accepted the food.

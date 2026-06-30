@@ -22,6 +22,18 @@ enum ProductType { NONE, EGG, MILK, WOOL }
 @export var wander_radius: float = 8.0
 @export var detection_range: float = 6.0  # Range at which animal detects threats
 
+# Predator
+@export var is_predator: bool = false
+@export var prey_species: Array = []  # species_ids this predator hunts
+@export var attack_damage: float = 5.0
+@export var attack_cooldown: float = 3.0      # Seconds between attacks
+@export var hunt_speed_mult: float = 1.5      # Speed multiplier when hunting
+
+# Grazing
+@export var can_graze: bool = false           # Can graze on grassy terrain
+@export var graze_hunger_reduction: float = 0.3  # Hunger reduction per graze cycle
+@export var graze_biomes: Array = []     # Biome IDs where this animal grazes (e.g., [2, 3, 8])
+
 # Collision
 @export var collision_radius: float = 0.4
 @export var collision_height: float = 1.0

@@ -24,6 +24,8 @@ const ShopUIScript = preload("res://src/ui/shop_ui.gd")
 const QuestJournalUIScript = preload("res://src/ui/quest_journal_ui.gd")
 const NotificationPopupScript = preload("res://src/ui/notification_popup.gd")
 const WeatherEffectsScript = preload("res://src/world/weather_effects.gd")
+const InteriorManagerScript = preload("res://src/world/interior_manager.gd")
+const CommunityCenterObject = preload("res://src/world/community_center_object.gd")
 var hud: Control = null
 var town_builder: Node3D = null
 var water_plane: MeshInstance3D = null
@@ -40,6 +42,10 @@ var _is_player_underground: bool = false
 var _surface_ambient_energy: float = 0.5   # Cached surface ambient (set by _update_lighting)
 var _surface_ambient_color: Color = Color(0.6, 0.6, 0.7)
 
+# Water shader globals
+const WATER_SUN_DIRECTION_PARAM: StringName = "sun_direction"
+const WATER_SUN_COLOR_PARAM: StringName = "sun_color"
+
 # Biome climate atmosphere
 var _current_player_biome: int = -1
 var _displayed_biome_fog: Color = Color(0.7, 0.8, 0.9)
@@ -48,6 +54,22 @@ var _biome_check_timer: float = 0.0
 
 # Reputation system
 var _reputation: Dictionary = {}  # npc_id -> int (-100 to 100)
+
+# Dynamic wildlife (wild animals follow chunk lifecycle)
+var _wildlife_by_chunk: Dictionary = {}  # Vector2i -> Array[BaseAnimal]
+var _night_spawn_timer: float = 0.0
+var _night_spawn_interval: float = 25.0  # seconds between night spawn waves
+var _is_night: bool = false
+
+# Wild animal spawn rules per species: which biomes and how many
+const WILD_SPAWN_RULES: Dictionary = {
+	"deer":		{ "biomes": [3, 8],		"count_range": [1, 2], "spawn_chance": 0.5 },
+	"rabbit":	{ "biomes": [2, 3, 8],		"count_range": [1, 3], "spawn_chance": 0.7 },
+	"boar":		{ "biomes": [2, 3, 8],		"count_range": [1, 1], "spawn_chance": 0.25 },
+	"wolf":		{ "biomes": [3, 5, 9, 6],	"count_range": [0, 1], "spawn_chance": 0.12 },
+	"duck":		{ "biomes": [1, 8],		"count_range": [1, 2], "spawn_chance": 0.35 },
+	"goat":		{ "biomes": [6, 9],		"count_range": [1, 1], "spawn_chance": 0.25 },
+}
 
 # Explicit references to autoload singletons
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
@@ -66,13 +88,21 @@ func _ready() -> void:
 	if chunk_manager:
 		chunk_manager.add_to_group("chunk_manager")
 	
+	# Set up global shader parameters for water shader before chunks generate
+	_setup_water_shader_globals()
+	
 	# Register town exclusion zone BEFORE terrain generation
 	# Village center is 25m east of world origin (player spawns near origin)
 	var village_center = Vector3(25, 0, 0)
 	if chunk_manager and chunk_manager.has_method("add_exclusion_zone"):
 		chunk_manager.add_exclusion_zone(village_center, 22.0)  # 22m radius covers all buildings
 	
-	# Initialize world first (generates terrain)
+	# Connect chunk signals BEFORE initial chunk generation so wildlife spawns on day 1
+	if chunk_manager:
+		chunk_manager.chunk_loaded.connect(_on_chunk_loaded)
+		chunk_manager.chunk_unloaded.connect(_on_chunk_unloaded)
+	
+	# Initialize world first (generates terrain and triggers chunk_loaded signals)
 	_initialize_world()
 	
 	# Setup player after terrain is ready
@@ -108,6 +138,9 @@ func _ready() -> void:
 	
 	# Spawn animals
 	call_deferred("_spawn_animals")
+	
+	# Setup interior manager (must be before village/buildings so doors can find it)
+	call_deferred("_setup_interior_manager")
 	
 	# Build starter village
 	call_deferred("_build_village")
@@ -152,6 +185,25 @@ func _ready() -> void:
 	
 	if game_manager:
 		print("Main World loaded - Seed: ", game_manager.world_seed)
+
+func _setup_water_shader_globals() -> void:
+	# Avoid re-adding globals if MainWorld is reloaded in the same session
+	var existing_dir = RenderingServer.global_shader_parameter_get(WATER_SUN_DIRECTION_PARAM)
+	if existing_dir == null:
+		RenderingServer.global_shader_parameter_add(WATER_SUN_DIRECTION_PARAM, RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3(0.25, 0.8, 0.55))
+	var existing_col = RenderingServer.global_shader_parameter_get(WATER_SUN_COLOR_PARAM)
+	if existing_col == null:
+		RenderingServer.global_shader_parameter_add(WATER_SUN_COLOR_PARAM, RenderingServer.GLOBAL_VAR_TYPE_VEC4, Vector4(1.0, 0.95, 0.85, 1.0))
+	_update_water_shader_globals()
+
+func _update_water_shader_globals() -> void:
+	if not sun:
+		return
+	var sun_dir := -sun.global_transform.basis.z.normalized()
+	RenderingServer.global_shader_parameter_set(WATER_SUN_DIRECTION_PARAM, sun_dir)
+	var energy := sun.light_energy if sun.light_energy > 0.0 else 0.0
+	var col := sun.light_color
+	RenderingServer.global_shader_parameter_set(WATER_SUN_COLOR_PARAM, Vector4(col.r, col.g, col.b, energy))
 
 func _spawn_player() -> void:
 	# Wait a frame for chunks to generate, then spawn player
@@ -251,18 +303,25 @@ const BIOME_FOG_COLORS: Dictionary = {
 	9: Color(0.65, 0.6, 0.55), # Highland — dry haze
 }
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# Handle pause input
 	if Input.is_action_just_pressed("pause"):
 		_toggle_pause()
 	
 	# Check biome climate
 	if player and chunk_manager and chunk_manager.has_method("get_biome_at"):
-		_biome_check_timer += _delta
+		_biome_check_timer += delta
 		if _biome_check_timer > 1.5:
 			_biome_check_timer = 0.0
 			_update_biome_climate()
 		_apply_biome_atmosphere()
+	
+	# Night-time enemy spawning
+	if _is_night and player and chunk_manager:
+		_night_spawn_timer -= delta
+		if _night_spawn_timer <= 0.0:
+			_night_spawn_timer = _night_spawn_interval + randf_range(-5.0, 5.0)
+			_spawn_night_enemies()
 	
 	# Animate water
 	if water_plane:
@@ -290,6 +349,13 @@ func _toggle_pause() -> void:
 
 func _on_time_changed(hour: float) -> void:
 	_update_lighting(hour)
+	var was_night = _is_night
+	_is_night = hour < 5.0 or hour >= 20.0
+	
+	# Dawn: despawn all enemies
+	if was_night and not _is_night:
+		_despawn_all_enemies()
+		_night_spawn_timer = 0.0
 
 func _on_day_changed(day: int) -> void:
 	if game_manager:
@@ -356,13 +422,12 @@ func _update_season_sky(season: int) -> void:
 			target_cloud_color = Color(0.8, 0.8, 0.8, 1.0)
 			target_fog_density = 0.001
 	
-	sky_mat.set_shader_parameter("cloud_density", target_density)
-	sky_mat.set_shader_parameter("cloud_color", target_cloud_color)
+	if sky_mat is ShaderMaterial:
+		pass  # Season handled via fog density below
 	env.fog_density = target_fog_density
-	
 	var season_names = ["Spring", "Summer", "Autumn", "Winter"]
 	var sname = season_names[season] if season < season_names.size() else "Unknown"
-	print("Season sky updated: ", sname, " (clouds: ", target_density, ", fog: ", target_fog_density, ")")
+	print("Season sky updated: ", sname, " (fog: ", target_fog_density, ")")
 
 func _update_lighting(hour: float) -> void:
 	# Sun rotation: hour 6 = sunrise (0°), hour 12 = noon (90°), hour 18 = sunset (180°)
@@ -406,12 +471,50 @@ func _update_lighting(hour: float) -> void:
 	
 	sun.light_energy = light_energy
 	sun.light_color = light_color
-	
-	# Sky colors are handled automatically by BinbunSky shader via LIGHT0_DIRECTION
-	# Cloud density is set per-season via _update_season_sky()
+	_update_water_shader_globals()
 	
 	if world_environment and world_environment.environment:
 		var env = world_environment.environment
+		var sky_mat = env.sky.sky_material if env.sky else null
+		
+		# --- Sky colors (day/night transition) ---
+		if sky_mat is ShaderMaterial:
+			var sky_top: Color
+			var sky_horizon: Color
+			var sky_energy: float
+			var star_vis: float
+			if hour >= 6.0 and hour < 18.0:
+				sky_top = Color(0.2, 0.4, 0.8)
+				sky_horizon = Color(0.55, 0.7, 0.9)
+				sky_energy = 1.0
+				star_vis = 0.0
+			elif hour >= 5.0 and hour < 6.0:
+				var t = hour - 5.0
+				sky_top = Color(0.02, 0.02, 0.08).lerp(Color(0.2, 0.4, 0.8), t)
+				sky_horizon = Color(0.3, 0.2, 0.15).lerp(Color(0.55, 0.7, 0.9), t)
+				sky_energy = lerp(0.1, 1.0, t)
+				star_vis = lerp(1.0, 0.0, t)
+			elif hour >= 18.0 and hour < 20.0:
+				var t = (hour - 18.0) / 2.0
+				sky_top = Color(0.2, 0.4, 0.8).lerp(Color(0.02, 0.02, 0.08), t)
+				sky_horizon = Color(0.55, 0.7, 0.9).lerp(Color(0.1, 0.05, 0.02), t)
+				sky_energy = lerp(1.0, 0.1, t)
+				star_vis = lerp(0.0, 1.0, t)
+			else:
+				sky_top = Color(0.02, 0.02, 0.08)
+				sky_horizon = Color(0.05, 0.04, 0.06)
+				sky_energy = 0.1
+				star_vis = 1.0
+			sky_mat.set_shader_parameter("sky_top_color", sky_top)
+			sky_mat.set_shader_parameter("sky_horizon_color", sky_horizon)
+			sky_mat.set_shader_parameter("ground_horizon_color", sky_horizon)
+			sky_mat.set_shader_parameter("sky_energy", sky_energy)
+			sky_mat.set_shader_parameter("star_visibility", star_vis)
+			# Moon traces its own arc: rises at sunset (18:00), peaks at midnight, sets at sunrise (6:00)
+			# Rises from opposite side of horizon from the sun
+			var moon_angle = deg_to_rad((hour - 18.0) * 15.0)
+			var moon_dir = Vector3(0.0, sin(moon_angle), cos(moon_angle))
+			sky_mat.set_shader_parameter("moon_direction", moon_dir)
 		
 		# --- Ambient light ---
 		var target_ambient_color: Color
@@ -563,20 +666,22 @@ func _load_placed_objects() -> void:
 		if not item:
 			continue
 
-		var obj := PlaceableObject.new()
-		obj.name = "Placed_%s" % item_id
-		obj.global_position = pos
-		obj.rotation.y = rot_y
-		obj.gate_open = gate_open
-		obj.setup(
-			item_id,
-			item.item_name,
-			item.placeable_model_path,
-			item.placeable_scale,
-			item.placeable_collision_size,
-			is_gate
-		)
-		add_child(obj)
+		if item_id == "community_center":
+			var cc = CommunityCenterObject.new()
+			var interior_id: String = data.get("interior_id", "")
+			cc.setup(item_id, item.item_name, "", item.placeable_scale, item.placeable_collision_size, false, interior_id)
+			cc.name = "Placed_%s" % item_id
+			cc.global_position = pos
+			cc.rotation.y = rot_y
+			add_child(cc)
+		else:
+			var obj := PlaceableObject.new()
+			obj.name = "Placed_%s" % item_id
+			obj.global_position = pos
+			obj.rotation.y = rot_y
+			obj.gate_open = gate_open
+			obj.setup(item_id, item.item_name, item.placeable_model_path, item.placeable_scale, item.placeable_collision_size, is_gate)
+			add_child(obj)
 	# Restore claims
 	var claims_data: Array = game_manager.world_data.get("claims", [])
 	for claim in claims_data:
@@ -809,10 +914,10 @@ func _build_village() -> void:
 	town_builder.build_village(village_center)
 	print("Starter village built at ", village_center)
 
-const SKELETON_MINION = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Minion.glb"
-const SKELETON_WARRIOR = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Warrior.glb"
-const SKELETON_ROGUE = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Rogue.glb"
-const SKELETON_MAGE = "res://KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Mage.glb"
+const SKELETON_MINION = "res://assets/characters/Zombie_Male.blend"
+const SKELETON_WARRIOR = "res://assets/characters/Zombie_Female.blend"
+const SKELETON_ROGUE = "res://assets/characters/Goblin_Male.blend"
+const SKELETON_MAGE = "res://assets/characters/Goblin_Female.blend"
 
 func _spawn_enemies() -> void:
 	if not player:
@@ -831,7 +936,7 @@ func _spawn_enemies() -> void:
 			Color.WHITE, 10.0, [
 				{"item_id": "string", "min_amount": 1, "max_amount": 2, "chance": 0.5},
 				{"item_id": "stick", "min_amount": 1, "max_amount": 1, "chance": 0.3},
-			], SKELETON_MINION, 1.0)
+			], SKELETON_MINION, 0.5)
 	
 	# Skeleton Rogues - fast, medium difficulty (2)
 	for i in 2:
@@ -844,7 +949,7 @@ func _spawn_enemies() -> void:
 			Color.WHITE, 18.0, [
 				{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.5},
 				{"item_id": "string", "min_amount": 1, "max_amount": 3, "chance": 0.6},
-			], SKELETON_ROGUE, 1.0)
+			], SKELETON_ROGUE, 0.5)
 	
 	# Skeleton Warrior - tough melee (1) — far from village
 	_create_enemy(spawn_pos + Vector3(-25, 0, 22), "Skeleton Warrior", 40.0, 1.2, 2.5, 8.0, 1.8, 12.0,
@@ -852,7 +957,7 @@ func _spawn_enemies() -> void:
 			{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.7},
 			{"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.4},
 			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15},
-		], SKELETON_WARRIOR, 1.0)
+		], SKELETON_WARRIOR, 0.5)
 	
 	# Skeleton Mage - ranged caster, dangerous (1) — far from village
 	_create_enemy(spawn_pos + Vector3(-28, 0, -18), "Skeleton Mage", 25.0, 1.0, 2.0, 10.0, 2.5, 14.0,
@@ -860,7 +965,7 @@ func _spawn_enemies() -> void:
 			{"item_id": "coal", "min_amount": 2, "max_amount": 4, "chance": 0.8},
 			{"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.25},
 			{"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.5},
-		], SKELETON_MAGE, 1.0)
+		], SKELETON_MAGE, 0.5)
 	
 	print("Enemies spawned")
 
@@ -889,6 +994,9 @@ func _spawn_animals() -> void:
 	_spawn_in_biomes("deer", 2, spawn_pos, 25.0, [3, 8])  # Forest, Meadow
 	_spawn_in_biomes("rabbit", 3, spawn_pos, 20.0, [2, 3, 8])  # Plains, Forest, Meadow
 	
+	# --- Predators in wild biomes (further out, fewer numbers) ---
+	_spawn_in_biomes("wolf", 1, spawn_pos, 40.0, [3, 5, 9])  # Forest, Taiga, Highland
+	
 	print("Animals spawned")
 
 func _spawn_in_biomes(species_id: String, count: int, center: Vector3, radius: float, biomes: Array) -> void:
@@ -905,7 +1013,7 @@ func _spawn_in_biomes(species_id: String, count: int, center: Vector3, radius: f
 		var valid := true
 		if chunk_manager and chunk_manager.has_method("get_biome_at"):
 			var biome: int = chunk_manager.get_biome_at(pos)
-			if biome in biomes:
+			if biome not in biomes:
 				valid = false
 		if valid:
 			_create_animal(species_id, pos)
@@ -924,7 +1032,7 @@ func _register_animal_species() -> void:
 	chicken.detection_range = 4.0
 	chicken.collision_radius = 0.25
 	chicken.collision_height = 0.5
-	chicken.model_path = "res://Animal QiwiiPack/Animal Models/Chicken.fbx"
+	chicken.model_path = ""
 	chicken.model_scale = 0.4
 	chicken.body_color = Color(0.95, 0.9, 0.8)
 	chicken.product_type = AnimalDataScript.ProductType.EGG
@@ -951,7 +1059,7 @@ func _register_animal_species() -> void:
 	cow.detection_range = 5.0
 	cow.collision_radius = 0.5
 	cow.collision_height = 1.4
-	cow.model_path = "res://Animal QiwiiPack/Animal Models/Cow.fbx"
+	cow.model_path = ""
 	cow.model_scale = 0.6
 	cow.body_color = Color(0.9, 0.85, 0.8)
 	cow.product_type = AnimalDataScript.ProductType.MILK
@@ -959,6 +1067,9 @@ func _register_animal_species() -> void:
 	cow.product_interval = 120.0
 	cow.product_amount = 1
 	cow.feed_item_ids = ["animal_feed", "wheat", "carrot_raw"]
+	cow.can_graze = true
+	cow.graze_hunger_reduction = 0.3
+	cow.graze_biomes = [2, 8, 3]
 	cow.loot_table = [
 		{"item_id": "raw_meat", "min_amount": 2, "max_amount": 4, "chance": 1.0},
 		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.8},
@@ -978,7 +1089,7 @@ func _register_animal_species() -> void:
 	sheep.detection_range = 5.0
 	sheep.collision_radius = 0.4
 	sheep.collision_height = 1.0
-	sheep.model_path = "res://Animal QiwiiPack/Animal Models/Sheep White.fbx"
+	sheep.model_path = ""
 	sheep.model_scale = 0.5
 	sheep.body_color = Color(0.95, 0.95, 0.9)
 	sheep.product_type = AnimalDataScript.ProductType.WOOL
@@ -986,6 +1097,9 @@ func _register_animal_species() -> void:
 	sheep.product_interval = 150.0
 	sheep.product_amount = 1
 	sheep.feed_item_ids = ["animal_feed", "wheat"]
+	sheep.can_graze = true
+	sheep.graze_hunger_reduction = 0.35
+	sheep.graze_biomes = [2, 8, 3]
 	sheep.loot_table = [
 		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 2, "chance": 1.0},
 		{"item_id": "wool", "min_amount": 1, "max_amount": 3, "chance": 0.9},
@@ -1005,6 +1119,7 @@ func _register_animal_species() -> void:
 	goat.detection_range = 6.0
 	goat.collision_radius = 0.35
 	goat.collision_height = 0.9
+	goat.model_path = ""
 	goat.model_scale = 1.0
 	goat.body_color = Color(0.75, 0.7, 0.6)
 	goat.product_type = AnimalDataScript.ProductType.MILK
@@ -1012,6 +1127,9 @@ func _register_animal_species() -> void:
 	goat.product_interval = 140.0
 	goat.product_amount = 1
 	goat.feed_item_ids = ["animal_feed", "wheat", "carrot_raw"]
+	goat.can_graze = true
+	goat.graze_hunger_reduction = 0.3
+	goat.graze_biomes = [2, 8, 3, 9]
 	goat.loot_table = [
 		{"item_id": "raw_meat", "min_amount": 1, "max_amount": 2, "chance": 1.0},
 		{"item_id": "leather", "min_amount": 1, "max_amount": 1, "chance": 0.6},
@@ -1031,7 +1149,7 @@ func _register_animal_species() -> void:
 	duck.detection_range = 4.0
 	duck.collision_radius = 0.25
 	duck.collision_height = 0.5
-	duck.model_path = "res://Animal QiwiiPack/Animal Models/Chick.fbx"
+	duck.model_path = ""
 	duck.model_scale = 0.5
 	duck.body_color = Color(0.95, 0.92, 0.75)
 	duck.product_type = AnimalDataScript.ProductType.EGG
@@ -1058,11 +1176,14 @@ func _register_animal_species() -> void:
 	boar.detection_range = 6.0
 	boar.collision_radius = 0.45
 	boar.collision_height = 0.9
-	boar.model_path = "res://Animal QiwiiPack/Animal Models/Pig.fbx"
+	boar.model_path = ""
 	boar.model_scale = 0.5
 	boar.body_color = Color(0.5, 0.35, 0.25)
 	boar.product_type = AnimalDataScript.ProductType.NONE
 	boar.feed_item_ids = ["animal_feed", "carrot_raw", "potato"]
+	boar.can_graze = true
+	boar.graze_hunger_reduction = 0.25
+	boar.graze_biomes = [2, 3, 8]
 	boar.loot_table = [
 		{"item_id": "raw_meat", "min_amount": 2, "max_amount": 4, "chance": 1.0},
 		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.7},
@@ -1082,6 +1203,7 @@ func _register_animal_species() -> void:
 	deer.detection_range = 10.0
 	deer.collision_radius = 0.4
 	deer.collision_height = 1.3
+	deer.model_path = ""
 	deer.model_scale = 1.0
 	deer.body_color = Color(0.6, 0.45, 0.3)
 	deer.product_type = AnimalDataScript.ProductType.NONE
@@ -1106,6 +1228,7 @@ func _register_animal_species() -> void:
 	rabbit.detection_range = 8.0
 	rabbit.collision_radius = 0.2
 	rabbit.collision_height = 0.4
+	rabbit.model_path = ""
 	rabbit.model_scale = 1.0
 	rabbit.body_color = Color(0.7, 0.6, 0.5)
 	rabbit.product_type = AnimalDataScript.ProductType.NONE
@@ -1116,6 +1239,35 @@ func _register_animal_species() -> void:
 	rabbit.xp_reward = 8.0
 	rabbit.xp_skill = "combat"
 	_animal_species["rabbit"] = rabbit
+
+	# Wolf (wild predator)
+	var wolf = AnimalDataScript.new()
+	wolf.species_id = "wolf"
+	wolf.display_name = "Wolf"
+	wolf.animal_type = AnimalDataScript.AnimalType.HUNTABLE
+	wolf.max_health = 40.0
+	wolf.move_speed = 2.5
+	wolf.flee_speed = 5.0
+	wolf.wander_radius = 15.0
+	wolf.detection_range = 12.0
+	wolf.collision_radius = 0.4
+	wolf.collision_height = 1.0
+	wolf.model_path = ""
+	wolf.model_scale = 0.7
+	wolf.body_color = Color(0.45, 0.4, 0.35)
+	wolf.product_type = AnimalDataScript.ProductType.NONE
+	wolf.is_predator = true
+	wolf.prey_species = ["deer", "rabbit"]
+	wolf.attack_damage = 8.0
+	wolf.attack_cooldown = 3.0
+	wolf.hunt_speed_mult = 1.8
+	wolf.loot_table = [
+		{"item_id": "raw_meat", "min_amount": 2, "max_amount": 3, "chance": 1.0},
+		{"item_id": "leather", "min_amount": 1, "max_amount": 2, "chance": 0.8},
+	]
+	wolf.xp_reward = 20.0
+	wolf.xp_skill = "combat"
+	_animal_species["wolf"] = wolf
 
 func _create_animal(species_id: String, pos: Vector3, tamed: bool = false, baby: bool = false) -> void:
 	var data = _animal_species.get(species_id)
@@ -1134,6 +1286,134 @@ func _create_animal(species_id: String, pos: Vector3, tamed: bool = false, baby:
 	animal.setup(data, tamed, baby)
 	animal.position = pos
 	add_child(animal)
+
+# ── Dynamic Wildlife (chunk lifecycle) ──────────────────────────────────────
+
+func _on_chunk_loaded(chunk_pos: Vector2i) -> void:
+	## Spawn wild animals when a chunk finishes generating.
+	_spawn_wildlife_for_chunk(chunk_pos)
+
+func _on_chunk_unloaded(chunk_pos: Vector2i) -> void:
+	## Despawn wild animals when a chunk is unloaded.
+	_despawn_wildlife_for_chunk(chunk_pos)
+
+func _spawn_wildlife_for_chunk(chunk_pos: Vector2i) -> void:
+	## Spawn wild/huntable animals in a chunk based on its dominant biome.
+	if not chunk_manager or not _animal_species:
+		return
+
+	var chunk_world_x = chunk_pos.x * 32 + 16
+	var chunk_world_z = chunk_pos.y * 32 + 16
+	var center_biome = chunk_manager.get_biome_at(Vector3(chunk_world_x, 0, chunk_world_z))
+
+	var spawned: Array[BaseAnimal] = []
+	var rng = RandomNumberGenerator.new()
+	rng.seed = hash(chunk_pos) ^ hash(game_manager.world_seed if game_manager else 0)
+
+	for species_id in WILD_SPAWN_RULES:
+		var rule = WILD_SPAWN_RULES[species_id]
+		if center_biome not in rule["biomes"]:
+			continue
+		if rng.randf() > rule["spawn_chance"]:
+			continue
+		var count = rng.randi_range(rule["count_range"][0], rule["count_range"][1])
+		for i in range(count):
+			var lx = rng.randf_range(1.0, 31.0)
+			var lz = rng.randf_range(1.0, 31.0)
+			var wx = chunk_world_x + (lx - 16.0)
+			var wz = chunk_world_z + (lz - 16.0)
+			var pos = Vector3(wx, 0, wz)
+			var biome = chunk_manager.get_biome_at(pos)
+			if biome not in rule["biomes"]:
+				continue
+			var terrain_y = chunk_manager.get_terrain_height(pos) if chunk_manager.has_method("get_terrain_height") else 30.0
+			pos.y = terrain_y
+			var animal = BaseAnimalScript.new()
+			animal.setup(_animal_species[species_id], false, false)
+			animal.position = pos
+			add_child(animal)
+			spawned.append(animal)
+
+	if spawned.size() > 0:
+		_wildlife_by_chunk[chunk_pos] = spawned
+
+func _despawn_wildlife_for_chunk(chunk_pos: Vector2i) -> void:
+	## Remove all wild animals belonging to an unloaded chunk.
+	var animals = _wildlife_by_chunk.get(chunk_pos)
+	if not animals or animals.is_empty():
+		return
+	for animal in animals:
+		if is_instance_valid(animal):
+			animal.queue_free()
+	_wildlife_by_chunk.erase(chunk_pos)
+
+# ── Night Enemy Spawning ────────────────────────────────────────────────────
+
+func _spawn_night_enemies() -> void:
+	## Spawn a wave of enemies at night, around the player but not too close.
+	if not player or not chunk_manager:
+		return
+
+	var spawn_pos = player.global_position
+	var wave_size = randi_range(2, 4)
+
+	for i in range(wave_size):
+		var angle = randf_range(0.0, TAU)
+		var dist = randf_range(20.0, 40.0)
+		var offset = Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+		var pos = spawn_pos + offset
+
+		# Skip water
+		var biome = chunk_manager.get_biome_at(pos) if chunk_manager.has_method("get_biome_at") else -1
+		if biome == 0:
+			continue
+
+		# Skip village area
+		if pos.distance_to(Vector3(25, 0, 0)) < 22.0:
+			continue
+
+		# Pick enemy type based on difficulty
+		var roll = randf()
+		var ename: String
+		var health: float
+		var speed: float
+		var chase_speed: float
+		var damage: float
+		var atk_range: float
+		var detect: float
+		var emodel: String
+		var escale: float
+		var loot: Array
+
+		if roll < 0.5:
+			ename = "Skeleton Minion"
+			health = 15.0; speed = 1.5; chase_speed = 2.5; damage = 3.0; atk_range = 1.5; detect = 10.0
+			emodel = "res://assets/characters/Zombie_Male.blend"; escale = 0.5
+			loot = [{"item_id": "bone", "min_amount": 1, "max_amount": 2, "chance": 0.6}]
+		elif roll < 0.8:
+			ename = "Skeleton Rogue"
+			health = 20.0; speed = 2.5; chase_speed = 4.5; damage = 5.0; atk_range = 1.5; detect = 12.0
+			emodel = "res://assets/characters/Goblin_Male.blend"; escale = 0.5
+			loot = [{"item_id": "bone", "min_amount": 1, "max_amount": 2, "chance": 0.7}]
+		elif roll < 0.95:
+			ename = "Skeleton Warrior"
+			health = 40.0; speed = 1.2; chase_speed = 3.0; damage = 8.0; atk_range = 2.0; detect = 10.0
+			emodel = "res://assets/characters/Zombie_Female.blend"; escale = 0.5
+			loot = [{"item_id": "bone", "min_amount": 2, "max_amount": 4, "chance": 1.0}]
+		else:
+			ename = "Skeleton Mage"
+			health = 25.0; speed = 1.0; chase_speed = 2.0; damage = 6.0; atk_range = 8.0; detect = 14.0
+			emodel = "res://assets/characters/Goblin_Female.blend"; escale = 0.5
+			loot = [{"item_id": "bone", "min_amount": 2, "max_amount": 3, "chance": 1.0}]
+
+		_create_enemy(pos, ename, health, speed, chase_speed, damage, atk_range, detect,
+			Color.WHITE, 10.0, loot, emodel, escale)
+
+func _despawn_all_enemies() -> void:
+	## Called at dawn — remove all enemies from the world.
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(enemy):
+			enemy.queue_free()
 
 func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
 		chase_spd: float, dmg: float, atk_range: float, detect: float,
@@ -1164,12 +1444,12 @@ func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
 
 # ── NPC System ───────────────────────────────────────────────────────────────
 
-const ADVENTURER_BARBARIAN = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Barbarian.glb"
-const ADVENTURER_KNIGHT = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb"
-const ADVENTURER_MAGE = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb"
-const ADVENTURER_RANGER = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Ranger.glb"
-const ADVENTURER_ROGUE = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue.glb"
-const ADVENTURER_ROGUE_HOODED = "res://KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue_Hooded.glb"
+const ADVENTURER_BARBARIAN = "res://assets/characters/Viking_Male.blend"
+const ADVENTURER_KNIGHT = "res://assets/characters/Knight_Male.blend"
+const ADVENTURER_MAGE = "res://assets/characters/Wizard.blend"
+const ADVENTURER_RANGER = "res://assets/characters/Casual_Male.blend"
+const ADVENTURER_ROGUE = "res://assets/characters/Ninja_Male.blend"
+const ADVENTURER_ROGUE_HOODED = "res://assets/characters/Ninja_Female.blend"
 
 var _npc_registry: Dictionary = {}  # npc_id -> NPCData
 
@@ -1196,6 +1476,14 @@ func _setup_notification_ui() -> void:
 	notification_popup.name = "NotificationPopup"
 	$UI.add_child(notification_popup)
 
+func _setup_interior_manager() -> void:
+	await get_tree().process_frame
+
+	var interior_manager = InteriorManagerScript.new()
+	interior_manager.name = "InteriorManager"
+	add_child(interior_manager)
+	print("Interior manager initialized")
+
 func _setup_weather() -> void:
 	await get_tree().process_frame
 
@@ -1221,7 +1509,8 @@ func modify_reputation(npc_id: String, delta: int) -> void:
 	if not _reputation.has(npc_id):
 		_reputation[npc_id] = 0
 	_reputation[npc_id] = clampi(_reputation[npc_id] + delta, -100, 100)
-	var name_str = _npc_registry.get(npc_id, {}).get("display_name", npc_id) if _npc_registry.get(npc_id) else npc_id
+	var npc_entry = _npc_registry.get(npc_id)
+	var name_str = npc_entry.display_name if npc_entry else npc_id
 	var direction := "increased" if delta >= 0 else "decreased"
 	print("Reputation with %s %s by %d (now %d)" % [name_str, direction, abs(delta), _reputation[npc_id]])
 
@@ -1318,7 +1607,7 @@ func _register_npc_data() -> void:
 	shopkeeper.role = NPCDataScript.NPCRole.MERCHANT
 	shopkeeper.title = "General Store"
 	shopkeeper.model_path = ADVENTURER_RANGER
-	shopkeeper.model_scale = 1.0
+	shopkeeper.model_scale = 0.5
 	shopkeeper.body_color = Color(0.6, 0.8, 0.5)
 	shopkeeper.wander_radius = 2.0
 	shopkeeper.greeting_lines = ["Welcome!", "Need supplies?", "Browse my wares!"]
@@ -1355,7 +1644,7 @@ func _register_npc_data() -> void:
 	innkeeper.role = NPCDataScript.NPCRole.INNKEEPER
 	innkeeper.title = "Innkeeper"
 	innkeeper.model_path = ADVENTURER_BARBARIAN
-	innkeeper.model_scale = 1.0
+	innkeeper.model_scale = 0.5
 	innkeeper.body_color = Color(0.7, 0.5, 0.4)
 	innkeeper.wander_radius = 2.5
 	innkeeper.greeting_lines = ["Come in, come in!", "Hungry?", "Rest your feet!"]
@@ -1389,7 +1678,7 @@ func _register_npc_data() -> void:
 	blacksmith.role = NPCDataScript.NPCRole.BLACKSMITH
 	blacksmith.title = "Blacksmith"
 	blacksmith.model_path = ADVENTURER_KNIGHT
-	blacksmith.model_scale = 1.0
+	blacksmith.model_scale = 0.5
 	blacksmith.body_color = Color(0.5, 0.4, 0.35)
 	blacksmith.wander_radius = 2.0
 	blacksmith.greeting_lines = ["Need something forged?", "Steel and fire!", "What'll it be?"]
@@ -1423,7 +1712,7 @@ func _register_npc_data() -> void:
 	baker.role = NPCDataScript.NPCRole.MERCHANT
 	baker.title = "Baker"
 	baker.model_path = ADVENTURER_ROGUE
-	baker.model_scale = 1.0
+	baker.model_scale = 0.5
 	baker.body_color = Color(0.85, 0.75, 0.6)
 	baker.wander_radius = 2.0
 	baker.greeting_lines = ["Fresh bread!", "Smells good, right?", "Try my pastries!"]
@@ -1455,7 +1744,7 @@ func _register_npc_data() -> void:
 	mayor.role = NPCDataScript.NPCRole.QUEST_GIVER
 	mayor.title = "Village Elder"
 	mayor.model_path = ADVENTURER_MAGE
-	mayor.model_scale = 1.0
+	mayor.model_scale = 0.5
 	mayor.body_color = Color(0.6, 0.5, 0.7)
 	mayor.wander_radius = 3.0
 	mayor.greeting_lines = ["Ah, the newcomer!", "Good day, friend.", "Our village grows!"]
@@ -1486,7 +1775,7 @@ func _register_npc_data() -> void:
 	herbalist.role = NPCDataScript.NPCRole.HERBALIST
 	herbalist.title = "Herbalist"
 	herbalist.model_path = ADVENTURER_ROGUE_HOODED
-	herbalist.model_scale = 1.0
+	herbalist.model_scale = 0.5
 	herbalist.body_color = Color(0.4, 0.7, 0.5)
 	herbalist.wander_radius = 2.5
 	herbalist.greeting_lines = ["Herbs and remedies...", "Nature provides.", "Need a cure?"]
@@ -1526,7 +1815,7 @@ func _register_npc_data() -> void:
 	farmer_npc.role = NPCDataScript.NPCRole.FARMER
 	farmer_npc.title = "Farmer"
 	farmer_npc.model_path = ADVENTURER_BARBARIAN
-	farmer_npc.model_scale = 1.0
+	farmer_npc.model_scale = 0.5
 	farmer_npc.body_color = Color(0.65, 0.55, 0.4)
 	farmer_npc.wander_radius = 3.0
 	farmer_npc.greeting_lines = ["Fine day for farming!", "Howdy!", "Crops are coming in!"]
@@ -1561,7 +1850,7 @@ func _register_npc_data() -> void:
 	guard.role = NPCDataScript.NPCRole.GUARD
 	guard.title = "Guard Captain"
 	guard.model_path = ADVENTURER_KNIGHT
-	guard.model_scale = 1.0
+	guard.model_scale = 0.5
 	guard.body_color = Color(0.5, 0.5, 0.6)
 	guard.wander_radius = 4.0
 	guard.greeting_lines = ["Stay safe.", "Keep your wits about you.", "All clear... for now."]
@@ -1598,7 +1887,7 @@ func _spawn_claim_boundary(center: Vector3, radius: float, _owner: String) -> vo
 		post.name = "BoundaryPost_%d" % i
 		post.set_meta("claim_owner", _owner)
 		post.set_meta("is_boundary", true)
-		post.setup("claim_post", "Boundary Post", "res://modular_terrain_collection/Hilly_Prop_Fence_Post_1.obj", 1.5, Vector3(0.15, 0.6, 0.15))
+		post.setup("claim_post", "Boundary Post", "", 1.5, Vector3(0.15, 0.6, 0.15))
 		post.global_position = pos
 		add_child(post)
 	# Tag the claim center node

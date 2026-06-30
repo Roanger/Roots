@@ -44,6 +44,7 @@ func _ready() -> void:
 			Equipment.EquipmentSlot.TOOL_2: slot_name = "Tool 2"
 			Equipment.EquipmentSlot.TOOL_3: slot_name = "Tool 3"
 			Equipment.EquipmentSlot.WEAPON: slot_name = "Weapon"
+			Equipment.EquipmentSlot.OFFHAND: slot_name = "Offhand"
 		label.text = slot_name
 	
 	# Connect mouse signals
@@ -250,6 +251,8 @@ func can_drop_data(position: Vector2, data: Variant) -> bool:
 			valid = item_data.item_type == ItemData.ItemType.TOOL
 		Equipment.EquipmentSlot.WEAPON:
 			valid = item_data.item_type == ItemData.ItemType.WEAPON
+		Equipment.EquipmentSlot.OFFHAND:
+			valid = item_data.is_offhand
 	
 	# Store for potential manual drop handling
 	if valid:

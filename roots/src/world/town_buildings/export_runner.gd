@@ -1,0 +1,175 @@
+extends SceneTree
+
+## Runtime scene exporter for Medieval Village MegaKit building prefabs.
+## Run from project root: godot --headless --script src/world/town_buildings/export_runner.gd
+
+const GLTF_BASE = "res://assets/Medieval Village MegaKit[Standard]/glTF/"
+const WALL_H: float = 3.12
+const GRID: float = 2.0
+const H: float = 1.0
+const OUTPUT_DIR = "res://src/world/town_buildings/"
+
+func _initialize() -> void:
+	print("=== Exporting Town Building Scenes ===")
+	_export_small_house()
+	_export_large_house()
+	_export_market_stall()
+	_export_town_well()
+	print("=== Export Complete! ===")
+	quit()
+
+func _add_piece(parent: Node3D, gltf_name: String, local_pos: Vector3, rot_y: float = 0.0) -> void:
+	var scene = load(GLTF_BASE + gltf_name) as PackedScene
+	if not scene:
+		push_warning("ExportRunner: missing piece: " + gltf_name)
+		return
+	var inst = scene.instantiate() as Node3D
+	if not inst:
+		return
+	inst.name = gltf_name.get_basename()
+	inst.position = local_pos
+	if rot_y != 0.0:
+		inst.rotation.y = rot_y
+	parent.add_child(inst)
+	inst.owner = parent
+
+func _set_owner_recursive(node: Node, owner: Node) -> void:
+	if node == owner:
+		return
+	node.owner = owner
+	for child in node.get_children():
+		_set_owner_recursive(child, owner)
+
+func _add_building_collision(parent: Node3D, box_size: Vector3, center_offset: Vector3) -> void:
+	var body = StaticBody3D.new()
+	body.name = "BuildingCollision"
+	body.collision_layer = 2
+	body.collision_mask = 0
+	var col = CollisionShape3D.new()
+	col.name = "CollisionShape"
+	var shape = BoxShape3D.new()
+	shape.size = box_size
+	col.shape = shape
+	col.position = center_offset
+	body.add_child(col)
+	parent.add_child(body)
+	body.owner = parent
+	col.owner = parent
+
+func _save_scene(root: Node3D, filename: String) -> void:
+	var scene = PackedScene.new()
+	_set_owner_recursive(root, root)
+	var err = scene.pack(root)
+	if err != OK:
+		push_error("Failed to pack scene: " + filename + " error: " + str(err))
+		root.free()
+		return
+	var path = OUTPUT_DIR + filename
+	err = ResourceSaver.save(scene, path)
+	if err != OK:
+		push_error("Failed to save scene: " + path + " error: " + str(err))
+	else:
+		print("  Saved: ", path)
+	root.free()
+
+func _export_small_house() -> void:
+	var building = Node3D.new()
+	building.name = "SmallHouse"
+	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(H, 0, H))
+	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(GRID + H, 0, H))
+	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(H, 0, GRID + H))
+	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(GRID + H, 0, GRID + H))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Door_Round.gltf", Vector3(H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2, 0, GRID * 2 - H), -PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2, 0, GRID - H), -PI / 2.0)
+	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(0, 0, 0))
+	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(GRID * 2, 0, 0), -PI / 2.0)
+	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(GRID * 2, 0, GRID * 2), PI)
+	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
+	_add_piece(building, "Roof_RoundTiles_4x4.gltf", Vector3(GRID, WALL_H + 0.515, GRID))
+	_add_piece(building, "Door_1_Round.gltf", Vector3(H, 0, GRID * 2), PI)
+	_add_piece(building, "Prop_Chimney.gltf", Vector3(GRID * 1.5, WALL_H + 1.5, -0.5))
+	_add_building_collision(building, Vector3(GRID * 2, WALL_H, GRID * 2), Vector3(GRID, WALL_H * 0.5, GRID))
+	_save_scene(building, "small_house.tscn")
+
+func _export_large_house() -> void:
+	var building = Node3D.new()
+	building.name = "LargeHouse"
+	for x in range(3):
+		for z in range(2):
+			_add_piece(building, "Floor_WoodDark.gltf", Vector3(x * GRID + H, 0, z * GRID + H))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2 + H, 0, 0))
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Door_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Window_Wide_Flat.gltf", Vector3(GRID * 2 + H, 0, GRID * 2), PI)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 3, 0, GRID * 2 - H), -PI / 2.0)
+	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(GRID * 3, 0, GRID - H), -PI / 2.0)
+	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, 0))
+	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(GRID * 3, 0, 0), -PI / 2.0)
+	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(GRID * 3, 0, GRID * 2), PI)
+	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
+	_add_piece(building, "Roof_RoundTiles_6x4.gltf", Vector3(GRID * 1.5, WALL_H + 0.782, GRID))
+	_add_piece(building, "Door_2_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
+	_add_piece(building, "Prop_Chimney2.gltf", Vector3(GRID * 2.5, WALL_H + 1.5, -0.5))
+	_add_piece(building, "Overhang_Plaster_Long.gltf", Vector3(GRID * 1.5, WALL_H, GRID * 2))
+	_add_piece(building, "Balcony_Simple_Straight.gltf", Vector3(GRID * 1.5, WALL_H * 0.65, GRID * 2))
+	_add_piece(building, "Prop_Vine1.gltf", Vector3(0, WALL_H * 0.3, GRID))
+	_add_building_collision(building, Vector3(GRID * 3, WALL_H, GRID * 2), Vector3(GRID * 1.5, WALL_H * 0.5, GRID))
+	_save_scene(building, "large_house.tscn")
+
+func _export_market_stall() -> void:
+	var stall = Node3D.new()
+	stall.name = "MarketStall"
+	_add_piece(stall, "Prop_Crate.gltf", Vector3(0, 0, 0))
+	_add_piece(stall, "Prop_Crate.gltf", Vector3(0.8, 0, 0))
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(-0.8, 0, 0))
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(1.8, 0, 0))
+	_add_piece(stall, "Roof_Wooden_2x1.gltf", Vector3(0.4, 2.5, 0))
+	_add_building_collision(stall, Vector3(2.0, 1.0, 1.0), Vector3(0.5, 0.5, 0))
+	_save_scene(stall, "market_stall.tscn")
+
+func _export_town_well() -> void:
+	var well = Node3D.new()
+	well.name = "TownWell"
+	var mesh_inst = MeshInstance3D.new()
+	mesh_inst.name = "WellBase"
+	var cylinder = CylinderMesh.new()
+	cylinder.top_radius = 0.8
+	cylinder.bottom_radius = 1.0
+	cylinder.height = 1.2
+	mesh_inst.mesh = cylinder
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.5, 0.45, 0.4)
+	mesh_inst.material_override = mat
+	mesh_inst.position.y = 0.6
+	well.add_child(mesh_inst)
+	mesh_inst.owner = well
+	_add_piece(well, "Roof_Wooden_2x1.gltf", Vector3(0, 2.5, 0))
+	_add_piece(well, "Prop_Support.gltf", Vector3(-0.8, 0, 0))
+	_add_piece(well, "Prop_Support.gltf", Vector3(0.8, 0, 0))
+	var body = StaticBody3D.new()
+	body.name = "WellCollision"
+	body.collision_layer = 2
+	body.collision_mask = 0
+	var col = CollisionShape3D.new()
+	col.name = "CollisionShape"
+	var shape = CylinderShape3D.new()
+	shape.radius = 1.0
+	shape.height = 1.2
+	col.shape = shape
+	col.position.y = 0.6
+	body.add_child(col)
+	well.add_child(body)
+	body.owner = well
+	col.owner = well
+	_add_building_collision(well, Vector3(2.0, 1.0, 2.0), Vector3(0, 0.5, 0))
+	_save_scene(well, "town_well.tscn")

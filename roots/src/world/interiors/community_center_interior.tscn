@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c6e6th0v0nst5"]
+
+[ext_resource type="Script" path="res://src/world/interiors/community_center_interior.gd" id="1_q56ve"]
+
+[node name="CommunityCenterInterior" type="Node3D"]
+script = ExtResource("1_q56ve")

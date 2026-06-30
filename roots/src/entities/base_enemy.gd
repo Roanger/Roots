@@ -41,6 +41,7 @@ var _spawn_position: Vector3 = Vector3.ZERO
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _mesh: MeshInstance3D = null
 var _model_node: Node3D = null
+var _anim_player: AnimationPlayer = null
 var _original_color: Color = Color.WHITE
 var _gravity: float = 20.0
 var _all_mesh_materials: Array = []  # Cached for hurt flash
@@ -109,6 +110,9 @@ func _build_model_visual() -> void:
 	
 	_model_node.scale = Vector3.ONE * model_scale
 	add_child(_model_node)
+	_anim_player = _find_anim_player(_model_node)
+	if _anim_player:
+		_anim_player.play("Idle")
 	
 	# Cache all mesh materials for hurt flash
 	_cache_mesh_materials(_model_node)
@@ -155,6 +159,41 @@ func _cache_mesh_materials(node: Node) -> void:
 	for child in node.get_children():
 		_cache_mesh_materials(child)
 
+func _find_anim_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var result = _find_anim_player(child)
+		if result:
+			return result
+	return null
+
+func _update_animation() -> void:
+	if not _anim_player or not is_instance_valid(_anim_player):
+		return
+	var desired := "Idle"
+	match ai_state:
+		AIState.IDLE:
+			desired = "Idle"
+		AIState.WANDER:
+			desired = "Walk"
+		AIState.CHASE:
+			desired = "Run"
+		AIState.ATTACK:
+			desired = "Punch"
+		AIState.HURT:
+			desired = "RecieveHit"
+		AIState.DEAD:
+			desired = "Death"
+	if _anim_player.current_animation != desired:
+		_anim_player.play(desired)
+	# Scale walk/run speed by movement speed
+	if desired in ["Walk", "Run"]:
+		var spd = chase_speed if desired == "Run" else move_speed
+		_anim_player.speed_scale = clampf(spd / 2.0, 0.5, 2.0)
+	else:
+		_anim_player.speed_scale = 1.0
+
 func _physics_process(delta: float) -> void:
 	# Apply standard Godot gravity
 	if not is_on_floor():
@@ -180,6 +219,7 @@ func _physics_process(delta: float) -> void:
 		_check_player_detection()
 
 	move_and_slide()
+	_update_animation()
 
 func _process_idle(delta: float) -> void:
 	velocity.x = 0

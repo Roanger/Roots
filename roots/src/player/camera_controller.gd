@@ -12,6 +12,7 @@ extends Node3D
 @export var min_zoom_fov: float = 30.0
 @export var zoom_step: float = 5.0
 @export var collision_margin: float = 0.1
+@export var camera_forward_offset: float = 0.4
 
 var _target_pitch: float = 0.0
 var _target_yaw: float = 0.0
@@ -24,6 +25,7 @@ var _current_fov: float = 75.0
 var _invert_y: bool = false
 var _sensitivity: float = 0.002
 var _collision_ray: RayCast3D = null
+var height_target: Node3D = null
 
 func _ready() -> void:
 	if not camera:
@@ -62,11 +64,14 @@ func _process(delta: float) -> void:
 	_current_yaw = lerp_angle(_current_yaw, _target_yaw, rot_t)
 	_current_pitch = lerp(_current_pitch, _target_pitch, rot_t)
 
-	var safe_height := first_person_height
+	var target_height := first_person_height
+	if height_target and is_instance_valid(height_target):
+		target_height = to_local(height_target.global_position).y
+	var safe_height := target_height
 	if _collision_ray and _collision_ray.is_colliding():
 		var hit_pos = _collision_ray.get_collision_point()
 		var hit_dist = to_local(hit_pos).y
-		safe_height = minf(first_person_height, hit_dist - collision_margin)
+		safe_height = minf(target_height, hit_dist - collision_margin)
 	var h_t := 1.0 - exp(-height_smoothing * delta)
 	_current_height = lerp(_current_height, safe_height, h_t)
 
@@ -79,7 +84,7 @@ func _apply_camera() -> void:
 	if not camera:
 		return
 	position = Vector3.ZERO
-	camera.position = Vector3(0, _current_height, 0)
+	camera.position = Vector3(0, _current_height, -camera_forward_offset)
 	rotation.y = _current_yaw
 	camera.rotation.x = _current_pitch
 	camera.rotation.y = 0.0
@@ -103,3 +108,6 @@ func get_look_direction() -> Vector3:
 
 func get_pitch() -> float:
 	return rad_to_deg(_current_pitch)
+
+func set_height_target(target: Node3D) -> void:
+	height_target = target

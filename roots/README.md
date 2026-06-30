@@ -22,8 +22,8 @@ A peaceful multiplayer farming simulation built with Godot 4.7, featuring proced
 ### World
 - Smooth 2D heightmap terrain with real physics collision (`StaticBody3D` + `ConcavePolygonShape3D`)
 - Threaded chunk generation with seamless boundary stitching
-- Procedural medieval village (MegaKit modular buildings, 8 NPCs, market stalls)
-- Day/night cycle with BinbunSky shader, seasonal sky/fog variation
+- Procedural medieval village (8 NPCs, market stalls)
+- Day/night cycle with seasonal sky/fog variation
 - In-game clock (time, day of week, season)
 
 ### Animals & Husbandry
@@ -124,7 +124,6 @@ This project is proprietary software. All rights reserved.
 
 - [GD-Sync](https://www.gd-sync.com) — Multiplayer framework
 - [Godot Engine](https://godotengine.org) — Game engine
-- [KayKit](https://kaylousberg.com) — 3D asset packs (RPG Tools, Adventurers, Skeletons, Forest Nature)
 - [Jolt Physics](https://github.com/jrouwe/JoltPhysics) — Physics engine
 
 ---

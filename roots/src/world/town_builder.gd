@@ -1,10 +1,9 @@
 extends Node3D
 class_name TownBuilder
-## Assembles a starter village from Medieval Village MegaKit glTF pieces.
+## Assembles a starter village from modular pieces.
 ## Buildings are prefab functions that snap modular walls, floors, roofs, and props together.
 ## The village is placed at a given center position, snapped to terrain.
 
-const GLTF_BASE = "res://Medieval Village MegaKit[Standard]/glTF/"
 const SCENE_DIR = "res://src/world/town_buildings/"
 
 # Wall height ~3.1m, wall width = 2m grid
@@ -59,6 +58,7 @@ func _place_or_load(scene_id: String, pos: Vector3, rot_y: float, label_text: St
 		inst.rotation.y = rot_y
 		_add_label(inst, label_text, _get_label_offset(fallback))
 		add_child(inst)
+		_add_scene_door(inst, fallback, label_text)
 		# Well needs terrain-relative border stones even when loaded from scene
 		if fallback == "well":
 			_place_border_stones(pos)
@@ -102,7 +102,7 @@ func _get_label_offset(building_type: String) -> Vector3:
 # ─── Prefab: Small House (4x4m footprint, 1 story) ───
 # Wall pieces are 2m wide centered on origin (X: -1 to +1).
 # H = half-wall offset (1m) to center wall on grid edge.
-const H: float = 1.0  # half-wall centering offset
+const H: float = 1.0
 
 func _build_small_house(pos: Vector3, rot_y: float, label_text: String) -> void:
 	var building = Node3D.new()
@@ -111,49 +111,19 @@ func _build_small_house(pos: Vector3, rot_y: float, label_text: String) -> void:
 	building.position = pos
 	building.rotation.y = rot_y
 	
-	# Floor (2x2 grid = 4x4m) — floors are centered on origin (-1 to +1), shift +H on both axes
-	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(H, 0, H))
-	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(GRID + H, 0, H))
-	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(H, 0, GRID + H))
-	_add_piece(building, "Floor_UnevenBrick.gltf", Vector3(GRID + H, 0, GRID + H))
+	var path = "res://assets/Buildings/Blends/House_1.blend"
+	if ResourceLoader.exists(path):
+		var scene = load(path) as PackedScene
+		if scene:
+			var inst = scene.instantiate() as Node3D
+			if inst:
+				inst.position = Vector3(GRID, 0, GRID)
+				inst.scale = Vector3(2.0, 2.0, 2.0)
+				building.add_child(inst)
 	
-	# Back wall (Z = 0 side, rot_y=0 → wall extends along X, shift +H on X)
-	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(H, 0, 0))
-	_add_piece(building, "Wall_Plaster_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
-	
-	# Front wall (Z = 4m side, rot_y=PI → wall extends along X, shift +H on X)
-	_add_piece(building, "Wall_Plaster_Door_Round.gltf", Vector3(H, 0, GRID * 2), PI)
-	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
-	
-	# Left wall (X = 0 side, rot_y=PI/2 → wall extends along Z, shift +H on Z)
-	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
-	_add_piece(building, "Wall_Plaster_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
-	
-	# Right wall (X = 4m side, rot_y=-PI/2 → wall extends along Z, shift +H on Z)
-	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2, 0, GRID * 2 - H), -PI / 2.0)
-	_add_piece(building, "Wall_Plaster_Straight.gltf", Vector3(GRID * 2, 0, GRID - H), -PI / 2.0)
-	
-	# Corners
-	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(0, 0, 0))
-	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(GRID * 2, 0, 0), -PI / 2.0)
-	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(GRID * 2, 0, GRID * 2), PI)
-	_add_piece(building, "Corner_Exterior_Wood.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
-	
-	# Roof
-	_add_piece(building, "Roof_RoundTiles_4x6.gltf", Vector3(GRID, WALL_H, GRID), 0.0)
-	
-	# Door — door mesh extends from origin to +X (~1m), place at wall door cutout
-	_add_piece(building, "Door_1_Round.gltf", Vector3(H, 0, GRID * 2), PI)
-	
-	# Chimney — raise so angled cap sits on roof slope, outside back wall
-	_add_piece(building, "Prop_Chimney.gltf", Vector3(GRID * 1.5, WALL_H - 2.84, -0.5))
-	
-	# Building label
 	_add_label(building, label_text, Vector3(GRID, WALL_H + 1.5, GRID))
-	
-	# Collision box for the whole building
 	_add_building_collision(building, Vector3(GRID * 2, WALL_H, GRID * 2), Vector3(GRID, WALL_H * 0.5, GRID))
-	
+	_add_entrance_door(building, label_text, Vector3(H, 0, GRID * 2 + 0.15))
 	add_child(building)
 
 # ─── Prefab: Large House (6x4m footprint, 1 story + overhang) ───
@@ -164,59 +134,19 @@ func _build_large_house(pos: Vector3, rot_y: float, label_text: String) -> void:
 	building.position = pos
 	building.rotation.y = rot_y
 	
-	# Floor (3x2 grid = 6x4m) — floors centered on origin, shift +H on both axes
-	for x in range(3):
-		for z in range(2):
-			_add_piece(building, "Floor_WoodDark.gltf", Vector3(x * GRID + H, 0, z * GRID + H))
+	var path = "res://assets/Buildings/Blends/House_2.blend"
+	if ResourceLoader.exists(path):
+		var scene = load(path) as PackedScene
+		if scene:
+			var inst = scene.instantiate() as Node3D
+			if inst:
+				inst.position = Vector3(GRID * 1.5, 0, GRID)
+				inst.scale = Vector3(2.0, 2.0, 2.0)
+				building.add_child(inst)
 	
-	# Back wall (Z = 0, rot_y=0 → shift +H on X)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(H, 0, 0))
-	_add_piece(building, "Wall_UnevenBrick_Window_Wide_Round.gltf", Vector3(GRID + H, 0, 0))
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(GRID * 2 + H, 0, 0))
-	
-	# Front wall (Z = 4m, rot_y=PI → shift +H on X)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(H, 0, GRID * 2), PI)
-	_add_piece(building, "Wall_UnevenBrick_Door_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
-	_add_piece(building, "Wall_UnevenBrick_Window_Wide_Flat.gltf", Vector3(GRID * 2 + H, 0, GRID * 2), PI)
-	
-	# Left wall (X = 0, rot_y=PI/2 → shift +H on Z)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(0, 0, H), PI / 2.0)
-	_add_piece(building, "Wall_UnevenBrick_Window_Thin_Round.gltf", Vector3(0, 0, GRID + H), PI / 2.0)
-	
-	# Right wall (X = 6m, rot_y=-PI/2 → shift +H on Z)
-	_add_piece(building, "Wall_UnevenBrick_Straight.gltf", Vector3(GRID * 3, 0, GRID * 2 - H), -PI / 2.0)
-	_add_piece(building, "Wall_UnevenBrick_Window_Thin_Round.gltf", Vector3(GRID * 3, 0, GRID - H), -PI / 2.0)
-	
-	# Corners
-	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, 0))
-	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(GRID * 3, 0, 0), -PI / 2.0)
-	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(GRID * 3, 0, GRID * 2), PI)
-	_add_piece(building, "Corner_Exterior_Brick.gltf", Vector3(0, 0, GRID * 2), PI / 2.0)
-	
-	# Roof
-	_add_piece(building, "Roof_RoundTiles_6x6.gltf", Vector3(GRID * 1.5, WALL_H, GRID), 0.0)
-	
-	# Door — door mesh extends from origin to +X, place at wall door cutout
-	_add_piece(building, "Door_2_Round.gltf", Vector3(GRID + H, 0, GRID * 2), PI)
-	
-	# Chimney — raise so angled cap sits on roof slope, outside back wall
-	_add_piece(building, "Prop_Chimney2.gltf", Vector3(GRID * 2.5, WALL_H - 2.84, -0.5))
-	
-	# Overhang on front
-	_add_piece(building, "Overhang_UnevenBrick_Long.gltf", Vector3(GRID * 1.5, WALL_H, GRID * 2))
-	
-	# Balcony on front (decorative) — spans X:-1 to +1, Z:~0.9 to ~1.1 (sticks outward)
-	_add_piece(building, "Balcony_Simple_Straight.gltf", Vector3(GRID * 1.5, WALL_H * 0.65, GRID * 2))
-	
-	# Vines on side
-	_add_piece(building, "Prop_Vine1.gltf", Vector3(0, WALL_H * 0.3, GRID))
-	
-	# Label
 	_add_label(building, label_text, Vector3(GRID * 1.5, WALL_H + 2.0, GRID))
-	
-	# Collision
 	_add_building_collision(building, Vector3(GRID * 3, WALL_H, GRID * 2), Vector3(GRID * 1.5, WALL_H * 0.5, GRID))
-	
+	_add_entrance_door(building, label_text, Vector3(GRID + H, 0, GRID * 2 + 0.15))
 	add_child(building)
 
 # ─── Prefab: Market Stall (open-air, 2x2m) ───
@@ -227,64 +157,32 @@ func _build_market_stall(pos: Vector3, rot_y: float, label_text: String) -> void
 	stall.position = pos
 	stall.rotation.y = rot_y
 	
-	# Crate as counter
 	_add_piece(stall, "Prop_Crate.gltf", Vector3(0, 0, 0))
 	_add_piece(stall, "Prop_Crate.gltf", Vector3(0.8, 0, 0))
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(-0.8, 0, 0))
+	_add_piece(stall, "Corner_Exterior_Wood.gltf", Vector3(1.8, 0, 0))
+	_add_piece(stall, "Roof_Wooden_2x1.gltf", Vector3(0.4, 2.5, 0))
 	
-	# Support posts + roof — same approach as the Town Well
-	_add_piece(stall, "Prop_Support.gltf", Vector3(-0.8, 0, 0))
-	_add_piece(stall, "Prop_Support.gltf", Vector3(1.8, 0, 0))
-	_add_piece(stall, "Roof_Wooden_2x1.gltf", Vector3(0.4, 2.2, 0))
-	
-	# Label
 	_add_label(stall, label_text, Vector3(0.5, 2.8, 0))
-	
-	# Small collision
 	_add_building_collision(stall, Vector3(2.0, 1.0, 1.0), Vector3(0.5, 0.5, 0))
-	
 	add_child(stall)
 
 # ─── Market Center (well + path markers) ───
 func _place_market_center(center: Vector3) -> void:
-	# Central well placeholder (stone cylinder + label)
 	var well = Node3D.new()
 	well.name = "Town_Well"
 	well.position = center
 	
-	var mesh_inst = MeshInstance3D.new()
-	var cylinder = CylinderMesh.new()
-	cylinder.top_radius = 0.8
-	cylinder.bottom_radius = 1.0
-	cylinder.height = 1.2
-	mesh_inst.mesh = cylinder
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.5, 0.45, 0.4)
-	mesh_inst.material_override = mat
-	mesh_inst.position.y = 0.6
-	well.add_child(mesh_inst)
-	
-	# Well roof (small wooden roof)
-	_add_piece(well, "Roof_Wooden_2x1.gltf", Vector3(0, 2.2, 0))
-	
-	# Support posts for well roof
-	_add_piece(well, "Prop_Support.gltf", Vector3(-0.8, 0, 0))
-	_add_piece(well, "Prop_Support.gltf", Vector3(0.8, 0, 0))
+	var path = "res://assets/Buildings/Blends/Bell_Tower.blend"
+	if ResourceLoader.exists(path):
+		var scene = load(path) as PackedScene
+		if scene:
+			var inst = scene.instantiate() as Node3D
+			if inst:
+				inst.scale = Vector3(1.2, 1.2, 1.2)
+				well.add_child(inst)
 	
 	_add_label(well, "Town Well", Vector3(0, 3.0, 0))
-	
-	# Collision for well
-	var body = StaticBody3D.new()
-	body.collision_layer = 2
-	body.collision_mask = 0
-	var col = CollisionShape3D.new()
-	var shape = CylinderShape3D.new()
-	shape.radius = 1.0
-	shape.height = 1.2
-	col.shape = shape
-	col.position.y = 0.6
-	body.add_child(col)
-	well.add_child(body)
-	
 	add_child(well)
 	_place_border_stones(center)
 
@@ -340,18 +238,19 @@ func _add_piece(parent: Node3D, gltf_name: String, local_pos: Vector3, rot_y: fl
 			inst.rotation.y = rot_y
 		parent.add_child(inst)
 
+const MEDIEVAL_KIT_DIR = "res://assets/Medieval Village MegaKit[Standard]/glTF/"
+
 func _load_gltf(gltf_name: String) -> PackedScene:
 	if _scene_cache.has(gltf_name):
 		return _scene_cache[gltf_name]
-	var path = GLTF_BASE + gltf_name
+	var path = MEDIEVAL_KIT_DIR + gltf_name
 	if ResourceLoader.exists(path):
 		var scene = load(path) as PackedScene
 		_scene_cache[gltf_name] = scene
 		return scene
-	else:
-		push_warning("TownBuilder: glTF not found: " + path)
-		_scene_cache[gltf_name] = null
-		return null
+	push_warning("TownBuilder: asset not found: " + path)
+	_scene_cache[gltf_name] = null
+	return null
 
 func _add_label(parent: Node3D, text: String, local_pos: Vector3) -> void:
 	var label = Label3D.new()
@@ -364,6 +263,13 @@ func _add_label(parent: Node3D, text: String, local_pos: Vector3) -> void:
 	label.outline_size = 4
 	parent.add_child(label)
 
+func _add_scene_door(inst: Node3D, fallback: String, label_text: String) -> void:
+	match fallback:
+		"small":
+			_add_entrance_door(inst, label_text, Vector3(H, 0, GRID * 2 + 0.15))
+		"large":
+			_add_entrance_door(inst, label_text, Vector3(GRID + H, 0, GRID * 2 + 0.15))
+
 func _add_building_collision(parent: Node3D, box_size: Vector3, center_offset: Vector3) -> void:
 	var body = StaticBody3D.new()
 	body.collision_layer = 2
@@ -375,6 +281,42 @@ func _add_building_collision(parent: Node3D, box_size: Vector3, center_offset: V
 	col.position = center_offset
 	body.add_child(col)
 	parent.add_child(body)
+
+const BuildingDoorScript = preload("res://src/world/building_door.gd")
+
+## Interior scene mapping: building label -> { interior_id, scene_path }
+func _get_interior_map(label: String) -> Dictionary:
+	match label:
+		"General Store":    return {"id": "general_store", "scene": "res://src/world/interiors/shop_interior.tscn"}
+		"Tavern":           return {"id": "tavern",        "scene": "res://src/world/interiors/tavern_interior.tscn"}
+		"Blacksmith":       return {"id": "blacksmith",    "scene": "res://src/world/interiors/shop_interior.tscn"}
+		"Bakery":           return {"id": "bakery",        "scene": "res://src/world/interiors/shop_interior.tscn"}
+		"Town Hall":        return {"id": "town_hall",     "scene": "res://src/world/interiors/small_house_interior.tscn"}
+		"Herbalist":        return {"id": "herbalist",     "scene": "res://src/world/interiors/shop_interior.tscn"}
+		"Farmer House":     return {"id": "farmer_house",  "scene": "res://src/world/interiors/small_house_interior.tscn"}
+		"Guard Post":       return {"id": "guard_post",    "scene": "res://src/world/interiors/small_house_interior.tscn"}
+		_:                  return {"id": label.to_lower().replace(" ", "_"), "scene": "res://src/world/interiors/small_house_interior.tscn"}
+
+func _add_entrance_door(building: Node3D, label_text: String, local_pos: Vector3) -> void:
+	var imap = _get_interior_map(label_text)
+	var door = BuildingDoorScript.new()
+	door.name = "Door_" + label_text.replace(" ", "_")
+	door.building_name = label_text
+	door.is_exit = false
+	door.interior_id = imap.id
+	door.interior_scene_path = imap.scene
+	door.spawn_offset = Vector3(0, 0.5, -0.5)
+	door.position = local_pos
+	door.rotation.y = PI  # Faces outward
+
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(1.2, 2.0, 0.3)
+	col.shape = shape
+	col.position.y = 1.0
+	door.add_child(col)
+
+	building.add_child(door)
 
 func _get_terrain_y(world_pos: Vector3) -> float:
 	if chunk_manager and chunk_manager.has_method("get_terrain_height"):

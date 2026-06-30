@@ -1,4 +1,4 @@
-extends Node
+waaextends Node
 class_name CropDatabase
 ## Database for all crop definitions
 
