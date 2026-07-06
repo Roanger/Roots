@@ -1,5 +1,19 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "unsloth-studio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Unsloth Studio",
+      "options": {
+        "baseURL": "http://localhost:8888/v1"
+      },
+      "models": {
+        "unsloth/Qwen3.6-27B-GGUF": {
+          "name": "Qwen 3.6 27B"
+        }
+      }
+    }
+  },
   "instructions": [
     "AGENTS.md",
     "docs/coding_standards.md",

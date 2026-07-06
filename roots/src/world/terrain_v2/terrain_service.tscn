@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://dhmn5mbkfga8"]
+
+[ext_resource type="Script" path="res://src/world/terrain_v2/terrain_service.gd" id="1_service"]
+
+[node name="ChunkManager" type="Node"]
+script = ExtResource("1_service")
+chunk_size = 32
+view_distance = 4
+generate_objects = true
+save_chunks = true

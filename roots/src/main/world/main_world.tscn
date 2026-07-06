@@ -2,13 +2,14 @@
 
 [ext_resource type="Script" uid="uid://b2omevnwad3to" path="res://src/main/world/main_world.gd" id="1_world"]
 [ext_resource type="PackedScene" path="res://src/player/player.tscn" id="2_player"]
-[ext_resource type="PackedScene" path="res://src/world/chunks/chunk_manager.tscn" id="3_chunk"]
+[ext_resource type="PackedScene" path="res://src/world/terrain_v2/terrain_service.tscn" id="3_chunk"]
 [ext_resource type="PackedScene" path="res://src/world/crops/farm_plot.tscn" id="4_farmplot"]
 [ext_resource type="PackedScene" path="res://src/ui/inventory_ui.tscn" id="5_inventory"]
 [ext_resource type="PackedScene" path="res://src/ui/character_ui.tscn" id="6_character"]
 [ext_resource type="PackedScene" path="res://src/ui/hotbar_ui.tscn" id="7_hotbar"]
 [ext_resource type="PackedScene" path="res://src/items/world_item.tscn" id="8_worlditem"]
 [ext_resource type="Shader" path="res://src/shaders/sky_shader.gdshader" id="9_skyshader"]
+[ext_resource type="Script" path="res://src/world/terrain_v2/world_object_spawner.gd" id="10_spawner"]
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("9_skyshader")
 shader_parameter/sky_top_color = Color(0.2, 0.4, 0.8, 1)
@@ -46,6 +47,10 @@ fog_sky_affect = 0.5
 [node name="MainWorld" type="Node3D" unique_id=93936536]
 script = ExtResource("1_world")
 
+[node name="MusicPlayer" type="AudioStreamPlayer" parent="."]
+bus = &"Music"
+autoplay = true
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1201223862]
 environment = SubResource("Environment_sky")
 
@@ -74,6 +79,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 12, 4)
 
 [node name="FarmPlot4" parent="FarmPlots" unique_id=1792476725 instance=ExtResource("4_farmplot")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 12, 4)
+
+[node name="WorldObjectSpawner" type="Node" parent="."]
+script = ExtResource("10_spawner")
 
 [node name="WorldItems" type="Node3D" parent="." unique_id=2113745253]
 

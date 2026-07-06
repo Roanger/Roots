@@ -1,5 +1,6 @@
 extends Node3D
 
+@onready var music_player: AudioStreamPlayer = $MusicPlayer
 @onready var player: CharacterBody3D = $Player
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var sun: DirectionalLight3D = $Sun
@@ -55,6 +56,9 @@ var _biome_check_timer: float = 0.0
 # Reputation system
 var _reputation: Dictionary = {}  # npc_id -> int (-100 to 100)
 
+# Village placement (computed from terrain to avoid water)
+var _village_center: Vector3 = Vector3(25, 0, 0)
+
 # Dynamic wildlife (wild animals follow chunk lifecycle)
 var _wildlife_by_chunk: Dictionary = {}  # Vector2i -> Array[BaseAnimal]
 var _night_spawn_timer: float = 0.0
@@ -88,87 +92,32 @@ func _ready() -> void:
 	if chunk_manager:
 		chunk_manager.add_to_group("chunk_manager")
 	
+	# Start world music
+	_start_world_music()
+	
 	# Set up global shader parameters for water shader before chunks generate
 	_setup_water_shader_globals()
 	
-	# Register town exclusion zone BEFORE terrain generation
-	# Village center is 25m east of world origin (player spawns near origin)
-	var village_center = Vector3(25, 0, 0)
+	# Find a dry spot for the village, then register the exclusion zone
+	_village_center = _find_village_position()
 	if chunk_manager and chunk_manager.has_method("add_exclusion_zone"):
-		chunk_manager.add_exclusion_zone(village_center, 22.0)  # 22m radius covers all buildings
+		chunk_manager.add_exclusion_zone(_village_center, 22.0)
 	
-	# Connect chunk signals BEFORE initial chunk generation so wildlife spawns on day 1
+	# Connect chunk signals
 	if chunk_manager:
 		chunk_manager.chunk_loaded.connect(_on_chunk_loaded)
 		chunk_manager.chunk_unloaded.connect(_on_chunk_unloaded)
 	
-	# Initialize world first (generates terrain and triggers chunk_loaded signals)
+	# Initialize world — starts VoxelLodTerrain generation
 	_initialize_world()
 	
-	# Setup player after terrain is ready
+	# Setup player basics (no terrain-dependent positioning yet)
 	if player:
 		player.capture_mouse()
 		player.set_chunk_manager(chunk_manager)
-		# Find spawn point on terrain (after chunks are generated)
-		call_deferred("_spawn_player")
+		player.set_physics_process(false)  # Disable gravity until terrain is ready
 	
-	# Position farm plots on terrain after chunks are generated
-	call_deferred("_position_farm_plots")
-	
-	# Setup inventory UI
-	call_deferred("_setup_inventory_ui")
-	
-	# Setup character UI
-	call_deferred("_setup_character_ui")
-	
-	# Setup hotbar UI
-	call_deferred("_setup_hotbar_ui")
-	
-	# Setup HUD
-	call_deferred("_setup_hud")
-	
-	# Setup Skill Tree UI
-	call_deferred("_setup_skill_tree_ui")
-	
-	# Setup Crafting UI
-	call_deferred("_setup_crafting_ui")
-	
-	# Spawn enemies
-	call_deferred("_spawn_enemies")
-	
-	# Spawn animals
-	call_deferred("_spawn_animals")
-	
-	# Setup interior manager (must be before village/buildings so doors can find it)
-	call_deferred("_setup_interior_manager")
-	
-	# Build starter village
-	call_deferred("_build_village")
-	
-	# Initialize quest system (before NPCs so starter quests can be triggered)
-	call_deferred("_init_quest_system")
-	
-	# Spawn NPCs in village
-	call_deferred("_spawn_npcs")
-	
-	# Setup dialogue & shop & journal UI
-	call_deferred("_setup_dialogue_ui")
-	call_deferred("_setup_shop_ui")
-	call_deferred("_setup_quest_journal_ui")
-	call_deferred("_setup_notification_ui")
-	
-	# Setup reputation
-	call_deferred("_setup_reputation")
-	
-	# Setup weather effects
-	call_deferred("_setup_weather")
-	
-	# Restore saved data (player inventory/equipment/stats, farm plots, placed objects)
-	call_deferred("_load_player_data")
-	call_deferred("_load_farm_plots")
-	call_deferred("_load_placed_objects")
-	
-	# Connect signals
+	# Connect time/day/season signals
 	if game_manager:
 		game_manager.time_changed.connect(_on_time_changed)
 		game_manager.day_changed.connect(_on_day_changed)
@@ -179,12 +128,123 @@ func _ready() -> void:
 	if event_bus:
 		event_bus.player_underground_changed.connect(_on_player_underground_changed)
 	
-	# Wire autosave: populate game_manager data before save_manager writes to disk
 	if save_manager and save_manager.has_signal("save_started"):
 		save_manager.save_started.connect(prepare_save_data)
 	
+	# Show loading screen while terrain generates
+	_show_loading_screen()
+	
+	# Start terrain-ready wait — spawns everything once chunks are ready
+	call_deferred("_on_terrain_ready")
+	
 	if game_manager:
 		print("Main World loaded - Seed: ", game_manager.world_seed)
+
+func _show_loading_screen() -> void:
+	var overlay := CanvasLayer.new()
+	overlay.name = "LoadingScreen"
+	overlay.layer = 128
+	add_child(overlay)
+
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.05, 0.05)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(bg)
+
+	var label := Label.new()
+	label.text = "Building World"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 36)
+	label.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7))
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	overlay.add_child(label)
+
+	if game_manager:
+		var seed_label := Label.new()
+		seed_label.text = "Seed: %d" % game_manager.world_seed
+		seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		seed_label.add_theme_font_size_override("font_size", 16)
+		seed_label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.5))
+		seed_label.set_anchors_preset(Control.PRESET_CENTER)
+		seed_label.position = Vector2(0, 40)
+		overlay.add_child(seed_label)
+
+
+func _hide_loading_screen() -> void:
+	var overlay = get_node_or_null("LoadingScreen")
+	if overlay:
+		overlay.queue_free()
+
+
+func _on_terrain_ready() -> void:
+	## Waits for VoxelLodTerrain to generate terrain collision around the
+	## player spawn point, then spawns everything and hides loading screen.
+	await get_tree().process_frame
+
+	# Find spawn point now (CPU noise, works before voxel blocks exist)
+	var spawn_pos := _find_spawn_position()
+
+	# Raycast from above the spawn point to detect when terrain collision
+	# actually exists (VoxelLodTerrain streams blocks asynchronously)
+	var origin := Vector3(spawn_pos.x, spawn_pos.y + 100, spawn_pos.z)
+	var query := PhysicsRayQueryParameters3D.new()
+	query.from = origin
+	query.to = Vector3(spawn_pos.x, spawn_pos.y - 20, spawn_pos.z)
+	query.collision_mask = 1
+	for _attempt in 120:
+		var space := player.get_world_3d().direct_space_state if player else null
+		if space:
+			var result := space.intersect_ray(query)
+			if result:
+				break
+		await get_tree().create_timer(0.1).timeout
+
+	# Extra frames for secondary collision shapes
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# --- Spawn everything ---
+	_spawn_player()
+	_position_farm_plots()
+	_setup_inventory_ui()
+	_setup_character_ui()
+	_setup_hotbar_ui()
+	_setup_hud()
+	_setup_skill_tree_ui()
+	_setup_crafting_ui()
+	_spawn_enemies()
+	_spawn_animals()
+	_setup_interior_manager()
+	_build_village()
+	_init_quest_system()
+	_spawn_npcs()
+	_setup_dialogue_ui()
+	_setup_shop_ui()
+	_setup_quest_journal_ui()
+	_setup_notification_ui()
+	_setup_reputation()
+	_setup_weather()
+	_load_player_data()
+	_load_farm_plots()
+	_load_placed_objects()
+
+	_hide_loading_screen()
+	print("Terrain ready — all entities spawned")
+
+func _start_world_music() -> void:
+	if not music_player:
+		return
+	var stream := preload("res://assets/Music/Shaggs Farm Game Song 1 Ver 2.mp3")
+	if stream:
+		music_player.stream = stream
+		music_player.bus = &"Music"
+		var settings_node = get_node_or_null("/root/Settings")
+		var vol := 0.7
+		if settings_node:
+			vol = float(settings_node.get_setting("audio", "music_volume", 0.7))
+		music_player.volume_db = linear_to_db(vol)
+		music_player.play()
 
 func _setup_water_shader_globals() -> void:
 	# Avoid re-adding globals if MainWorld is reloaded in the same session
@@ -210,33 +270,81 @@ func _spawn_player() -> void:
 	await get_tree().process_frame
 	
 	if player:
-		var spawn_height = _find_spawn_height()
-		player.position = Vector3(0, spawn_height + 5, 0)  # Spawn higher above terrain
-		print("Player spawned at height: ", spawn_height + 5)
+		var spawn_pos = _find_spawn_position()
+		player.position = Vector3(spawn_pos.x, spawn_pos.y + 5, spawn_pos.z)
+		player.set_physics_process(true)  # Re-enable gravity now that terrain exists
+		print("Player spawned at: ", player.position)
 
 func _initialize_world() -> void:
-	# Create water plane - DISABLED FOR TESTING
-	# _create_water_plane()
+	# Create water plane at sea level
+	_create_water_plane()
 	
-	# Setup chunk manager
+	# Setup terrain service
 	if chunk_manager:
-		chunk_manager.terrain_container = terrain_container
 		chunk_manager.player_node = player
-		# Set chunk save directory from world seed (same world = same chunk dir)
-		if game_manager and game_manager.world_seed != 0:
-			chunk_manager.chunk_save_dir = "user://saves/world_%d/chunks/" % game_manager.world_seed
-		if chunk_manager.has_method("force_update"):
-			chunk_manager.force_update()
 	
 	# Setup initial lighting
 	if game_manager:
 		_update_lighting(game_manager.current_hour)
 
-func _find_spawn_height() -> float:
-	# Get terrain height at spawn point from chunk manager
-	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
-		return chunk_manager.get_terrain_height(Vector3(0, 0, 0))
-	return 25.0  # Default spawn height (adjusted for new terrain range)
+func _find_spawn_position() -> Vector3:
+	## Search for dry land near the origin.  Expands outward in rings until
+	## a position above sea level with a non-water biome is found.
+	if not chunk_manager or not chunk_manager.has_method("get_terrain_height") or not chunk_manager.has_method("get_biome_at"):
+		return Vector3(0, 25, 0)
+	var step := 8
+	var max_radius := 80
+	for r in range(0, max_radius + 1, step):
+		var edge := r + step
+		for x in range(-edge, edge + 1, step):
+			for z in range(-edge, edge + 1, step):
+				if absf(x) <= r and absf(z) <= r:
+					continue
+				var biome: int = chunk_manager.get_biome_at(Vector3(x, 0, z))
+				if biome <= 1:
+					continue
+				var h: float = chunk_manager.get_terrain_height(Vector3(x, 0, z))
+				if h > 0.5:
+					return Vector3(x, h, z)
+	return Vector3(0, 25, 0)
+
+func _find_village_position() -> Vector3:
+	## Search for dry land starting at (25, 0, 0).  Expands outward in rings
+	## until a position whose entire 16m footprint is above sea level.
+	const VILLAGE_RADIUS: float = 16.0
+	if not chunk_manager or not chunk_manager.has_method("get_terrain_height") or not chunk_manager.has_method("get_biome_at"):
+		return Vector3(25, 0, 0)
+
+	# Try default first
+	if _is_dry_footprint(25.0, 0.0, VILLAGE_RADIUS):
+		var h: float = chunk_manager.get_terrain_height(Vector3(25, 0, 0))
+		return Vector3(25, h, 0)
+
+	var step := 8
+	var max_radius := 120
+	for r in range(0, max_radius + 1, step):
+		var edge := r + step
+		for x in range(-edge, edge + 1, step):
+			for z in range(-edge, edge + 1, step):
+				if absf(x) <= r and absf(z) <= r:
+					continue
+				if _is_dry_footprint(25.0 + x, z, VILLAGE_RADIUS):
+					var h: float = chunk_manager.get_terrain_height(Vector3(25 + x, 0, z))
+					return Vector3(25 + x, h, z)
+	return Vector3(25, 0, 0)
+
+func _is_dry_footprint(cx: float, cz: float, radius: float) -> bool:
+	if chunk_manager.get_biome_at(Vector3(cx, 0, cz)) <= 1:
+		return false
+	for i in 8:
+		var a := i * TAU / 8.0
+		var px := cx + cos(a) * radius
+		var pz := cz + sin(a) * radius
+		if chunk_manager.get_biome_at(Vector3(px, 0, pz)) <= 1:
+			return false
+		if chunk_manager.get_terrain_height(Vector3(px, 0, pz)) < 1.0:
+			return false
+	return true
 
 func _position_farm_plots() -> void:
 	# Wait a few frames for chunks to generate, then position farm plots
@@ -276,19 +384,20 @@ func _create_water_plane() -> void:
 	plane_mesh.size = Vector2(2000, 2000)
 	water_plane.mesh = plane_mesh
 	
-	var water_material = StandardMaterial3D.new()
-	water_material.albedo_color = Color(0.2, 0.4, 0.7, 0.8)
-	water_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	water_material.roughness = 0.1
-	water_material.metallic = 0.3
-	water_material.emission_enabled = true
-	water_material.emission = Color(0.1, 0.2, 0.4)
-	water_material.emission_energy_multiplier = 0.2
+	var water_material = ShaderMaterial.new()
+	water_material.shader = preload("res://src/shaders/water_shader.gdshader")
+	water_material.set_shader_parameter("shallow_color", Color(0.12, 0.55, 0.72, 0.82))
+	water_material.set_shader_parameter("deep_color", Color(0.02, 0.18, 0.38, 0.95))
+	water_material.set_shader_parameter("foam_color", Color(0.98, 0.99, 1.0, 0.92))
+	water_material.set_shader_parameter("time_scale", 0.55)
+	water_material.set_shader_parameter("wave_strength", 0.35)
+	water_material.set_shader_parameter("normal_strength", 0.75)
 	
 	water_plane.material_override = water_material
-	water_plane.position = Vector3(0, 16, 0)  # Water level
+	water_plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water_plane.position = Vector3(0, 0, 0)  # Sea level at y=0
 	
-	terrain_container.add_child(water_plane)
+	add_child(water_plane)
 
 const BIOME_FOG_COLORS: Dictionary = {
 	0: Color(0.2, 0.3, 0.6),   # Water — misty blue
@@ -307,6 +416,11 @@ func _process(delta: float) -> void:
 	# Handle pause input
 	if Input.is_action_just_pressed("pause"):
 		_toggle_pause()
+	
+	# Follow player with water plane (center it on player XZ, keep Y at sea level)
+	if water_plane and player:
+		var pp = player.global_position
+		water_plane.global_position = Vector3(pp.x, 0, pp.z)
 	
 	# Check biome climate
 	if player and chunk_manager and chunk_manager.has_method("get_biome_at"):
@@ -904,15 +1018,12 @@ func _create_station(pos: Vector3, station_type: int, station_name: String, colo
 
 func _build_village() -> void:
 	await get_tree().process_frame
-	# Fixed village center matching the exclusion zone registered in _ready()
-	var village_center = Vector3(25, 0, 0)
-	
 	town_builder = TownBuilderScript.new()
 	town_builder.name = "TownBuilder"
 	town_builder.setup(chunk_manager)
 	add_child(town_builder)
-	town_builder.build_village(village_center)
-	print("Starter village built at ", village_center)
+	town_builder.build_village(_village_center)
+	print("Starter village built at ", _village_center)
 
 const SKELETON_MINION = "res://assets/characters/Zombie_Male.blend"
 const SKELETON_WARRIOR = "res://assets/characters/Zombie_Female.blend"
@@ -1014,6 +1125,9 @@ func _spawn_in_biomes(species_id: String, count: int, center: Vector3, radius: f
 		if chunk_manager and chunk_manager.has_method("get_biome_at"):
 			var biome: int = chunk_manager.get_biome_at(pos)
 			if biome not in biomes:
+				valid = false
+		if valid and chunk_manager and chunk_manager.has_method("get_terrain_height"):
+			if chunk_manager.get_terrain_height(pos) < 1.0:
 				valid = false
 		if valid:
 			_create_animal(species_id, pos)
@@ -1275,10 +1389,12 @@ func _create_animal(species_id: String, pos: Vector3, tamed: bool = false, baby:
 		push_warning("Unknown animal species: %s" % species_id)
 		return
 	
-	# Snap to terrain height
+	# Snap to terrain height — skip if in water
 	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
-		var terrain_y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
-		pos.y = terrain_y
+		var h: float = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		if h < 1.0:
+			return
+		pos.y = h
 	else:
 		pos.y = 30.0
 	
@@ -1419,9 +1535,11 @@ func _create_enemy(pos: Vector3, ename: String, health: float, spd: float,
 		chase_spd: float, dmg: float, atk_range: float, detect: float,
 		color: Color, xp: float, loot: Array,
 		emodel: String = "", escale: float = 1.0) -> void:
-	# Snap to terrain height
+	# Snap to terrain height — skip if in water
 	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
 		var terrain_y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		if terrain_y < 1.0:
+			return
 		pos.y = terrain_y
 	else:
 		pos.y = 30.0
@@ -1540,18 +1658,17 @@ func _spawn_npcs() -> void:
 	
 	_register_npc_data()
 	
-	var village_center = Vector3(25, 0, 0)
-	
 	# NPCs placed near their respective buildings (matching build_village layout)
-	# Building positions from town_builder: offset from village_center
-	_create_npc("shopkeeper",   village_center + Vector3(2, 0, -12))   # General Store (north)
-	_create_npc("innkeeper",    village_center + Vector3(12, 0, -8))   # Tavern (northeast)
-	_create_npc("blacksmith",   village_center + Vector3(12, 0, 2))    # Blacksmith (east)
-	_create_npc("baker",        village_center + Vector3(8, 0, 12))    # Bakery (southeast)
-	_create_npc("mayor",        village_center + Vector3(-2, 0, 12))   # Town Hall (south)
-	_create_npc("herbalist",    village_center + Vector3(-8, 0, 8))    # Herbalist (southwest)
-	_create_npc("farmer",       village_center + Vector3(-12, 0, -2))  # Farmer House (west)
-	_create_npc("guard",        village_center + Vector3(-8, 0, -8))   # Guard Post (northwest)
+	# Building positions from town_builder: offset from _village_center
+	var vc := _village_center
+	_create_npc("shopkeeper",   Vector3(vc.x + 2, 0, vc.z - 12))   # General Store (north)
+	_create_npc("innkeeper",    Vector3(vc.x + 12, 0, vc.z - 8))   # Tavern (northeast)
+	_create_npc("blacksmith",   Vector3(vc.x + 12, 0, vc.z + 2))   # Blacksmith (east)
+	_create_npc("baker",        Vector3(vc.x + 8, 0, vc.z + 12))   # Bakery (southeast)
+	_create_npc("mayor",        Vector3(vc.x - 2, 0, vc.z + 12))   # Town Hall (south)
+	_create_npc("herbalist",    Vector3(vc.x - 8, 0, vc.z + 8))    # Herbalist (southwest)
+	_create_npc("farmer",       Vector3(vc.x - 12, 0, vc.z - 2))   # Farmer House (west)
+	_create_npc("guard",        Vector3(vc.x - 8, 0, vc.z - 8))    # Guard Post (northwest)
 	
 	# Start quests via QuestManager
 	_add_starter_quests()
@@ -1916,9 +2033,13 @@ func _create_npc(npc_id: String, pos: Vector3) -> void:
 		push_warning("Unknown NPC: %s" % npc_id)
 		return
 	
-	# Snap to terrain height
+	# Snap to terrain height — skip if in water
 	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
-		pos.y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		var h: float = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
+		if h < 1.0:
+			push_warning("NPC %s skipped — spawn position in water" % npc_id)
+			return
+		pos.y = h
 	else:
 		pos.y = 30.0
 	

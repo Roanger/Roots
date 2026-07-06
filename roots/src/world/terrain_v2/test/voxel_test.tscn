@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3 uid="uid://dvoxeltest0001"]
+
+[ext_resource type="Script" path="res://src/world/terrain_v2/test/voxel_test.gd" id="1_root"]
+[ext_resource type="Script" path="res://src/world/terrain_v2/test/voxel_test_camera.gd" id="2_cam"]
+
+[sub_resource type="VoxelMesherTransvoxel" id="VoxelMesherTransvoxel_1"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+
+[node name="VoxelTest" type="Node3D"]
+script = ExtResource("1_root")
+
+[node name="VoxelLodTerrain" type="VoxelLodTerrain" parent="."]
+mesher = SubResource("VoxelMesherTransvoxel_1")
+lod_count = 6
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 60, 0)
+far = 2000.0
+script = ExtResource("2_cam")
+
+[node name="VoxelViewer" type="VoxelViewer" parent="Camera3D"]
+view_distance = 1024
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 50, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")

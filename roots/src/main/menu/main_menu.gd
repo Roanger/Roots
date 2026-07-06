@@ -1,5 +1,6 @@
 extends Control
 
+@onready var music_player: AudioStreamPlayer = $MusicPlayer
 @onready var title_label: Label = $VBoxContainer/TitleLabel
 @onready var new_game_btn: Button = $VBoxContainer/MarginContainer/VBoxContainer/NewGameBtn
 @onready var load_game_btn: Button = $VBoxContainer/MarginContainer/VBoxContainer/LoadGameBtn
@@ -31,14 +32,28 @@ func _ready() -> void:
 	# Apply initial settings
 	if settings:
 		settings.apply_settings()
-		
-	# Also update references to use renamed methods if needed
+	
+	# Start menu music
+	_start_menu_music()
 	
 	# Connect time signal for day/night background
 	if game_manager:
 		game_manager.time_changed.connect(_on_time_changed)
 	
 	_update_menu_state("main")
+
+func _start_menu_music() -> void:
+	if not music_player:
+		return
+	var stream := preload("res://assets/Music/Shaggs Farm Game Song 1 Ver 1.mp3")
+	if stream:
+		music_player.stream = stream
+		music_player.bus = &"Music"
+		var vol := 0.7
+		if settings:
+			vol = float(settings.get_setting("audio", "music_volume", 0.7))
+		music_player.volume_db = linear_to_db(vol)
+		music_player.play()
 
 func _on_new_game_pressed() -> void:
 	# Show confirmation dialog

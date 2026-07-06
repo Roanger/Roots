@@ -44,6 +44,9 @@ func _build_ui() -> void:
 	vbox.add_child(_make_slider_row("Mouse Sensitivity", 0.1, 2.0, 0.05, "controls", "mouse_sensitivity", _on_sensitivity_changed))
 	vbox.add_child(_make_check_row("Invert Y", "controls", "invert_y", _on_invert_changed))
 
+	vbox.add_child(_make_section_label("Audio"))
+	vbox.add_child(_make_music_volume_row())
+
 	vbox.add_child(_make_section_label("General"))
 	vbox.add_child(_make_check_row("Fullscreen", "general", "fullscreen", _on_fullscreen_changed))
 	vbox.add_child(_make_check_row("VSync", "general", "vsync", _on_vsync_changed))
@@ -75,6 +78,33 @@ func _make_panel_style() -> StyleBox:
 	style.corner_radius_bottom_right = 6
 	style.corner_radius_bottom_left = 6
 	return style
+
+func _make_music_volume_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.text = "Music Volume"
+	label.custom_minimum_size = Vector2(220, 0)
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	var current_raw := float(settings.get_setting("audio", "music_volume", 0.7))
+	slider.value = current_raw * 100.0
+	slider.custom_minimum_size = Vector2(180, 0)
+	slider.value_changed.connect(_on_music_volume_changed)
+	row.add_child(slider)
+	var val_label := Label.new()
+	val_label.custom_minimum_size = Vector2(60, 0)
+	val_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	val_label.text = "%.0f%%" % slider.value
+	slider.value_changed.connect(func(v: float): val_label.text = "%.0f%%" % v)
+	row.add_child(val_label)
+	return row
+
+func _on_music_volume_changed(value: float) -> void:
+	settings.set_setting("audio", "music_volume", value / 100.0)
 
 func _make_option_row(label_text: String, options: Array, category: String, key: String, callback: Callable) -> HBoxContainer:
 	var row := HBoxContainer.new()

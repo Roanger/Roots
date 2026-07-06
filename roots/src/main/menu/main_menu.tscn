@@ -38,6 +38,10 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main_menu")
 
+[node name="MusicPlayer" type="AudioStreamPlayer" parent="."]
+bus = &"Music"
+autoplay = true
+
 [node name="Background" type="TextureRect" parent="." unique_id=1582722574]
 modulate = Color(0.6, 0.6, 0.6, 1)
 layout_mode = 1

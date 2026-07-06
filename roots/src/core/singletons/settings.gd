@@ -72,7 +72,16 @@ signal setting_changed(category: String, key: String, value: Variant)
 @onready var game_manager: Node = get_node_or_null("/root/GameManager")
 
 func _ready() -> void:
+	_ensure_audio_buses()
 	load_settings()
+
+func _ensure_audio_buses() -> void:
+	var bus_names := ["Music", "SFX", "Voice", "Ambient"]
+	for name in bus_names:
+		if AudioServer.get_bus_index(name) < 0:
+			AudioServer.add_bus()
+			var idx := AudioServer.get_bus_count() - 1
+			AudioServer.set_bus_name(idx, name)
 
 func load_settings() -> void:
 	if FileAccess.file_exists(SETTINGS_FILE):
