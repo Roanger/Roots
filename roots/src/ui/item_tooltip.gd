@@ -182,6 +182,7 @@ func _get_type_string(data: ItemData) -> String:
 
 func _get_tier_name(tier: ItemData.ToolTier) -> String:
 	match tier:
+		ItemData.ToolTier.STONE: return "Stone"
 		ItemData.ToolTier.WOOD: return "Wood"
 		ItemData.ToolTier.BRONZE: return "Bronze"
 		ItemData.ToolTier.IRON: return "Iron"
@@ -192,12 +193,16 @@ func _get_tier_name(tier: ItemData.ToolTier) -> String:
 func _build_stats_text(data: ItemData, inv_item: InventoryItem) -> String:
 	var lines: Array[String] = []
 	
-	# Tool stats
+	# Tool / Weapon stats
 	if data.item_type == ItemData.ItemType.TOOL or data.item_type == ItemData.ItemType.WEAPON:
 		if data.tool_power > 0:
 			lines.append("Power: %d" % data.tool_power)
 		if data.tool_range > 0 and data.tool_range != 2.0:
 			lines.append("Range: %.1f" % data.tool_range)
+	
+	# Armor defense
+	if data.item_type == ItemData.ItemType.EQUIPMENT and data.defense_value > 0:
+		lines.append("Defense: %d" % data.defense_value)
 	
 	# Durability
 	if data.has_durability:

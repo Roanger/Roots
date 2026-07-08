@@ -90,6 +90,7 @@ const AFFINITY_TABLE: Dictionary = {
 
 ## Tier multipliers: higher tier tools deal more damage/effectiveness
 const TIER_MULTIPLIER: Dictionary = {
+	ItemData.ToolTier.STONE: 0.75,
 	ItemData.ToolTier.WOOD: 1.0,
 	ItemData.ToolTier.BRONZE: 1.5,
 	ItemData.ToolTier.IRON: 2.0,

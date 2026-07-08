@@ -49,10 +49,7 @@ func _load_assets() -> void:
 	for path in [
 		"res://assets/Ultimate_Trees/CommonTree_1.blend", "res://assets/Ultimate_Trees/CommonTree_2.blend",
 		"res://assets/Ultimate_Trees/CommonTree_3.blend", "res://assets/Ultimate_Trees/CommonTree_4.blend",
-		"res://assets/Ultimate_Trees/CommonTree_5.blend",
-		"res://assets/Ultimate_Trees/Willow_1.blend", "res://assets/Ultimate_Trees/Willow_2.blend",
-		"res://assets/Ultimate_Trees/Willow_3.blend", "res://assets/Ultimate_Trees/Willow_4.blend",
-		"res://assets/Ultimate_Trees/Willow_5.blend"]:
+		"res://assets/Ultimate_Trees/CommonTree_5.blend"]:
 		var s := load(path) as PackedScene
 		if s: _tree_scenes.append(s)
 	# Dead trees
@@ -506,9 +503,11 @@ func _get_tree_loot(biome: int, rng: RandomNumberGenerator) -> Array:
 
 
 func _get_rock_loot(biome: int, rng: RandomNumberGenerator) -> Array:
+	var common := [{"item_id": "small_stone", "min_amount": 1, "max_amount": 3, "chance": 1.0}]
 	match biome:
-		6, 9: return [{"item_id": "stone", "min_amount": 3, "max_amount": 6, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.5}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.4}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.3}, {"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.1}]
-		5, 7: return [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.6}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15}]
-		2: return [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}]
-		1: return [{"item_id": "stone", "min_amount": 1, "max_amount": 3, "chance": 1.0}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.2}]
-		_: return [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 2, "chance": 0.3}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.2}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.15}]
+		6, 9: common += [{"item_id": "stone", "min_amount": 3, "max_amount": 6, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.5}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 3, "chance": 0.4}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.3}, {"item_id": "gold_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.1}]
+		5, 7: common += [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 3, "chance": 0.6}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.15}]
+		2: common += [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}]
+		1: common += [{"item_id": "stone", "min_amount": 1, "max_amount": 3, "chance": 1.0}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 1, "chance": 0.2}]
+		_: common += [{"item_id": "stone", "min_amount": 2, "max_amount": 4, "chance": 1.0}, {"item_id": "coal", "min_amount": 1, "max_amount": 2, "chance": 0.3}, {"item_id": "iron_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.2}, {"item_id": "copper_nugget", "min_amount": 1, "max_amount": 2, "chance": 0.15}]
+	return common

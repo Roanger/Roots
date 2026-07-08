@@ -33,7 +33,8 @@ enum ItemQuality {
 }
 
 enum ToolTier {
-	WOOD,       # Starter tier - weakest
+	STONE,      # Ground-tier — hand-crafted from gathered stones and sticks
+	WOOD,       # Starter tier at workbench
 	BRONZE,     # Copper-based
 	IRON,       # Mid-tier
 	STEEL,      # Advanced
@@ -74,6 +75,9 @@ enum ToolTier {
 @export var stamina_restore: float = 0.0
 @export var buff_effects: Array[Dictionary] = []
 
+# Equipment properties
+@export var defense_value: int = 0  # Damage reduction for armor
+
 # Tool properties
 @export var tool_type: String = ""  # "hoe", "axe", "pickaxe", "sickle", "watering_can"
 @export var tool_tier: ToolTier = ToolTier.WOOD
@@ -83,6 +87,9 @@ enum ToolTier {
 # Seed properties
 @export var crop_id: String = ""  # What crop this seed grows
 @export var growth_time: float = 60.0  # Seconds to grow
+
+# Station (crafting bench) type — 0 = not a station, 1-7 = CraftingStation enum
+@export var station_type: int = 0
 
 # Placeable properties
 @export var placeable_model_path: String = ""  # OBJ/FBX path for world placement

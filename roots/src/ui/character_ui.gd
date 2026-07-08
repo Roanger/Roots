@@ -20,6 +20,9 @@ signal character_closed()
 @onready var weapon_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/WeaponContainer/WeaponSlot
 @onready var offhand_slot: EquipmentSlotUI = $CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/OffhandContainer/OffhandSlot
 
+@onready var defense_stats_label: Label = $CharacterPanel/MarginContainer/VBoxContainer/StatsContainer/DefenseStatsLabel
+@onready var weapon_stats_label: Label = $CharacterPanel/MarginContainer/VBoxContainer/StatsContainer/WeaponStatsLabel
+
 var equipment: Equipment = null
 var player: Node = null
 var slot_scene = preload("res://src/ui/equipment_slot.tscn")
@@ -98,11 +101,35 @@ func _update_all_slots() -> void:
 		return
 	
 	for slot_type in slots.keys():
-		# slot_type is Equipment.EquipmentSlot enum value (which is an int)
 		var item = equipment.get_equipped_item(slot_type)
 		var slot_ui = slots[slot_type]
 		if slot_ui:
 			slot_ui.update_slot(item)
+	
+	_update_stats_display()
+
+func _update_stats_display() -> void:
+	if not equipment:
+		return
+	
+	var total_defense := 0
+	var weapon_damage := 0
+	
+	for slot_type in slots.keys():
+		var item = equipment.get_equipped_item(slot_type)
+		if item and item.item_data:
+			if slot_type in [Equipment.EquipmentSlot.GEAR_HEAD, Equipment.EquipmentSlot.GEAR_CHEST, Equipment.EquipmentSlot.GEAR_LEGS, Equipment.EquipmentSlot.GEAR_FEET]:
+				total_defense += item.item_data.defense_value
+			if slot_type == Equipment.EquipmentSlot.WEAPON:
+				weapon_damage = item.item_data.tool_power
+	
+	if defense_stats_label:
+		defense_stats_label.text = "Armor: %d" % total_defense
+	if weapon_stats_label:
+		if weapon_damage > 0:
+			weapon_stats_label.text = "Damage: %d" % weapon_damage
+		else:
+			weapon_stats_label.text = ""
 
 func _on_equipment_changed(slot_name: String) -> void:
 	# Find slot type from name and update

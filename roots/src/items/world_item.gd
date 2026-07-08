@@ -6,6 +6,7 @@ class_name WorldItem
 @export var quantity: int = 1
 @export var pickup_radius: float = 2.0
 @export var auto_pickup: bool = false
+@export var despawn_time: float = 0.0  # 0 = never, otherwise seconds until auto-removal
 
 @onready var sprite: Sprite3D = $Sprite3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
@@ -34,9 +35,23 @@ func _ready() -> void:
 	# Connect body entered signal for auto-pickup or proximity detection
 	if pickup_area:
 		pickup_area.body_entered.connect(_on_body_entered)
+	
+	# Start despawn timer if configured
+	if despawn_time > 0.0:
+		var timer := Timer.new()
+		timer.one_shot = true
+		timer.wait_time = despawn_time
+		timer.timeout.connect(_on_despawn_timeout)
+		timer.name = "DespawnTimer"
+		add_child(timer)
+		timer.start()
 		
 	# Randomize bobbing start time
 	_bob_time = randf() * 10.0
+
+func _on_despawn_timeout() -> void:
+	if not _picked_up and is_instance_valid(self):
+		queue_free()
 
 func _process(delta: float) -> void:
 	# Rotate slowly

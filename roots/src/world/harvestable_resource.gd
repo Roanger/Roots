@@ -106,6 +106,13 @@ func _spawn_drops(_player: Node3D) -> void:
 			yield_bonus = sm.get_perk_bonus(skill_id, 0)   # PerkData.PerkEffect.YIELD_BONUS
 			double_chance = sm.get_perk_bonus(skill_id, 7)  # PerkData.PerkEffect.DOUBLE_HARVEST
 	
+	# Discover herbs in the herbarium on harvest
+	if resource_type == ToolAffinity.TargetType.HERB and sm and sm.has_method("discover_herb"):
+		for loot in loot_table:
+			var item_id: String = loot.get("item_id", "")
+			if item_id != "":
+				sm.discover_herb(item_id)
+	
 	for loot in loot_table:
 		var chance: float = loot.get("chance", 1.0)
 		if rng.randf() > chance:
@@ -152,6 +159,7 @@ func _spawn_world_item(item_id: String, amount: int, world_pos: Vector3) -> void
 	world_item.item_id = item_id
 	world_item.quantity = amount
 	world_item.auto_pickup = true
+	world_item.despawn_time = 120.0
 	world_item.position = world_pos
 	
 	# Add to the scene tree at a high level so it persists after parent is freed

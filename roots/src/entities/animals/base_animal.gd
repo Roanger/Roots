@@ -36,6 +36,7 @@ var _flee_timer: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _mesh: MeshInstance3D = null
 var _model_node: Node3D = null
+var _anim_player: AnimationPlayer = null
 var _original_color: Color = Color.WHITE
 var _all_mesh_materials: Array = []
 var _chunk_manager: Node = null
@@ -131,19 +132,34 @@ func _build_model_visual() -> void:
 
 	# FBX models from QiwiiPack have baked-in position offsets (e.g. Z=-14)
 	# and -90° X rotation from FBX Y-up conversion. Fix all child transforms.
+	# Custom .blend models (no armature) come through glTF with correct axes.
 	_model_node.position = Vector3.ZERO
 	_model_node.rotation = Vector3.ZERO
+	var has_skeleton := false
+	for child in _model_node.get_children():
+		if child is Skeleton3D:
+			has_skeleton = true
+			break
 	for child in _model_node.get_children():
 		if child is Node3D:
 			child.position = Vector3.ZERO
-			# FBX uses Y-up, Godot uses Z-up → meshes come in rotated -90° on X
-			# Reset to just the -90° X rotation which is the correct orientation fix
-			child.rotation = Vector3(-PI / 2.0, 0, 0)
+			if has_skeleton:
+				child.rotation = Vector3(-PI / 2.0, 0, 0)
 
 	_model_node.scale = Vector3.ONE * animal_data.model_scale * _get_scale_factor()
 	add_child(_model_node)
 	_cache_mesh_materials(_model_node)
 	_original_color = animal_data.body_color
+	_anim_player = _find_anim_player(_model_node)
+
+func _find_anim_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var found = _find_anim_player(child)
+		if found:
+			return found
+	return null
 
 func _build_placeholder_visual() -> void:
 	_mesh = MeshInstance3D.new()
@@ -234,6 +250,60 @@ func _physics_process(delta: float) -> void:
 		_attack_timer -= delta
 
 	move_and_slide()
+	_update_animations(delta)
+
+func _update_animations(delta: float) -> void:
+	if not animal_data:
+		return
+
+	if _anim_player:
+		var desired = "Idle"
+		if ai_state == AIState.DEAD:
+			desired = "Death"
+		elif ai_state == AIState.HURT:
+			if _anim_player.has_animation("Idle_HitReact_Left"):
+				desired = "Idle_HitReact_Left"
+			else:
+				desired = "Idle"
+		elif velocity.length() > 0.1:
+			if ai_state in [AIState.FLEE, AIState.HUNTING]:
+				if _anim_player.has_animation("Gallop"):
+					desired = "Gallop"
+				elif _anim_player.has_animation("Walk"):
+					desired = "Walk"
+			else:
+				if _anim_player.has_animation("Walk"):
+					desired = "Walk"
+		elif ai_state in [AIState.GRAZING, AIState.FEEDING]:
+			if _anim_player.has_animation("Eating"):
+				desired = "Eating"
+			elif _anim_player.has_animation("Idle_Headlow"):
+				desired = "Idle_Headlow"
+		
+		if _anim_player.has_animation(desired) and _anim_player.current_animation != desired:
+			_anim_player.play(desired)
+	else:
+		var visual = _model_node if _model_node else _mesh
+		if visual:
+			if ai_state == AIState.DEAD:
+				pass
+			elif velocity.length() > 0.1:
+				var speed_mult = 0.015 if ai_state in [AIState.FLEE, AIState.HUNTING] else 0.008
+				var bob_height = 0.06 if ai_state in [AIState.FLEE, AIState.HUNTING] else 0.03
+				var time_ms = Time.get_ticks_msec()
+				visual.position.y = abs(sin(time_ms * speed_mult)) * bob_height
+				visual.rotation.x = deg_to_rad(5.0)
+				visual.rotation.z = sin(time_ms * speed_mult * 0.5) * deg_to_rad(4.0)
+			else:
+				var time_ms = Time.get_ticks_msec()
+				if ai_state in [AIState.GRAZING, AIState.FEEDING]:
+					visual.position.y = 0.0
+					visual.rotation.x = deg_to_rad(15.0)
+					visual.rotation.z = 0.0
+				else:
+					visual.position.y = sin(time_ms * 0.002) * 0.01
+					visual.rotation.x = 0.0
+					visual.rotation.z = 0.0
 
 # ── AI States ────────────────────────────────────────────────────────────────
 
@@ -531,6 +601,7 @@ func _drop_product() -> void:
 	world_item.item_id = animal_data.product_item_id
 	world_item.quantity = animal_data.product_amount
 	world_item.auto_pickup = true
+	world_item.despawn_time = 300.0
 	world_item.position = drop_pos
 
 	var tree_root = get_tree().current_scene
@@ -774,11 +845,11 @@ func _die() -> void:
 	ai_state = AIState.DEAD
 	_death_timer = 1.5
 
-	# Grant XP
+	# Grant XP based on animal type
 	var skill_manager = get_node_or_null("/root/SkillManager")
-	if skill_manager and skill_manager.has_method("grant_action_xp"):
-		var skill = animal_data.xp_skill if animal_data else "combat"
-		skill_manager.grant_action_xp(skill)
+	if skill_manager and skill_manager.has_method("grant_xp") and animal_data:
+		var skill_id = "militia" if animal_data.animal_type == AnimalDataScript.AnimalType.HUNTABLE else "husbandry"
+		skill_manager.grant_xp(skill_id, int(animal_data.xp_reward))
 
 	# Spawn loot
 	_spawn_loot()
@@ -820,6 +891,7 @@ func _spawn_loot() -> void:
 		world_item.item_id = item_id
 		world_item.quantity = amount
 		world_item.auto_pickup = true
+		world_item.despawn_time = 120.0
 		world_item.position = drop_pos
 
 		var tree_root = get_tree().current_scene

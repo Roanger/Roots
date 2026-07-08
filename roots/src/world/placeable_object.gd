@@ -7,12 +7,14 @@ class_name PlaceableObject
 @export var object_name: String = "Fence"
 @export var is_gate: bool = false  # Gates can be opened/closed
 @export var gate_open: bool = false
+@export var damage_on_contact: float = 0.0  # Damage per second to enemies touching this (for spikes/traps)
 
 var _model_node: Node3D = null
 var _collision_shape: CollisionShape3D = null
 var _gate_interact_shape: CollisionShape3D = null  # Small shape on hinge post for raycast when gate is open
 var _gate_pivot: Node3D = null  # Pivot node for gate hinge rotation
 var _campfire_light: OmniLight3D = null
+var _damage_area: Area3D = null
 
 func setup(p_item_id: String, p_name: String, model_path: String, model_scale: float, collision_size: Vector3, p_is_gate: bool = false) -> void:
 	item_id = p_item_id
@@ -98,6 +100,21 @@ func setup(p_item_id: String, p_name: String, model_path: String, model_scale: f
 		_campfire_light.position.y = collision_size.y * model_scale * 0.5 + 0.2
 		add_child(_campfire_light)
 	
+	# Damage area for traps (spikes, barricades)
+	if damage_on_contact > 0.0:
+		_damage_area = Area3D.new()
+		var area_shape = CollisionShape3D.new()
+		var area_box = BoxShape3D.new()
+		area_box.size = collision_size * model_scale
+		area_shape.shape = area_box
+		area_shape.position.y = collision_size.y * model_scale * 0.5
+		_damage_area.add_child(area_shape)
+		_damage_area.collision_layer = 0
+		_damage_area.collision_mask = 4  # Enemy layer
+		_damage_area.body_entered.connect(_on_damage_area_body_entered)
+		_damage_area.body_exited.connect(_on_damage_area_body_exited)
+		add_child(_damage_area)
+	
 	# Add to group for save/load and pasture detection
 	add_to_group("placeables")
 	if is_gate:
@@ -113,6 +130,22 @@ func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
 		if found:
 			return found
 	return null
+
+var _enemies_in_range: Array[Node3D] = []
+
+func _process(delta: float) -> void:
+	if damage_on_contact <= 0.0 or _enemies_in_range.is_empty():
+		return
+	for enemy in _enemies_in_range:
+		if is_instance_valid(enemy) and enemy.has_method("take_damage"):
+			enemy.take_damage(damage_on_contact * delta)
+
+func _on_damage_area_body_entered(body: Node3D) -> void:
+	if body.is_in_group("enemies") and body not in _enemies_in_range:
+		_enemies_in_range.append(body)
+
+func _on_damage_area_body_exited(body: Node3D) -> void:
+	_enemies_in_range.erase(body)
 
 func _build_placeholder(collision_size: Vector3) -> void:
 	var mesh_inst = MeshInstance3D.new()

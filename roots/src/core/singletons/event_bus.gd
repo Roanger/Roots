@@ -36,6 +36,9 @@ signal npc_dialogue_ended(npc_id: String)
 signal npc_shop_opened(npc_id: String)
 signal npc_item_bought(npc_id: String, item_id: String, price: int)
 
+# Herb gathering events
+signal herb_discovered(herb_item_id: String)
+
 # Crafting events
 signal open_crafting_station(station_type: int)
 signal crafting_started(station_type: String, recipe_id: String)

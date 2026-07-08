@@ -195,7 +195,10 @@ graph TD
 #### 3.1 Profession System Expansion
 - [x] Design profession structure (Blacksmithing, Cooking, Baking, Militia, Husbandry, Alchemy, Herb Gathering)
 - [x] Create profession-specific skill trees (PerkData resource, 5-tier perk chains per profession, unlock with skill points)
-- [ ] Implement profession tools and equipment
+- [x] Stone tier tools — hand-craftable from ground resources (small_stone + stick) at HAND station, no profession required
+- [x] Starting inventory gutted — players now start with 4 small_stone + 3 stick, must craft first stone tool to bootstrap
+- [x] small_stone added to rock loot tables so mining yields both small_stone and regular stone
+- [ ] Implement profession tools and equipment (higher tiers)
 - [ ] Add profession-specific interactions
 - [x] Design profession progression rewards (XP bonus, yield bonus, damage/defense, resource saving, buff duration, double harvest, crit chance perks)
 
@@ -223,7 +226,7 @@ graph TD
 - [x] Create ore spawning and mining (rocks drop stone/coal/iron/copper via HarvestableResource)
 - [x] Design smelting process (forge recipes: ore→ingot, steel alloy, mythril)
 - [x] Implement smithing recipes (40+ recipes across all tiers)
-- [ ] Create weapon/armor crafting (tiered weapons, armor sets)
+- [x] Create weapon/armor crafting (tiered weapons, armor sets)
 
 #### 3.5 Husbandry & Animals
 - [x] Design animal AI behaviors (BaseAnimal: idle/wander/flee/follow/feeding/hurt/dead states)
@@ -240,7 +243,7 @@ graph TD
 - [x] Create breeding system (feed two same-species adults near each other → baby spawns, breed cooldown)
 - [x] Add more building placeables (Barn, Hut, Feeding Trough, Campfire, Sitting Log + crafting recipes)
 - [x] FBX offset fix in PlaceableObject for building models
-- [ ] Find/add models for goat, deer, rabbit (currently placeholder capsules)
+- [x] Find/add models for goat, deer, rabbit (currently placeholder capsules)
 
 #### 3.6 Militia/Combat
 - [x] Design combat system (left-click swing, tool affinity damage, tier scaling)
@@ -249,7 +252,7 @@ graph TD
 - [x] Player damage + death/respawn system
 - [x] Enemy loot drops (WorldItem auto-pickup)
 - [x] Enemy types: Skeleton Minion, Skeleton Rogue, Skeleton Warrior, Skeleton Mage
-- [ ] Add combat skill progression (XP wiring exists, needs balancing)
+- [x] Add combat skill progression (XP wiring exists, needs balancing)
 - [ ] Design defensive structures
 
 ---
@@ -286,7 +289,7 @@ graph TD
 - [x] **[REWRITE]** Dynamic FarmPlot spawning on tilled terrain
 - [x] **[REWRITE]** Terrain visual feedback (vertex color changes for modified cells)
 - [x] **[REWRITE]** Save/load terrain modifications per chunk (per-chunk JSON at `user://saves/world_<seed>/chunks/`)
-- [~] Shovel digging visuals — *Implemented but non-functional in practice; the underlying terrain mesh does not robustly support persistent deformation. Deferred to the future world-generation rewrite.*
+- [x] Shovel digging — VoxelLodTerrain `do_sphere()` via correct local-coordinate raycast, persisted via VoxelStreamSQLite + dug-position serialization
 - [x] Design plot claiming — Claim Post placeable (Workbench recipe: 3 logs + 5 stone + 2 rope), spawns 8 boundary posts in 8m radius circle, claim data persisted in world_data
 - [ ] Implement housing placement
 - [x] Create decoration system — added flower pot, wooden chair, small table with hand-craftable recipes and placeable via existing placement system
@@ -663,7 +666,7 @@ For solo development, prioritize these skills:
     - ~~Re-integrate farm plot tilling and object placement~~ ✓
     - ~~Fix chunk seam stitching~~ ✓
     - ~~Fix WorldItem collision (not pushed by player)~~ ✓
-    - ~~Shovel digging visuals~~ [~] — *Implemented but non-functional in practice; deferred to future world-generation rewrite.*
+    - ~~Shovel digging visuals~~ ✓
 15. ~~**Phase 4.2: NPC System** — Villagers, merchants, quests~~ ✓
 16. ~~**Phase 4.5: Weather System** — WeatherManager autoload, rain/snow GPUParticles3D, fog/cloud modulation, save/load~~ ✓
 17. ~~**Phase 4.4: Wildlife & Fishing** — Biome-aware animal spawning, fishing spot system, fishing rod tool, fish items/recipes~~ ✓
@@ -674,11 +677,16 @@ For solo development, prioritize these skills:
 22. ~~**Phase 4.2: Reputation** — Per-NPC reputation, quest/hit modifiers, shop price multipliers~~ ✓
 23. ~~**Phase 4.3: Community Buildings** — Door/interior system, 4 interior scenes, interaction prompt, Community Center placeable with shared storage chest, doors on all 8 village buildings.~~ ✓
 24. ~~**Phase 4.4: Animal Behaviors** — Grazing (hunger-reduction on grass biomes, self-feed), Fleeing (auto-detect threats via `detection_range`), Hunting (Wolf predator chases deer/rabbit). Plus dynamic wildlife spawning per chunk (wild animals spawn on chunk load, despawn on unload). Night-time enemy spawning (wave every ~25s, 2-4 enemies, dawn despawn).~~ ✓
-25. **Next (Phase 4 remaining):** housing/decorations (4.3), quest content (4.6), wildlife interactions (4.4), environmental hazards (4.5).
-26. **Future (post-Milestone 3):** Full world-generation rewrite to support hydrology/rivers, swimming, waterfalls, boats, caves, robust digging, and dense forests/grasslands. Current terrain/water systems are placeholders for that rewrite.
+25. ~~**3.4: Weapon/armor crafting** — Mythril armor set (4 items + 4 recipes), forgeable at Anvil, defense tooltips, Armor/Damage display in character UI.~~ ✓
+26. ~~**3.6: Combat skill progression** — `mil_critical_eye` crit chance (10% for 2x), `mil_legendary` capstone (+50 max HP), perk ordinals fixed, HEALTH_BONUS/STAMINA_BONUS wired.~~ ✓
+27. ~~**4.3: Shovel digging** — Fixed VoxelLodTerrain coordinate-space bug (`do_sphere` now works), fixed `elif` indentation bug (shovel path was unreachable), fixed `VoxelRaycastResult.is_empty()` → `null` check. Digging is now functional.~~ ✓
+28. ~~**3.1: Stone tier + bootstrap** — STONE ToolTier added below WOOD (0.75x multiplier). 6 stone tools (hoe/axe/pickaxe/shovel/sickle/hammer), hand-craftable at HAND station from small_stone + stick. Starting inventory gutted to 4 small_stone + 3 stick. small_stone drops from rocks.~~ ✓
+29. ~~**Phase 3.1 / 3.3: Crafting station placeables** — 7 bench items (workbench, forge, anvil, cooking_fire, alchemy_table, loom, sawmill) added as PLACEABLE items with station_type in item_database. 7 hand-craftable recipes in recipe_database (Workbench + Cooking Fire at HAND, others at Workbench/Forge). `_place_object()` in player_controller.gd extended to detect station items and spawn `CraftingStationObject` with model/collision/label. `_spawn_crafting_stations()` and `_create_station()` removed from main_world.gd — stations must now be crafted and placed by the player.~~
+30. **Next (Phase 4 remaining):** housing placement (4.3), land permissions (4.3), quest content (4.6), wildlife interactions (4.4), environmental hazards (4.5), natural disasters (4.5).
+30. **Future (post-Milestone 3):** Full world-generation rewrite to support hydrology/rivers, swimming, waterfalls, boats, caves, robust digging, and dense forests/grasslands. Current terrain/water systems are placeholders for that rewrite.
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Jun 2026 – **Water shader v2 + camera/model improvements.** Rewrote water shader with depth-based color/foam, refraction, Fresnel sky reflection, and specular sun sparkle; sun direction/color fed via global shader uniforms. Player camera now tracks the selected character model's head bone for eye-level first-person view and rotates with camera yaw. Added Future World Generation Rewrite section to plan: current heightmap/water systems are acknowledged as placeholders for a later hydrology/rivers/swimming/waterfalls/boats/caves rewrite. Shovel digging marked as deferred to that rewrite.*
+*Last updated: Jul 2026 – **Crafting station placeables, Stone tier, bootstrap, Mythril armor, combat perks, shovel digging.** 7 station items/recipes, stations now player-crafted (no auto-spawn). Also: STONE ToolTier (0.75x), 6 stone tools hand-craftable at HAND, small_stone item, bootstrap starting inventory.*

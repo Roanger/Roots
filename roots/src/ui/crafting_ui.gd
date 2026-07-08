@@ -152,6 +152,13 @@ func _build_ui() -> void:
 	var sep = HSeparator.new()
 	detail_vbox.add_child(sep)
 	
+	# Skill requirement label (hidden if no requirement)
+	var skill_req_label = Label.new()
+	skill_req_label.name = "SkillRequirementLabel"
+	skill_req_label.add_theme_font_size_override("font_size", 14)
+	skill_req_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.2))
+	detail_vbox.add_child(skill_req_label)
+	
 	# Ingredients label
 	var ing_label = Label.new()
 	ing_label.text = "Ingredients:"
@@ -262,12 +269,20 @@ func _refresh_recipes(category_filter: int = -1) -> void:
 		btn.custom_minimum_size = Vector2(0, 36)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		
-		# Show recipe name + craftable indicator
-		var can_craft = recipe.has_ingredients(inventory) if inventory else false
-		btn.text = ("● " if can_craft else "○ ") + recipe.recipe_name
+		# Check skill requirement
+		var meets_skill = _meets_skill_requirement(recipe)
+		var can_craft = (meets_skill and recipe.has_ingredients(inventory)) if inventory else false
+		
+		var indicator = "● " if can_craft else "○ "
+		var skill_text = ""
+		if not meets_skill:
+			skill_text = " [Req: %s Lv.%d]" % [_get_skill_display_name(recipe.required_skill), recipe.required_skill_level]
+		btn.text = indicator + recipe.recipe_name + skill_text
 		
 		if can_craft:
 			btn.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
+		elif not meets_skill:
+			btn.add_theme_color_override("font_color", Color(0.6, 0.3, 0.3))
 		else:
 			btn.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 		
@@ -284,6 +299,22 @@ func _update_detail_panel() -> void:
 	
 	_detail_name.text = selected_recipe.recipe_name
 	_detail_desc.text = selected_recipe.description
+	
+	# Update skill requirement label
+	var skill_req_label = _detail_panel.find_child("SkillRequirementLabel", true, false)
+	if skill_req_label:
+		var meets_skill = _meets_skill_requirement(selected_recipe)
+		if selected_recipe.required_skill != "" and selected_recipe.required_skill_level > 0:
+			var skill_name = _get_skill_display_name(selected_recipe.required_skill)
+			var player_level = 0
+			var sm = get_node_or_null("/root/SkillManager")
+			if sm and sm.has_method("get_skill_level"):
+				player_level = sm.get_skill_level(selected_recipe.required_skill)
+			skill_req_label.text = "Requires: %s Lv.%d  (You: %d)" % [skill_name, selected_recipe.required_skill_level, player_level]
+			skill_req_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3) if meets_skill else Color(1.0, 0.3, 0.3))
+			skill_req_label.visible = true
+		else:
+			skill_req_label.visible = false
 	
 	# Clear ingredients
 	for child in _ingredients_container.get_children():
@@ -339,9 +370,19 @@ func _update_detail_panel() -> void:
 		_output_container.add_child(out_label)
 	
 	# Update craft buttons
-	var can_craft = selected_recipe.has_ingredients(inventory) if inventory else false
+	var meets_skill = _meets_skill_requirement(selected_recipe)
+	var has_mats = selected_recipe.has_ingredients(inventory) if inventory else false
+	var can_craft = meets_skill and has_mats
 	_craft_button.disabled = not can_craft or _is_crafting
-	_craft_button.text = "Craft" if not _is_crafting else "Crafting..."
+	
+	if not meets_skill:
+		_craft_button.text = "Requires Higher Level"
+	elif not has_mats:
+		_craft_button.text = "Missing Ingredients"
+	elif _is_crafting:
+		_craft_button.text = "Crafting..."
+	else:
+		_craft_button.text = "Craft"
 	
 	var max_count = _get_max_craftable(selected_recipe)
 	_craft_all_button.disabled = max_count < 2 or _is_crafting
@@ -352,6 +393,8 @@ func _update_detail_panel() -> void:
 func _on_craft_pressed() -> void:
 	if not selected_recipe or _is_crafting:
 		return
+	if not _meets_skill_requirement(selected_recipe):
+		return
 	if not selected_recipe.has_ingredients(inventory):
 		return
 	
@@ -360,6 +403,8 @@ func _on_craft_pressed() -> void:
 
 func _on_craft_all_pressed() -> void:
 	if not selected_recipe or _is_crafting:
+		return
+	if not _meets_skill_requirement(selected_recipe):
 		return
 	var max_count = _get_max_craftable(selected_recipe)
 	if max_count < 1:
@@ -406,7 +451,7 @@ func _finish_crafting() -> void:
 	var saved_resources := false
 	var sm = get_node_or_null("/root/SkillManager")
 	if sm and sm.has_method("get_total_perk_bonus"):
-		var save_chance = sm.get_total_perk_bonus(6)  # PerkData.PerkEffect.RESOURCE_SAVING
+		var save_chance = sm.get_total_perk_bonus(PerkData.PerkEffect.RESOURCE_SAVING)
 		if save_chance > 0.0 and randf() < save_chance:
 			saved_resources = true
 			print("[Crafting] Resource saving perk triggered! Materials preserved.")
@@ -496,3 +541,24 @@ func _center_panel() -> void:
 		return
 	var viewport_size = get_viewport_rect().size
 	_panel.position = (viewport_size - _panel.size) / 2.0
+
+func _meets_skill_requirement(recipe: CraftingRecipe) -> bool:
+	if recipe.required_skill == "" or recipe.required_skill_level <= 0:
+		return true
+	var sm = get_node_or_null("/root/SkillManager")
+	if not sm:
+		return true
+	if not sm.has_method("get_skill_level"):
+		return true
+	return sm.get_skill_level(recipe.required_skill) >= recipe.required_skill_level
+
+func _get_skill_display_name(skill_id: String) -> String:
+	if skill_id == "":
+		return ""
+	var sm = get_node_or_null("/root/SkillManager")
+	if not sm or not sm.has_method("get_skill_definition"):
+		return skill_id.capitalize()
+	var def = sm.get_skill_definition(skill_id)
+	if def and def.has_method("get_display_name"):
+		return def.display_name
+	return skill_id.capitalize()

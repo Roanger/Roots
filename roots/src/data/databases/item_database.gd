@@ -54,145 +54,299 @@ func _initialize_items() -> void:
 	potato_crop.icon = _load_icon("res://Veggies/icon-pumpkin.png")
 	_register_item(potato_crop)
 	
-	# Tools (icons from Weapon & Tool pack, 3D models from KayKit RPGToolsBits)
+	# Tools (icons from Weapon & Tool pack, 3D models from assets/Tools)
 	var hoe_tool = _create_tool("basic_hoe", "Basic Hoe", "For tilling soil.", 100, "hoe", 1, 100)
 	hoe_tool.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	hoe_tool.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	hoe_tool.world_model_path = "res://assets/Tools/wood_hoe.blend"
 	_register_item(hoe_tool)
 	var shovel_tool = _create_tool("basic_shovel", "Basic Shovel", "For digging and moving soil.", 80, "shovel", 1, 80)
 	shovel_tool.icon = _load_icon("res://Weapon & Tool/Shovel.png")
-	shovel_tool.world_model_path = "res://assets/gltf-tools/shovel.gltf"
+	shovel_tool.world_model_path = "res://assets/Tools/basic_shovel.blend"
 	_register_item(shovel_tool)
 	var watering_tool = _create_tool("basic_watering_can", "Watering Can", "For watering crops.", 150, "watering_can", 1, 150)
-	watering_tool.world_model_path = "res://assets/gltf-tools/bucket_metal.gltf"
+	watering_tool.world_model_path = "res://assets/Tools/basic_watering_can.blend"
 	_register_item(watering_tool)
 	var sickle_tool = _create_tool("basic_sickle", "Basic Sickle", "For harvesting crops.", 120, "sickle", 1, 120)
 	sickle_tool.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	sickle_tool.world_model_path = "res://assets/gltf-tools/knife.gltf"
+	sickle_tool.world_model_path = "res://assets/Tools/wood_sickle.blend"
 	_register_item(sickle_tool)
 	var axe_tool = _create_tool("basic_axe", "Basic Axe", "For chopping trees.", 150, "axe", 1, 100)
 	axe_tool.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	axe_tool.world_model_path = "res://assets/gltf-tools/axe.gltf"
+	axe_tool.world_model_path = "res://assets/Tools/wood_axe.blend"
 	_register_item(axe_tool)
 	var pickaxe_tool = _create_tool("basic_pickaxe", "Basic Pickaxe", "For mining rocks.", 150, "pickaxe", 1, 100)
 	pickaxe_tool.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	pickaxe_tool.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	pickaxe_tool.world_model_path = "res://assets/Tools/wood_pickaxe.blend"
 	_register_item(pickaxe_tool)
 	# Extra tools
 	var hammer_tool = _create_tool("basic_hammer", "Hammer", "For crafting and building.", 120, "hammer", 1, 100)
 	hammer_tool.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	hammer_tool.world_model_path = "res://assets/gltf-tools/hammer.gltf"
+	hammer_tool.world_model_path = "res://assets/Tools/basic_hammer.blend"
 	_register_item(hammer_tool)
 	var saw_tool = _create_tool("basic_saw", "Saw", "For cutting wood.", 100, "saw", 1, 80)
-	saw_tool.world_model_path = "res://assets/gltf-tools/saw.gltf"
+	saw_tool.world_model_path = "res://assets/Tools/basic_saw.blend"
 	_register_item(saw_tool)
 	var chisel_tool = _create_tool("basic_chisel", "Chisel", "For fine crafting work.", 90, "chisel", 1, 60)
-	chisel_tool.world_model_path = "res://assets/gltf-tools/chisel.gltf"
+	chisel_tool.world_model_path = "res://assets/Tools/basic_chisel.blend"
 	_register_item(chisel_tool)
 	
+	# ===== Stone Tier (Hand-craftable, gathered from ground) =====
+	var stone_hoe = _create_tool("stone_hoe", "Stone Hoe", "A crude stone hoe for tilling.", 30, "hoe", 1, 50, ItemData.ToolTier.STONE)
+	stone_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	stone_hoe.world_model_path = "res://assets/Tools/wood_hoe.blend"
+	_register_item(stone_hoe)
+	var stone_axe = _create_tool("stone_axe", "Stone Axe", "A sharpened stone axe for chopping.", 40, "axe", 1, 50, ItemData.ToolTier.STONE)
+	stone_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
+	stone_axe.world_model_path = "res://assets/Tools/wood_axe.blend"
+	_register_item(stone_axe)
+	var stone_pickaxe = _create_tool("stone_pickaxe", "Stone Pickaxe", "A crude stone pickaxe for mining.", 40, "pickaxe", 1, 50, ItemData.ToolTier.STONE)
+	stone_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
+	stone_pickaxe.world_model_path = "res://assets/Tools/wood_pickaxe.blend"
+	_register_item(stone_pickaxe)
+	var stone_shovel = _create_tool("stone_shovel", "Stone Shovel", "A stone-tipped shovel for digging.", 30, "shovel", 1, 50, ItemData.ToolTier.STONE)
+	stone_shovel.icon = _load_icon("res://Weapon & Tool/Shovel.png")
+	stone_shovel.world_model_path = "res://assets/Tools/basic_shovel.blend"
+	_register_item(stone_shovel)
+	var stone_sickle = _create_tool("stone_sickle", "Stone Sickle", "A stone sickle for harvesting.", 30, "sickle", 1, 50, ItemData.ToolTier.STONE)
+	stone_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
+	stone_sickle.world_model_path = "res://assets/Tools/wood_sickle.blend"
+	_register_item(stone_sickle)
+	var stone_hammer = _create_tool("stone_hammer", "Stone Hammer", "A stone hammer for building.", 40, "hammer", 1, 60, ItemData.ToolTier.STONE)
+	stone_hammer.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	stone_hammer.world_model_path = "res://assets/Tools/basic_hammer.blend"
+	_register_item(stone_hammer)
+
 	# ===== Tiered Tools =====
 	# Bronze tier (power 2, durability 150)
 	var bronze_hoe = _create_tool("bronze_hoe", "Bronze Hoe", "A copper-alloy hoe, better than wood.", 180, "hoe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	bronze_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	bronze_hoe.world_model_path = "res://assets/Tools/bronze_hoe.blend"
 	bronze_hoe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_hoe)
 	var bronze_axe = _create_tool("bronze_axe", "Bronze Axe", "A copper-alloy axe for chopping.", 200, "axe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	bronze_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
+	bronze_axe.world_model_path = "res://assets/Tools/bronze_axe.blend"
 	bronze_axe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_axe)
 	var bronze_pickaxe = _create_tool("bronze_pickaxe", "Bronze Pickaxe", "A copper-alloy pickaxe for mining.", 200, "pickaxe", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	bronze_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	bronze_pickaxe.world_model_path = "res://assets/Tools/bronze_pickaxe.blend"
 	bronze_pickaxe.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_pickaxe)
 	var bronze_sickle = _create_tool("bronze_sickle", "Bronze Sickle", "A copper-alloy sickle for harvesting.", 180, "sickle", 2, 150, ItemData.ToolTier.BRONZE)
 	bronze_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	bronze_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
+	bronze_sickle.world_model_path = "res://assets/Tools/bronze_sickle.blend"
 	bronze_sickle.rarity = ItemData.ItemRarity.COMMON
 	_register_item(bronze_sickle)
 	
 	# Iron tier (power 3, durability 200)
 	var iron_hoe = _create_tool("iron_hoe", "Iron Hoe", "A sturdy iron hoe.", 300, "hoe", 3, 200, ItemData.ToolTier.IRON)
 	iron_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	iron_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	iron_hoe.world_model_path = "res://assets/Tools/iron_hoe.blend"
 	iron_hoe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_hoe)
 	var iron_axe = _create_tool("iron_axe", "Iron Axe", "A sharp iron axe.", 350, "axe", 3, 200, ItemData.ToolTier.IRON)
 	iron_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	iron_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
+	iron_axe.world_model_path = "res://assets/Tools/iron_axe.blend"
 	iron_axe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_axe)
 	var iron_pickaxe = _create_tool("iron_pickaxe", "Iron Pickaxe", "A strong iron pickaxe.", 350, "pickaxe", 3, 200, ItemData.ToolTier.IRON)
 	iron_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	iron_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	iron_pickaxe.world_model_path = "res://assets/Tools/iron_pickaxe.blend"
 	iron_pickaxe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_pickaxe)
 	var iron_sickle = _create_tool("iron_sickle", "Iron Sickle", "A sharp iron sickle.", 300, "sickle", 3, 200, ItemData.ToolTier.IRON)
 	iron_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	iron_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
+	iron_sickle.world_model_path = "res://assets/Tools/iron_sickle.blend"
 	iron_sickle.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(iron_sickle)
 	
 	# Steel tier (power 5, durability 300)
 	var steel_hoe = _create_tool("steel_hoe", "Steel Hoe", "A refined steel hoe.", 500, "hoe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	steel_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	steel_hoe.world_model_path = "res://assets/Tools/steel_hoe.blend"
 	steel_hoe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_hoe)
 	var steel_axe = _create_tool("steel_axe", "Steel Axe", "A powerful steel axe.", 600, "axe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	steel_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
+	steel_axe.world_model_path = "res://assets/Tools/steel_axe.blend"
 	steel_axe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_axe)
 	var steel_pickaxe = _create_tool("steel_pickaxe", "Steel Pickaxe", "A powerful steel pickaxe.", 600, "pickaxe", 5, 300, ItemData.ToolTier.STEEL)
 	steel_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	steel_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	steel_pickaxe.world_model_path = "res://assets/Tools/steel_pickaxe.blend"
 	steel_pickaxe.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_pickaxe)
 	var steel_sickle = _create_tool("steel_sickle", "Steel Sickle", "A keen steel sickle.", 500, "sickle", 5, 300, ItemData.ToolTier.STEEL)
 	steel_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	steel_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
+	steel_sickle.world_model_path = "res://assets/Tools/steel_sickle.blend"
 	steel_sickle.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(steel_sickle)
 	
 	# Mythril tier (power 8, durability 500)
 	var mythril_hoe = _create_tool("mythril_hoe", "Mythril Hoe", "A legendary hoe of mythril.", 1000, "hoe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_hoe.icon = _load_icon("res://Weapon & Tool/Hammer.png")
-	mythril_hoe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	mythril_hoe.world_model_path = "res://assets/Tools/mythril_hoe.blend"
 	mythril_hoe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_hoe)
 	var mythril_axe = _create_tool("mythril_axe", "Mythril Axe", "A legendary axe of mythril.", 1200, "axe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
-	mythril_axe.world_model_path = "res://assets/gltf-tools/axe.gltf"
+	mythril_axe.world_model_path = "res://assets/Tools/mythril_axe.blend"
 	mythril_axe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_axe)
 	var mythril_pickaxe = _create_tool("mythril_pickaxe", "Mythril Pickaxe", "A legendary pickaxe of mythril.", 1200, "pickaxe", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_pickaxe.icon = _load_icon("res://Weapon & Tool/Pickaxe.png")
-	mythril_pickaxe.world_model_path = "res://assets/gltf-tools/pickaxe.gltf"
+	mythril_pickaxe.world_model_path = "res://assets/Tools/mythril_pickaxe.blend"
 	mythril_pickaxe.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_pickaxe)
 	var mythril_sickle = _create_tool("mythril_sickle", "Mythril Sickle", "A legendary sickle of mythril.", 1000, "sickle", 8, 500, ItemData.ToolTier.MYTHRIL)
 	mythril_sickle.icon = _load_icon("res://Weapon & Tool/Knife.png")
-	mythril_sickle.world_model_path = "res://assets/gltf-tools/knife.gltf"
+	mythril_sickle.world_model_path = "res://assets/Tools/mythril_sickle.blend"
 	mythril_sickle.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_sickle)
 	
-	# Weapons (3D models from KayKit Adventurers pack)
-	var sword_weapon = _create_weapon("basic_sword", "Iron Sword", "A sturdy one-handed sword.", 200, 10, 80, "sword", "res://assets/rpg_pack/Sword.blend")
+	# ===== Weapons (Tiered) =====
+	
+	# BRONZE tier
+	var bronze_sword = _create_weapon("bronze_sword", "Bronze Sword", "A bronze sword, better than nothing.", 120, 6, 100, "sword", "res://assets/Weapons/bronze_sword.blend")
+	bronze_sword.icon = _load_icon("res://Weapon & Tool/Silver Sword.png")
+	bronze_sword.tool_tier = ItemData.ToolTier.BRONZE
+	_register_item(bronze_sword)
+	var bronze_battle_axe = _create_weapon("bronze_battle_axe", "Bronze Battle Axe", "A bronze battle axe.", 100, 8, 90, "battle_axe", "res://assets/Weapons/bronze_battle_axe.blend")
+	bronze_battle_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
+	bronze_battle_axe.tool_tier = ItemData.ToolTier.BRONZE
+	_register_item(bronze_battle_axe)
+	var bronze_dagger = _create_weapon("bronze_dagger", "Bronze Dagger", "A bronze dagger.", 60, 4, 60, "dagger", "res://assets/Weapons/bronze_dagger.blend")
+	bronze_dagger.icon = _load_icon("res://Weapon & Tool/Knife.png")
+	bronze_dagger.tool_tier = ItemData.ToolTier.BRONZE
+	_register_item(bronze_dagger)
+	
+	# IRON tier (existing weapons)
+	var sword_weapon = _create_weapon("basic_sword", "Iron Sword", "A sturdy one-handed sword.", 200, 10, 200, "sword", "res://assets/Weapons/iron_sword.blend")
 	sword_weapon.icon = _load_icon("res://Weapon & Tool/Silver Sword.png")
+	sword_weapon.tool_tier = ItemData.ToolTier.IRON
 	_register_item(sword_weapon)
-	var axe_weapon = _create_weapon("basic_axe_weapon", "Battle Axe", "A one-handed battle axe.", 180, 12, 70, "battle_axe", "res://assets/rpg_pack/Axe_Double.blend")
+	var axe_weapon = _create_weapon("basic_axe_weapon", "Iron Battle Axe", "A heavy iron battle axe.", 180, 12, 180, "battle_axe", "res://assets/Weapons/iron_battle_axe.blend")
 	axe_weapon.icon = _load_icon("res://Weapon & Tool/Axe.png")
+	axe_weapon.tool_tier = ItemData.ToolTier.IRON
 	_register_item(axe_weapon)
-	var dagger_weapon = _create_weapon("basic_dagger", "Dagger", "A quick and light dagger.", 100, 6, 50, "dagger", "res://assets/rpg_pack/Dagger.blend")
+	var dagger_weapon = _create_weapon("basic_dagger", "Iron Dagger", "A sharp iron dagger.", 100, 6, 120, "dagger", "res://assets/Weapons/iron_dagger.blend")
 	dagger_weapon.icon = _load_icon("res://Weapon & Tool/Knife.png")
+	dagger_weapon.tool_tier = ItemData.ToolTier.IRON
 	_register_item(dagger_weapon)
+	
+	# STEEL tier
+	var steel_sword = _create_weapon("steel_sword", "Steel Sword", "A finely-crafted steel sword.", 400, 16, 350, "sword", "res://assets/Weapons/steel_sword.blend")
+	steel_sword.icon = _load_icon("res://Weapon & Tool/Silver Sword.png")
+	steel_sword.tool_tier = ItemData.ToolTier.STEEL
+	steel_sword.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(steel_sword)
+	var steel_battle_axe = _create_weapon("steel_battle_axe", "Steel Battle Axe", "A powerful steel battle axe.", 380, 18, 300, "battle_axe", "res://assets/Weapons/steel_battle_axe.blend")
+	steel_battle_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
+	steel_battle_axe.tool_tier = ItemData.ToolTier.STEEL
+	steel_battle_axe.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(steel_battle_axe)
+	var steel_dagger = _create_weapon("steel_dagger", "Steel Dagger", "A razor-sharp steel dagger.", 250, 10, 250, "dagger", "res://assets/Weapons/steel_dagger.blend")
+	steel_dagger.icon = _load_icon("res://Weapon & Tool/Knife.png")
+	steel_dagger.tool_tier = ItemData.ToolTier.STEEL
+	steel_dagger.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(steel_dagger)
+	
+	# MYTHRIL tier
+	var mythril_sword = _create_weapon("mythril_sword", "Mythril Sword", "A legendary mythril sword of incredible sharpness.", 900, 25, 600, "sword", "res://assets/Weapons/mythril_sword.blend")
+	mythril_sword.icon = _load_icon("res://Weapon & Tool/Silver Sword.png")
+	mythril_sword.tool_tier = ItemData.ToolTier.MYTHRIL
+	mythril_sword.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_sword)
+	var mythril_battle_axe = _create_weapon("mythril_battle_axe", "Mythril Battle Axe", "A mighty mythril battle axe.", 850, 28, 500, "battle_axe", "res://assets/Weapons/mythril_battle_axe.blend")
+	mythril_battle_axe.icon = _load_icon("res://Weapon & Tool/Axe.png")
+	mythril_battle_axe.tool_tier = ItemData.ToolTier.MYTHRIL
+	mythril_battle_axe.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_battle_axe)
+	var mythril_dagger = _create_weapon("mythril_dagger", "Mythril Dagger", "A lightning-quick mythril dagger.", 600, 15, 400, "dagger", "res://assets/Weapons/mythril_dagger.blend")
+	mythril_dagger.icon = _load_icon("res://Weapon & Tool/Knife.png")
+	mythril_dagger.tool_tier = ItemData.ToolTier.MYTHRIL
+	mythril_dagger.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_dagger)
+	
+	# ===== Armor (Equipment) =====
+	
+	# Bronze tier
+	var bronze_helmet = _create_equipment("bronze_helmet", "Bronze Helmet", "A basic bronze helmet for protection.", 80, 2, 100, ItemData.ToolTier.BRONZE)
+	bronze_helmet.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bronze_helmet.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bronze_helmet)
+	var bronze_chestplate = _create_equipment("bronze_chestplate", "Bronze Chestplate", "A bronze chestplate offering decent protection.", 120, 4, 100, ItemData.ToolTier.BRONZE)
+	bronze_chestplate.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bronze_chestplate.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bronze_chestplate)
+	var bronze_greaves = _create_equipment("bronze_greaves", "Bronze Greaves", "Bronze leg guards for lower body protection.", 100, 3, 100, ItemData.ToolTier.BRONZE)
+	bronze_greaves.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bronze_greaves.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bronze_greaves)
+	var bronze_boots = _create_equipment("bronze_boots", "Bronze Boots", "Sturdy bronze boots for foot protection.", 70, 2, 100, ItemData.ToolTier.BRONZE)
+	bronze_boots.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bronze_boots.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bronze_boots)
+	
+	# Iron tier
+	var iron_helmet = _create_equipment("iron_helmet", "Iron Helmet", "A sturdy iron helmet with solid protection.", 180, 4, 200, ItemData.ToolTier.IRON)
+	iron_helmet.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	iron_helmet.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(iron_helmet)
+	var iron_chestplate = _create_equipment("iron_chestplate", "Iron Chestplate", "A heavy iron chestplate for serious defense.", 260, 6, 200, ItemData.ToolTier.IRON)
+	iron_chestplate.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	iron_chestplate.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(iron_chestplate)
+	var iron_greaves = _create_equipment("iron_greaves", "Iron Greaves", "Iron leg guards for sturdy lower body protection.", 220, 5, 200, ItemData.ToolTier.IRON)
+	iron_greaves.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	iron_greaves.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(iron_greaves)
+	var iron_boots = _create_equipment("iron_boots", "Iron Boots", "Reinforced iron boots.", 150, 3, 200, ItemData.ToolTier.IRON)
+	iron_boots.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	iron_boots.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(iron_boots)
+	
+	# Steel tier
+	var steel_helmet = _create_equipment("steel_helmet", "Steel Helmet", "A high-quality steel helmet with excellent protection.", 400, 6, 300, ItemData.ToolTier.STEEL)
+	steel_helmet.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	steel_helmet.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(steel_helmet)
+	var steel_chestplate = _create_equipment("steel_chestplate", "Steel Chestplate", "A masterfully forged steel chestplate.", 600, 10, 300, ItemData.ToolTier.STEEL)
+	steel_chestplate.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	steel_chestplate.rarity = ItemData.ItemRarity.RARE
+	_register_item(steel_chestplate)
+	var steel_greaves = _create_equipment("steel_greaves", "Steel Greaves", "Steel leg guards for superior protection.", 500, 8, 300, ItemData.ToolTier.STEEL)
+	steel_greaves.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	steel_greaves.rarity = ItemData.ItemRarity.RARE
+	_register_item(steel_greaves)
+	var steel_boots = _create_equipment("steel_boots", "Steel Boots", "Heavy steel boots offering maximum foot protection.", 350, 5, 300, ItemData.ToolTier.STEEL)
+	steel_boots.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	steel_boots.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(steel_boots)
+	
+	# Mythril tier
+	var mythril_helmet = _create_equipment("mythril_helmet", "Mythril Helmet", "A legendary mythril helmet with unparalleled protection.", 1200, 10, 500, ItemData.ToolTier.MYTHRIL)
+	mythril_helmet.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	mythril_helmet.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_helmet)
+	var mythril_chestplate = _create_equipment("mythril_chestplate", "Mythril Chestplate", "A masterfully forged mythril chestplate of incredible strength.", 1800, 16, 500, ItemData.ToolTier.MYTHRIL)
+	mythril_chestplate.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	mythril_chestplate.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_chestplate)
+	var mythril_greaves = _create_equipment("mythril_greaves", "Mythril Greaves", "Mythril leg guards offering supreme protection.", 1500, 13, 500, ItemData.ToolTier.MYTHRIL)
+	mythril_greaves.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	mythril_greaves.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_greaves)
+	var mythril_boots = _create_equipment("mythril_boots", "Mythril Boots", "Mythril boots that feel light yet provide unmatched defense.", 1000, 8, 500, ItemData.ToolTier.MYTHRIL)
+	mythril_boots.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	mythril_boots.rarity = ItemData.ItemRarity.RARE
+	_register_item(mythril_boots)
 	
 	# ===== Fishing =====
 	var fishing_rod = _create_tool("basic_fishing_rod", "Fishing Rod", "A simple fishing rod for catching fish.", 40, "fishing_rod", 1, 60)
 	fishing_rod.icon = _load_icon("res://Weapon & Tool/Shovel.png")
+	fishing_rod.world_model_path = "res://assets/Tools/basic_fishing_rod.blend"
 	_register_item(fishing_rod)
 
 	var raw_fish = _create_food("raw_fish", "Raw Fish", "A fresh catch from the water.", 8, 8.0, 0.0, 3.0)
@@ -234,6 +388,9 @@ func _initialize_items() -> void:
 	stone.icon = _load_icon("res://Ore & Gem/Obsidian.png")
 	stone.world_model_path = "res://assets/Ultimate_Trees/Rock_1.blend"
 	_register_item(stone)
+	var small_stone = _create_material("small_stone", "Small Stone", "A small, hand-sized stone found on the ground.", 1, 99)
+	small_stone.icon = _load_icon("res://Ore & Gem/Coal.png")
+	_register_item(small_stone)
 	var stone_brick = _create_material("stone_brick", "Stone Brick", "A shaped stone brick.", 8, 50)
 	stone_brick.icon = _load_icon("res://Ore & Gem/Obsidian.png")
 	stone_brick.world_model_path = "res://assets/Ultimate_Trees/Rock_2.blend"
@@ -307,7 +464,7 @@ func _initialize_items() -> void:
 	paper.icon = _load_icon("res://Material/Paper.png")
 	_register_item(paper)
 	var torch_item = _create_tool("torch", "Torch", "A simple torch for light.", 30, "torch", 0, 80)
-	torch_item.world_model_path = "res://assets/gltf-tools/torch.gltf"
+	torch_item.world_model_path = "res://assets/Tools/torch.blend"
 	torch_item.is_offhand = true
 	torch_item.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(torch_item)
@@ -514,19 +671,19 @@ func _initialize_items() -> void:
 	# ===== Placeable Items (Fences, Gates) =====
 	
 	var fence_wood = _create_placeable("fence_wood", "Wooden Fence", "A sturdy wooden fence section.", 8,
-		"res://assets/Medieval Village MegaKit[Standard]/glTF/Prop_WoodenFence_Extension1.gltf", 1.0,
+		"res://assets/Placeables/fence_wood.blend", 1.0,
 		Vector3(2.0, 0.84, 0.12))
 	fence_wood.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(fence_wood)
 
 	var fence_post = _create_placeable("fence_post", "Fence Post", "A wooden fence post for corners and ends.", 5,
-		"res://assets/Medieval Village MegaKit[Standard]/glTF/Corner_Exterior_Wood.gltf", 0.6,
-		Vector3(0.25, 3.0, 0.25))
+		"res://assets/Placeables/fence_post.blend", 1.0,
+		Vector3(0.25, 1.55, 0.25))
 	fence_post.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(fence_post)
 
 	var fence_gate = _create_placeable("fence_gate", "Fence Gate", "A gate that can be opened and closed.", 15,
-		"res://assets/Medieval Village MegaKit[Standard]/glTF/Prop_WoodenFence_Single.gltf", 1.0,
+		"res://assets/Placeables/fence_gate.blend", 1.0,
 		Vector3(2.0, 0.84, 0.12))
 	fence_gate.icon = _load_icon("res://Material/Wooden Plank.png")
 	fence_gate.placeable_is_gate = true
@@ -549,38 +706,58 @@ func _initialize_items() -> void:
 	_register_item(hut)
 	
 	var feeding_trough = _create_placeable("feeding_trough", "Feeding Trough", "A wooden trough for feeding farm animals.", 20,
-		"", 1.0,
+		"res://assets/Placeables/feeding_trough.blend", 1.0,
 		Vector3(1.5, 0.5, 0.6))
 	feeding_trough.icon = _load_icon("res://Material/Wooden Plank.png")
 	_register_item(feeding_trough)
 	
 	var campfire = _create_placeable("campfire", "Campfire", "A warm campfire for light and cooking.", 15,
-		"", 2.0,
+		"res://assets/Placeables/campfire.blend", 1.0,
 		Vector3(0.8, 0.4, 0.8))
 	campfire.icon = _load_icon("res://Weapon & Tool/Torch.png")
 	_register_item(campfire)
 
 	var claim_post = _create_placeable("claim_post", "Claim Post", "Mark your territory. Only you can build within the claim zone.", 30,
-		"res://assets/Ultimate_Trees/WoodLog.blend", 2.0,
-		Vector3(0.3, 1.2, 0.3))
+		"res://assets/Placeables/claim_post.blend", 1.0,
+		Vector3(0.3, 1.25, 0.3))
 	claim_post.icon = _load_icon("res://Weapon & Tool/Shovel.png")
 	claim_post.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(claim_post)
 	
 	var sitting_log = _create_placeable("sitting_log", "Sitting Log", "A log to sit on by the fire.", 8,
-		"res://assets/Ultimate_Trees/WoodLog.blend", 2.0,
+		"res://assets/Placeables/sitting_log.blend", 1.0,
 		Vector3(1.2, 0.5, 0.5))
 	sitting_log.icon = _load_icon("res://Material/Wood Log.png")
 	_register_item(sitting_log)
 	
 	# ===== Decoration Placeables =====
 	_register_item(_create_placeable("flower_pot", "Flower Pot", "A charming pot with wildflowers.", 6,
-		"", 1.0, Vector3(0.3, 0.3, 0.3)))
+		"res://assets/Placeables/flower_pot.blend", 1.0, Vector3(0.3, 0.4, 0.3)))
 	_register_item(_create_placeable("chair_wood", "Wooden Chair", "A simple wooden chair.", 10,
-		"", 1.0, Vector3(0.5, 0.6, 0.5)))
+		"res://assets/Placeables/chair_wood.blend", 1.0, Vector3(0.5, 0.8, 0.5)))
 	_register_item(_create_placeable("table_small", "Small Table", "A small wooden table.", 15,
-		"", 1.0, Vector3(0.8, 0.6, 0.6)))
+		"res://assets/Placeables/table_small.blend", 1.0, Vector3(0.8, 0.6, 0.8)))
 
+	# ===== Defensive Placeables =====
+	
+	var wood_wall = _create_placeable("wood_wall", "Wooden Wall", "A sturdy wooden wall that blocks enemies.", 25,
+		"", 1.0, Vector3(2.0, 1.5, 0.3))
+	wood_wall.icon = _load_icon("res://Material/Wooden Plank.png")
+	wood_wall.rarity = ItemData.ItemRarity.COMMON
+	_register_item(wood_wall)
+	
+	var stone_wall = _create_placeable("stone_wall", "Stone Wall", "A strong stone wall that blocks enemies.", 50,
+		"", 1.0, Vector3(2.0, 1.8, 0.4))
+	stone_wall.icon = _load_icon("res://Ore & Gem/Obsidian.png")
+	stone_wall.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(stone_wall)
+	
+	var spiked_barricade = _create_placeable("spiked_barricade", "Spiked Barricade", "Damages enemies that touch it.", 35,
+		"", 1.0, Vector3(2.0, 1.2, 0.3))
+	spiked_barricade.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	spiked_barricade.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(spiked_barricade)
+	
 	# Community Center — a special placeable with interior and shared storage
 	var community_center = ItemData.new()
 	community_center.item_id = "community_center"
@@ -598,6 +775,57 @@ func _initialize_items() -> void:
 	community_center.placeable_can_rotate = true
 	community_center.icon = _load_icon("res://Misc/Crate.png")
 	_register_item(community_center)
+
+	# ===== Crafting Stations (placeable benches) =====
+
+	var bench_workbench = _create_placeable("workbench", "Workbench", "A sturdy workbench for crafting tools and items.", 50,
+		"res://assets/Crafting/workbench.blend", 1.0, Vector3(1.2, 0.8, 0.8))
+	bench_workbench.station_type = 1
+	bench_workbench.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bench_workbench.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bench_workbench)
+
+	var bench_forge = _create_placeable("forge", "Forge", "A coal-fired forge for smelting ores and heating metal.", 80,
+		"res://assets/Crafting/forge.blend", 1.0, Vector3(1.0, 1.5, 1.0))
+	bench_forge.station_type = 2
+	bench_forge.icon = _load_icon("res://Ore & Gem/Coal.png")
+	bench_forge.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(bench_forge)
+
+	var bench_anvil = _create_placeable("anvil", "Anvil", "A heavy anvil for shaping metal into tools and weapons.", 120,
+		"res://assets/Crafting/anvil.blend", 1.0, Vector3(0.7, 0.75, 0.4))
+	bench_anvil.station_type = 3
+	bench_anvil.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	bench_anvil.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(bench_anvil)
+
+	var bench_cooking = _create_placeable("cooking_fire", "Cooking Fire", "An open fire for cooking meals and boiling water.", 40,
+		"res://assets/Crafting/cooking_fire.blend", 1.0, Vector3(1.0, 0.75, 1.0))
+	bench_cooking.station_type = 4
+	bench_cooking.icon = _load_icon("res://Weapon & Tool/Torch.png")
+	bench_cooking.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bench_cooking)
+
+	var bench_alchemy = _create_placeable("alchemy_table", "Alchemy Table", "A sturdy table for brewing potions and mixing reagents.", 100,
+		"res://assets/Crafting/alchemy_table.blend", 1.0, Vector3(1.1, 1.1, 0.7))
+	bench_alchemy.station_type = 5
+	bench_alchemy.icon = _load_icon("res://Potion/Blue Potion.png")
+	bench_alchemy.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(bench_alchemy)
+
+	var bench_loom = _create_placeable("loom", "Loom", "A wooden loom for weaving fiber and wool into cloth.", 60,
+		"res://assets/Crafting/loom.blend", 1.0, Vector3(1.0, 1.1, 0.5))
+	bench_loom.station_type = 6
+	bench_loom.icon = _load_icon("res://Material/String.png")
+	bench_loom.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bench_loom)
+
+	var bench_sawmill = _create_placeable("sawmill", "Sawmill", "A sawmill for processing logs into planks and sticks.", 70,
+		"res://assets/Crafting/sawmill.blend", 1.0, Vector3(1.3, 0.9, 0.5))
+	bench_sawmill.station_type = 7
+	bench_sawmill.icon = _load_icon("res://Material/Wood Log.png")
+	bench_sawmill.rarity = ItemData.ItemRarity.COMMON
+	_register_item(bench_sawmill)
 
 	# Optional: assign more from root-level item###.png or other packs
 	_set_item_icons_from_pack()
@@ -737,6 +965,21 @@ func _create_food(id: String, name: String, desc: String, value: int, hunger: fl
 func _create_cooked_food(id: String, name: String, desc: String, value: int, hunger: float, health: float, stamina: float, buffs: Array[Dictionary] = []) -> ItemData:
 	var item = _create_food(id, name, desc, value, hunger, health, stamina)
 	item.buff_effects = buffs
+	return item
+
+func _create_equipment(id: String, name: String, desc: String, value: int, defense: int, durability: int, tier: int = ItemData.ToolTier.WOOD) -> ItemData:
+	var item = ItemData.new()
+	item.item_id = id
+	item.item_name = name
+	item.description = desc
+	item.item_type = ItemData.ItemType.EQUIPMENT
+	item.base_value = value
+	item.max_stack_size = 1
+	item.is_stackable = false
+	item.has_durability = true
+	item.max_durability = durability
+	item.defense_value = defense
+	item.tool_tier = tier
 	return item
 
 func _create_placeable(id: String, name: String, desc: String, value: int, model_path: String, model_scale: float, collision_size: Vector3) -> ItemData:

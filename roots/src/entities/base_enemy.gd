@@ -397,10 +397,10 @@ func _die() -> void:
 	ai_state = AIState.DEAD
 	_death_timer = 1.0
 	
-	# Grant XP
+	# Grant militia XP based on enemy difficulty
 	var skill_manager = get_node_or_null("/root/SkillManager")
-	if skill_manager and skill_manager.has_method("grant_action_xp"):
-		skill_manager.grant_action_xp(xp_skill)
+	if skill_manager and skill_manager.has_method("grant_xp"):
+		skill_manager.grant_xp("militia", int(xp_reward))
 	
 	# Spawn loot
 	_spawn_loot()
@@ -442,6 +442,7 @@ func _spawn_loot() -> void:
 		world_item.item_id = item_id
 		world_item.quantity = amount
 		world_item.auto_pickup = true
+		world_item.despawn_time = 120.0
 		world_item.position = drop_pos
 		
 		var tree_root = get_tree().current_scene

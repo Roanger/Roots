@@ -150,3 +150,23 @@ horizontal_alignment = 1
 [node name="OffhandSlot" parent="CharacterPanel/MarginContainer/VBoxContainer/ContentContainer/OffhandContainer" instance=ExtResource("2_equip_slot")]
 slot_type = 8
 slot_label = "Offhand"
+
+[node name="HSeparator2" type="HSeparator" parent="CharacterPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="StatsContainer" type="HBoxContainer" parent="CharacterPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="DefenseStatsLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/StatsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.55, 0.8, 0.55, 1)
+text = "Armor: 0"
+
+[node name="WeaponStatsLabel" type="Label" parent="CharacterPanel/MarginContainer/VBoxContainer/StatsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.8, 0.55, 0.55, 1)
+text = "Damage: 0"

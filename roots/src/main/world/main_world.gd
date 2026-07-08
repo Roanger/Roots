@@ -13,6 +13,7 @@ extends Node3D
 
 var hud_scene = preload("res://src/ui/hud/hud.tscn")
 const CraftingUIScript = preload("res://src/ui/crafting_ui.gd")
+const HerbariumUIScript = preload("res://src/ui/herbarium_ui.gd")
 const BaseEnemy = preload("res://src/entities/base_enemy.gd")
 const CraftingStationObject = preload("res://src/world/crafting_station_object.gd")
 const BaseAnimalScript = preload("res://src/entities/animals/base_animal.gd")
@@ -32,6 +33,7 @@ var town_builder: Node3D = null
 var water_plane: MeshInstance3D = null
 var skill_tree_ui: Control = null
 var crafting_ui: CraftingUI = null
+var herbarium_ui: Control = null
 var dialogue_ui: Control = null
 var shop_ui: Control = null
 var quest_journal_ui: Control = null
@@ -213,6 +215,7 @@ func _on_terrain_ready() -> void:
 	_setup_hud()
 	_setup_skill_tree_ui()
 	_setup_crafting_ui()
+	_setup_herbarium_ui()
 	_spawn_enemies()
 	_spawn_animals()
 	_setup_interior_manager()
@@ -746,13 +749,16 @@ func _serialize_terrain() -> Dictionary:
 		}
 	return {"version": "1.0.0", "seed": 0}
 
-func _serialize_farm_plots() -> Array:
+func _serialize_farm_plots() -> Dictionary:
 	var plots_data: Array = []
 	if farm_plots_container:
 		for child in farm_plots_container.get_children():
 			if child is FarmPlot:
 				plots_data.append(child.get_save_data())
-	return plots_data
+	var dug: Array = []
+	if chunk_manager and chunk_manager.has_method("serialize_dug_positions"):
+		dug = chunk_manager.serialize_dug_positions()
+	return {"plots": plots_data, "dug": dug}
 
 func _load_player_data() -> void:
 	if not game_manager or not player:
@@ -810,9 +816,18 @@ func _load_placed_objects() -> void:
 func _load_farm_plots() -> void:
 	if not game_manager or not farm_plots_container:
 		return
-	var plots_data = game_manager.world_data.get("farm_plots", [])
-	if plots_data.is_empty():
+	var farm_raw = game_manager.world_data.get("farm_plots", {})
+	if farm_raw.is_empty():
 		return
+	# Handle both old format (array of plot data) and new format (dict with plots/dug)
+	var plots_data: Array
+	if farm_raw is Array:
+		plots_data = farm_raw
+	else:
+		plots_data = farm_raw.get("plots", [])
+		var dug_data: Array = farm_raw.get("dug", [])
+		if not dug_data.is_empty() and chunk_manager and chunk_manager.has_method("restore_dug_positions"):
+			chunk_manager.restore_dug_positions(dug_data)
 	var crop_db = get_node_or_null("/root/CropDatabase")
 	var plots = farm_plots_container.get_children()
 	for i in range(min(plots_data.size(), plots.size())):
@@ -947,74 +962,24 @@ func _setup_crafting_ui() -> void:
 	if event_bus:
 		event_bus.open_crafting_station.connect(_on_open_crafting_station)
 	
-	# Spawn starter crafting stations near the player
-	call_deferred("_spawn_crafting_stations")
 	print("Crafting UI initialized")
+
+func _setup_herbarium_ui() -> void:
+	var ui_container = get_node_or_null("UI")
+	if not ui_container:
+		return
+	herbarium_ui = HerbariumUIScript.new()
+	herbarium_ui.name = "HerbariumUI"
+	ui_container.add_child(herbarium_ui)
+	herbarium_ui.initialize()
+	print("Herbarium UI initialized")
 
 func _on_open_crafting_station(station_type: int) -> void:
 	if crafting_ui:
 		crafting_ui.show_crafting(station_type)
 
-func _spawn_crafting_stations() -> void:
-	if not player:
-		return
-	var spawn_pos = player.global_position
-	
-	# Workbench - 3m in front of player spawn
-	_create_station(spawn_pos + Vector3(3, 0, 0), 1, "Workbench", Color(0.55, 0.35, 0.15))
-	# Forge - 5m to the right
-	_create_station(spawn_pos + Vector3(5, 0, 2), 2, "Forge", Color(0.3, 0.3, 0.3))
-	# Anvil - next to forge
-	_create_station(spawn_pos + Vector3(5, 0, 4), 3, "Anvil", Color(0.25, 0.25, 0.3))
-	# Alchemy Table - near the other stations
-	_create_station(spawn_pos + Vector3(3, 0, 4), 5, "Alchemy Table", Color(0.4, 0.2, 0.5))
-	# Cooking Fire - warm orange
-	_create_station(spawn_pos + Vector3(5, 0, 6), 4, "Cooking Fire", Color(0.8, 0.4, 0.1))
-
-func _create_station(pos: Vector3, station_type: int, station_name: String, color: Color) -> void:
-	# Snap to terrain height
-	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
-		pos.y = chunk_manager.get_terrain_height(Vector3(pos.x, 0, pos.z))
-	
-	var container = Node3D.new()
-	container.name = station_name
-	container.position = pos
-	
-	# Visual mesh
-	var mesh_inst = MeshInstance3D.new()
-	var box = BoxMesh.new()
-	box.size = Vector3(1.2, 0.8, 0.8)
-	mesh_inst.mesh = box
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = color
-	mesh_inst.material_override = mat
-	mesh_inst.position.y = 0.4
-	container.add_child(mesh_inst)
-	
-	# Label
-	var label = Label3D.new()
-	label.text = station_name
-	label.font_size = 32
-	label.position.y = 1.2
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	container.add_child(label)
-	
-	# Interactable collision (CraftingStationObject)
-	var station = CraftingStationObject.new()
-	station.name = "StationBody"
-	station.station_type = station_type
-	station.station_name = station_name
-	station.collision_layer = 2
-	station.collision_mask = 0
-	var col_shape = CollisionShape3D.new()
-	var shape = BoxShape3D.new()
-	shape.size = Vector3(1.2, 0.8, 0.8)
-	col_shape.shape = shape
-	col_shape.position.y = 0.4
-	station.add_child(col_shape)
-	container.add_child(station)
-	
-	add_child(container)
+# Crafting stations are now placed by the player from inventory items.
+# See _place_object() in player_controller.gd.
 
 func _build_village() -> void:
 	await get_tree().process_frame
@@ -1146,7 +1111,7 @@ func _register_animal_species() -> void:
 	chicken.detection_range = 4.0
 	chicken.collision_radius = 0.25
 	chicken.collision_height = 0.5
-	chicken.model_path = ""
+	chicken.model_path = "res://assets/Animals/Blends/chicken.blend"
 	chicken.model_scale = 0.4
 	chicken.body_color = Color(0.95, 0.9, 0.8)
 	chicken.product_type = AnimalDataScript.ProductType.EGG
@@ -1173,7 +1138,7 @@ func _register_animal_species() -> void:
 	cow.detection_range = 5.0
 	cow.collision_radius = 0.5
 	cow.collision_height = 1.4
-	cow.model_path = ""
+	cow.model_path = "res://assets/Animals/Blends/Cow.blend"
 	cow.model_scale = 0.6
 	cow.body_color = Color(0.9, 0.85, 0.8)
 	cow.product_type = AnimalDataScript.ProductType.MILK
@@ -1203,7 +1168,7 @@ func _register_animal_species() -> void:
 	sheep.detection_range = 5.0
 	sheep.collision_radius = 0.4
 	sheep.collision_height = 1.0
-	sheep.model_path = ""
+	sheep.model_path = "res://assets/Animals/Blends/sheep.blend"
 	sheep.model_scale = 0.5
 	sheep.body_color = Color(0.95, 0.95, 0.9)
 	sheep.product_type = AnimalDataScript.ProductType.WOOL
@@ -1233,8 +1198,8 @@ func _register_animal_species() -> void:
 	goat.detection_range = 6.0
 	goat.collision_radius = 0.35
 	goat.collision_height = 0.9
-	goat.model_path = ""
-	goat.model_scale = 1.0
+	goat.model_path = "res://assets/Animals/Blends/goat.blend"
+	goat.model_scale = 0.5
 	goat.body_color = Color(0.75, 0.7, 0.6)
 	goat.product_type = AnimalDataScript.ProductType.MILK
 	goat.product_item_id = "milk"
@@ -1263,7 +1228,7 @@ func _register_animal_species() -> void:
 	duck.detection_range = 4.0
 	duck.collision_radius = 0.25
 	duck.collision_height = 0.5
-	duck.model_path = ""
+	duck.model_path = "res://assets/Animals/Blends/duck.blend"
 	duck.model_scale = 0.5
 	duck.body_color = Color(0.95, 0.92, 0.75)
 	duck.product_type = AnimalDataScript.ProductType.EGG
@@ -1290,7 +1255,7 @@ func _register_animal_species() -> void:
 	boar.detection_range = 6.0
 	boar.collision_radius = 0.45
 	boar.collision_height = 0.9
-	boar.model_path = ""
+	boar.model_path = "res://assets/Animals/Blends/boar.blend"
 	boar.model_scale = 0.5
 	boar.body_color = Color(0.5, 0.35, 0.25)
 	boar.product_type = AnimalDataScript.ProductType.NONE
@@ -1317,8 +1282,8 @@ func _register_animal_species() -> void:
 	deer.detection_range = 10.0
 	deer.collision_radius = 0.4
 	deer.collision_height = 1.3
-	deer.model_path = ""
-	deer.model_scale = 1.0
+	deer.model_path = "res://assets/Animals/Blends/Deer.blend"
+	deer.model_scale = 0.5
 	deer.body_color = Color(0.6, 0.45, 0.3)
 	deer.product_type = AnimalDataScript.ProductType.NONE
 	deer.loot_table = [
@@ -1342,7 +1307,7 @@ func _register_animal_species() -> void:
 	rabbit.detection_range = 8.0
 	rabbit.collision_radius = 0.2
 	rabbit.collision_height = 0.4
-	rabbit.model_path = ""
+	rabbit.model_path = "res://assets/Animals/Blends/rabbit.blend"
 	rabbit.model_scale = 1.0
 	rabbit.body_color = Color(0.7, 0.6, 0.5)
 	rabbit.product_type = AnimalDataScript.ProductType.NONE
@@ -1366,8 +1331,8 @@ func _register_animal_species() -> void:
 	wolf.detection_range = 12.0
 	wolf.collision_radius = 0.4
 	wolf.collision_height = 1.0
-	wolf.model_path = ""
-	wolf.model_scale = 0.7
+	wolf.model_path = "res://assets/Animals/Blends/Wolf.blend"
+	wolf.model_scale = 0.45
 	wolf.body_color = Color(0.45, 0.4, 0.35)
 	wolf.product_type = AnimalDataScript.ProductType.NONE
 	wolf.is_predator = true
@@ -1500,30 +1465,35 @@ func _spawn_night_enemies() -> void:
 		var emodel: String
 		var escale: float
 		var loot: Array
+		var xp: float = 10.0
 
 		if roll < 0.5:
 			ename = "Skeleton Minion"
 			health = 15.0; speed = 1.5; chase_speed = 2.5; damage = 3.0; atk_range = 1.5; detect = 10.0
 			emodel = "res://assets/characters/Zombie_Male.blend"; escale = 0.5
 			loot = [{"item_id": "bone", "min_amount": 1, "max_amount": 2, "chance": 0.6}]
+			xp = 10.0
 		elif roll < 0.8:
 			ename = "Skeleton Rogue"
 			health = 20.0; speed = 2.5; chase_speed = 4.5; damage = 5.0; atk_range = 1.5; detect = 12.0
 			emodel = "res://assets/characters/Goblin_Male.blend"; escale = 0.5
 			loot = [{"item_id": "bone", "min_amount": 1, "max_amount": 2, "chance": 0.7}]
+			xp = 18.0
 		elif roll < 0.95:
 			ename = "Skeleton Warrior"
 			health = 40.0; speed = 1.2; chase_speed = 3.0; damage = 8.0; atk_range = 2.0; detect = 10.0
 			emodel = "res://assets/characters/Zombie_Female.blend"; escale = 0.5
 			loot = [{"item_id": "bone", "min_amount": 2, "max_amount": 4, "chance": 1.0}]
+			xp = 30.0
 		else:
 			ename = "Skeleton Mage"
 			health = 25.0; speed = 1.0; chase_speed = 2.0; damage = 6.0; atk_range = 8.0; detect = 14.0
 			emodel = "res://assets/characters/Goblin_Female.blend"; escale = 0.5
 			loot = [{"item_id": "bone", "min_amount": 2, "max_amount": 3, "chance": 1.0}]
+			xp = 35.0
 
 		_create_enemy(pos, ename, health, speed, chase_speed, damage, atk_range, detect,
-			Color.WHITE, 10.0, loot, emodel, escale)
+			Color.WHITE, xp, loot, emodel, escale)
 
 func _despawn_all_enemies() -> void:
 	## Called at dawn — remove all enemies from the world.
@@ -2279,6 +2249,15 @@ func _input(event: InputEvent) -> void:
 					crafting_ui.show_crafting()
 				get_viewport().set_input_as_handled()
 		
+		# H key to toggle herbarium
+		elif event.keycode == KEY_H:
+			if herbarium_ui:
+				if herbarium_ui.visible:
+					herbarium_ui.close()
+				else:
+					herbarium_ui.show_herbarium()
+				get_viewport().set_input_as_handled()
+
 		# J key to toggle quest journal
 		elif event.keycode == KEY_J:
 			if quest_journal_ui:

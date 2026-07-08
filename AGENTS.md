@@ -107,3 +107,21 @@ cells.
 
 Repo: `github.com/Roanger/Roots`. Default branch `main`. Only commit when
 explicitly asked. `*.import` and `.godot/` are gitignored.
+
+## Next session: Phase 3 & 4 remaining
+
+Next time start here. See `plans/roots_game_plan.md` for details.
+
+**Phase 3 to-dos:**
+- Plant identification system (3.2)
+- Goat/deer/rabbit 3D models (currently placeholder capsules) (3.5)
+- Defensive structures (3.6)
+
+**Phase 4 to-dos:**
+- Housing placement (4.3)
+- Player-specific land permissions (4.3)
+- More quest content and chains (4.6)
+- Wildlife interactions (4.4)
+- Seasonal animal migrations (4.4)
+- Environmental hazards (4.5)
+- Natural disasters (4.5)

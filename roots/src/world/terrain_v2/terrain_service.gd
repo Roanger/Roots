@@ -268,8 +268,8 @@ func modify_terrain_at(world_pos: Vector3, mod_type: int) -> bool:
 
 
 func dig_terrain_at(world_pos: Vector3) -> bool:
-	## Called by shovel swing.  Uses VoxelTool.do_sphere() for persistent
-	## SDF deformation.
+	## Called by shovel swing.  Uses VoxelTool raycast + do_sphere for
+	## persistent SDF deformation in local coordinates.
 	var key := "%d,%d" % [int(floorf(world_pos.x)), int(floorf(world_pos.z))]
 	if _dug_positions.has(key):
 		return false
@@ -285,9 +285,17 @@ func dig_terrain_at(world_pos: Vector3) -> bool:
 	if not tool:
 		return false
 
-	var dig_y := world_noise.get_height(world_pos.x, world_pos.z)
+	# Raycast from above the target downward to get the surface hit in
+	# VoxelLodTerrain local coordinates — do_sphere expects local coords.
+	var surface_y := world_noise.get_height(world_pos.x, world_pos.z)
+	var local_from := voxel_terrain.to_local(Vector3(world_pos.x, surface_y + 10.0, world_pos.z))
+	var local_to := voxel_terrain.to_local(Vector3(world_pos.x, surface_y - 5.0, world_pos.z))
+	var hit := tool.raycast(local_from, local_to - local_from, 16.0)
+	if hit == null:
+		return false
+
 	tool.mode = 1  # MODE_REMOVE
-	tool.do_sphere(Vector3(world_pos.x, dig_y, world_pos.z), 2.5)
+	tool.do_sphere(Vector3(hit.position), 2.5)
 	if voxel_terrain:
 		voxel_terrain.save_modified_blocks()
 	_dug_positions[key] = true
@@ -316,10 +324,18 @@ func _spawn_farm_plot_at(world_pos: Vector3) -> void:
 	plot.global_position = world_pos
 	plot.state = 1  # PlotState.TILLED
 
-	var scene_root = get_tree().current_scene
-	if scene_root:
-		scene_root.add_child(plot)
+	var container: Node = _get_farm_plots_container()
+	if container:
+		container.add_child(plot)
 		dynamic_farm_plots[key] = plot
+
+func _get_farm_plots_container() -> Node:
+	## Look for $FarmPlots on the current scene (MainWorld).
+	var scene_root = get_tree().current_scene
+	if scene_root and scene_root.has_node("FarmPlots"):
+		return scene_root.get_node("FarmPlots")
+	# Fallback: add to scene root
+	return scene_root
 
 
 func remove_farm_plot_at(world_pos: Vector3) -> void:
@@ -330,6 +346,21 @@ func remove_farm_plot_at(world_pos: Vector3) -> void:
 			plot.queue_free()
 		dynamic_farm_plots.erase(key)
 
+
+func serialize_dug_positions() -> Array:
+	var result: Array = []
+	for key in _dug_positions:
+		var parts: PackedStringArray = key.split(",")
+		if parts.size() == 2:
+			result.append({"x": int(parts[0]), "z": int(parts[1])})
+	return result
+
+func restore_dug_positions(data: Array) -> void:
+	_dug_positions.clear()
+	for entry in data:
+		var x: int = entry.get("x", 0)
+		var z: int = entry.get("z", 0)
+		_dug_positions["%d,%d" % [x, z]] = true
 
 func restore_tilled_plots_for_chunk(chunk_pos: Vector2i) -> void:
 	## Compat stub: farm plots are persistent overlays now.

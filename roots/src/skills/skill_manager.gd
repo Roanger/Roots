@@ -13,6 +13,9 @@ var skill_points: int = 0
 # Active perks: { perk_id: PerkData } (synergy perks)
 var active_perks: Dictionary = {}
 
+# Herbarium: tracks discovered plant species — { herb_item_id: true }
+var herbarium: Dictionary = {}
+
 # Skill definitions (populated in _ready)
 var skill_definitions: Dictionary = {}
 
@@ -273,8 +276,8 @@ func _register_default_perks() -> void:
 		"militia", 20, 2, "mil_thick_skin", PerkData.PerkEffect.CRIT_CHANCE, 0.10, 2)
 	_register_perk("mil_veteran", "Veteran", "+20% combat XP",
 		"militia", 35, 2, "mil_critical_eye", PerkData.PerkEffect.XP_BONUS, 0.20, 3)
-	_register_perk("mil_legendary", "Legendary Warrior", "+25% damage, +50 max health",
-		"militia", 50, 3, "mil_veteran", PerkData.PerkEffect.DAMAGE_BONUS, 0.25, 4)
+	_register_perk("mil_legendary", "Legendary Warrior", "+50 max health",
+		"militia", 50, 3, "mil_veteran", PerkData.PerkEffect.HEALTH_BONUS, 50.0, 4)
 
 # =====================
 # PERK UNLOCK & QUERY
@@ -471,6 +474,36 @@ func _check_synergy_perks() -> void:
 func has_perk(perk_id: String) -> bool:
 	return active_perks.has(perk_id)
 
+# =====================
+# HERBARIUM (Plant Discovery)
+# =====================
+
+func discover_herb(herb_item_id: String) -> bool:
+	if herbarium.has(herb_item_id):
+		return false
+	herbarium[herb_item_id] = true
+	if event_bus:
+		event_bus.emit_signal("notification_shown",
+			"New Discovery!",
+			"Discovered a new plant in your herbarium.",
+			"success")
+		event_bus.herb_discovered.emit(herb_item_id)
+	return true
+
+func is_herb_discovered(herb_item_id: String) -> bool:
+	return herbarium.has(herb_item_id)
+
+func get_discovered_herbs() -> Array:
+	return herbarium.keys()
+
+func get_undiscovered_wild_herbs() -> Array:
+	var all_herbs := ["common_mushroom", "golden_mushroom", "lavender", "chamomile", "mint_leaf", "sage_leaf", "nightshade", "wild_clover", "fern_frond"]
+	var undiscovered: Array = []
+	for herb_id in all_herbs:
+		if not herbarium.has(herb_id):
+			undiscovered.append(herb_id)
+	return undiscovered
+
 func get_all_skill_ids() -> Array:
 	return skill_definitions.keys()
 
@@ -495,6 +528,7 @@ func serialize() -> Dictionary:
 		"skill_points": skill_points,
 		"active_perks": active_perks.keys(),
 		"unlocked_perks": unlocked_perks.keys(),
+		"herbarium": herbarium.keys(),
 	}
 	for skill_id in skills:
 		data["skills"][skill_id] = {
@@ -511,6 +545,12 @@ func deserialize(data: Dictionary) -> void:
 		if skills.has(skill_id):
 			skills[skill_id]["xp"] = saved_skills[skill_id].get("xp", 0)
 			skills[skill_id]["level"] = saved_skills[skill_id].get("level", 1)
+	
+	# Restore herbarium
+	herbarium.clear()
+	var saved_herbs = data.get("herbarium", [])
+	for herb_id in saved_herbs:
+		herbarium[herb_id] = true
 	
 	# Restore active synergy perks
 	active_perks.clear()
