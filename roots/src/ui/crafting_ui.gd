@@ -5,6 +5,18 @@ class_name CraftingUI
 
 const RecipeDataScript = preload("res://src/crafting/recipe_data.gd")
 
+## Profession-gated "master craft" actions: a station-specific bonus that produces
+## higher-quality output once the governing skill is high enough. Not a recipe
+## unlock — it's a quality boost applied on top of any eligible recipe at that station.
+const MASTER_CRAFT_BY_STATION: Dictionary = {
+	CraftingRecipe.CraftingStation.FORGE: {"skill": "blacksmithing", "action_name": "Temper", "icon": "🔥", "types": [ItemData.ItemType.TOOL, ItemData.ItemType.WEAPON, ItemData.ItemType.EQUIPMENT]},
+	CraftingRecipe.CraftingStation.ANVIL: {"skill": "blacksmithing", "action_name": "Temper", "icon": "🔥", "types": [ItemData.ItemType.TOOL, ItemData.ItemType.WEAPON, ItemData.ItemType.EQUIPMENT]},
+	CraftingRecipe.CraftingStation.ALCHEMY_TABLE: {"skill": "alchemy", "action_name": "Distill", "icon": "⚗", "types": [ItemData.ItemType.POTION]},
+}
+const MASTER_CRAFT_MIN_LEVEL: int = 15
+const MASTER_CRAFT_EXCELLENT_LEVEL: int = 30
+const MASTER_CRAFT_PERFECT_LEVEL: int = 50
+
 signal item_crafted(recipe_id: String)
 
 var inventory: Inventory = null
@@ -30,8 +42,10 @@ var _output_container: HBoxContainer
 var _craft_button: Button
 var _craft_all_button: Button
 var _progress_bar: ProgressBar
+var _master_craft_toggle: CheckButton
 var _category_buttons: Dictionary = {}
 var _craft_queue: int = 0  # Remaining crafts in a Craft All batch
+var _crafting_duration: float = 1.0  # Effective (perk/equipment-adjusted) time for the current craft
 
 func _ready() -> void:
 	visible = false
@@ -187,6 +201,11 @@ func _build_ui() -> void:
 	var spacer = Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail_vbox.add_child(spacer)
+
+	# Master craft toggle (profession-gated station action, e.g. Forge "Temper", Alchemy Table "Distill")
+	_master_craft_toggle = CheckButton.new()
+	_master_craft_toggle.visible = false
+	detail_vbox.add_child(_master_craft_toggle)
 	
 	# Progress bar
 	_progress_bar = ProgressBar.new()
@@ -224,7 +243,7 @@ func _process(delta: float) -> void:
 		if _crafting_timer <= 0:
 			_finish_crafting()
 		else:
-			_progress_bar.value = (1.0 - _crafting_timer / selected_recipe.crafting_time) * 100.0
+			_progress_bar.value = (1.0 - _crafting_timer / _crafting_duration) * 100.0
 
 func show_crafting(station: int = CraftingRecipe.CraftingStation.HAND) -> void:
 	current_station = station
@@ -390,6 +409,8 @@ func _update_detail_panel() -> void:
 	if _is_crafting and _craft_queue > 0:
 		_craft_all_button.text = "Crafting... (%d left)" % _craft_queue
 
+	_update_master_craft_toggle(selected_recipe)
+
 func _on_craft_pressed() -> void:
 	if not selected_recipe or _is_crafting:
 		return
@@ -415,7 +436,12 @@ func _on_craft_all_pressed() -> void:
 
 func _start_crafting() -> void:
 	_is_crafting = true
-	_crafting_timer = selected_recipe.crafting_time
+	_crafting_duration = selected_recipe.crafting_time
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("get_perk_bonus") and selected_recipe.xp_skill != "":
+		var speed_bonus: float = sm.get_perk_bonus(selected_recipe.xp_skill, PerkData.PerkEffect.SPEED_BONUS)
+		_crafting_duration *= (1.0 - clampf(speed_bonus, 0.0, 0.9))
+	_crafting_timer = _crafting_duration
 	_progress_bar.visible = true
 	_progress_bar.value = 0
 	_craft_button.disabled = true
@@ -467,8 +493,16 @@ func _finish_crafting() -> void:
 	if item_database:
 		var output_item = item_database.get_item(selected_recipe.output_item_id)
 		if output_item:
-			inventory.add_item(output_item, selected_recipe.output_amount)
-			print("[Crafting] Crafted %s x%d" % [output_item.item_name, selected_recipe.output_amount])
+			var quality := ItemData.ItemQuality.NORMAL
+			if _master_craft_toggle and _master_craft_toggle.button_pressed:
+				var info = _get_master_craft_info(selected_recipe)
+				if not info.is_empty():
+					var level = _get_master_craft_skill_level(info)
+					if level >= MASTER_CRAFT_MIN_LEVEL:
+						quality = _get_master_craft_quality(level + _get_master_craft_quality_bonus_levels(info))
+			inventory.add_item(output_item, selected_recipe.output_amount, quality)
+			var quality_note = " (%s quality!)" % ItemData.get_quality_name(quality) if quality != ItemData.ItemQuality.NORMAL else ""
+			print("[Crafting] Crafted %s x%d%s" % [output_item.item_name, selected_recipe.output_amount, quality_note])
 	
 	# Grant XP
 	if selected_recipe.xp_skill != "" and selected_recipe.xp_amount > 0:
@@ -541,6 +575,63 @@ func _center_panel() -> void:
 		return
 	var viewport_size = get_viewport_rect().size
 	_panel.position = (viewport_size - _panel.size) / 2.0
+
+## Returns the MASTER_CRAFT_BY_STATION entry for this recipe's station if the
+## output item type is eligible, or an empty Dictionary otherwise.
+func _get_master_craft_info(recipe: CraftingRecipe) -> Dictionary:
+	if not recipe or not item_database:
+		return {}
+	var info: Dictionary = MASTER_CRAFT_BY_STATION.get(recipe.station, {})
+	if info.is_empty():
+		return {}
+	var output_data: ItemData = item_database.get_item(recipe.output_item_id)
+	if not output_data or not info["types"].has(output_data.item_type):
+		return {}
+	return info
+
+func _get_master_craft_skill_level(info: Dictionary) -> int:
+	var sm = get_node_or_null("/root/SkillManager")
+	if not sm or not sm.has_method("get_skill_level"):
+		return 0
+	return sm.get_skill_level(info.get("skill", ""))
+
+## Equipment-only QUALITY_BONUS (e.g. Blacksmith's Tongs, Alchemist's Mortar &
+## Pestle), expressed as extra effective levels for quality-tier purposes only.
+## Deliberately NOT added to the raw skill level used for the unlock gate —
+## equipment should not let players skip earning the skill level itself.
+func _get_master_craft_quality_bonus_levels(info: Dictionary) -> int:
+	var sm = get_node_or_null("/root/SkillManager")
+	if not sm or not sm.has_method("get_perk_bonus"):
+		return 0
+	var bonus: float = sm.get_perk_bonus(info.get("skill", ""), PerkData.PerkEffect.QUALITY_BONUS)
+	return int(round(bonus * 100.0))
+
+## Deterministic quality tier from skill level: higher level = better guaranteed quality.
+func _get_master_craft_quality(level: int) -> ItemData.ItemQuality:
+	if level >= MASTER_CRAFT_PERFECT_LEVEL:
+		return ItemData.ItemQuality.PERFECT
+	if level >= MASTER_CRAFT_EXCELLENT_LEVEL:
+		return ItemData.ItemQuality.EXCELLENT
+	return ItemData.ItemQuality.GOOD
+
+func _update_master_craft_toggle(recipe: CraftingRecipe) -> void:
+	if not _master_craft_toggle:
+		return
+	var info = _get_master_craft_info(recipe)
+	if info.is_empty():
+		_master_craft_toggle.visible = false
+		_master_craft_toggle.button_pressed = false
+		return
+	var level = _get_master_craft_skill_level(info)
+	var unlocked = level >= MASTER_CRAFT_MIN_LEVEL
+	var quality_name = ItemData.get_quality_name(_get_master_craft_quality(level + _get_master_craft_quality_bonus_levels(info))) if unlocked else ItemData.get_quality_name(ItemData.ItemQuality.GOOD)
+	_master_craft_toggle.visible = true
+	_master_craft_toggle.disabled = not unlocked
+	if unlocked:
+		_master_craft_toggle.text = "%s %s — craft %s quality (%s Lv.%d)" % [info["icon"], info["action_name"], quality_name, _get_skill_display_name(info["skill"]), level]
+	else:
+		_master_craft_toggle.button_pressed = false
+		_master_craft_toggle.text = "%s %s — requires %s Lv.%d (you: %d)" % [info["icon"], info["action_name"], _get_skill_display_name(info["skill"]), MASTER_CRAFT_MIN_LEVEL, level]
 
 func _meets_skill_requirement(recipe: CraftingRecipe) -> bool:
 	if recipe.required_skill == "" or recipe.required_skill_level <= 0:

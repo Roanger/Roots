@@ -62,10 +62,23 @@ func remove_amount(amount: int) -> int:
 func is_empty() -> bool:
 	return item_data == null or quantity <= 0
 
+func set_quality(new_quality: ItemData.ItemQuality) -> void:
+	quality = new_quality
+	if item_data and item_data.has_durability:
+		durability = get_effective_max_durability()
+
+func get_effective_max_durability() -> int:
+	if not item_data or not item_data.has_durability:
+		return 0
+	return int(round(item_data.max_durability * ItemData.get_quality_multiplier(quality)))
+
 func get_durability_percent() -> float:
 	if not item_data or not item_data.has_durability:
 		return 100.0
-	return float(durability) / float(item_data.max_durability) * 100.0
+	var effective_max = get_effective_max_durability()
+	if effective_max <= 0:
+		return 0.0
+	return float(durability) / float(effective_max) * 100.0
 
 func damage(amount: int) -> void:
 	if item_data and item_data.has_durability:
@@ -75,7 +88,7 @@ func damage(amount: int) -> void:
 
 func repair(amount: int) -> void:
 	if item_data and item_data.has_durability:
-		durability = min(item_data.max_durability, durability + amount)
+		durability = min(get_effective_max_durability(), durability + amount)
 
 func serialize() -> Dictionary:
 	return {

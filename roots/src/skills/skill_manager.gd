@@ -30,6 +30,29 @@ signal perk_unlocked(perk_id: String)
 # Reference to event bus
 var event_bus: Node = null
 
+# Player's Equipment resource (registered by player_controller.gd), so that
+# TOOL items worn in the passive Tool 1/2/3 slots contribute equip_bonuses
+# alongside unlocked perks.
+var _equipment_ref: Equipment = null
+
+func register_equipment(eq: Equipment) -> void:
+	_equipment_ref = eq
+
+func _get_equipment_bonus(skill_id: String, effect_type: int) -> float:
+	if not _equipment_ref:
+		return 0.0
+	var total := 0.0
+	for item in _equipment_ref.get_all_equipped_tools():
+		if not item or not item.item_data:
+			continue
+		for bonus in item.item_data.equip_bonuses:
+			if bonus.get("effect", -1) != effect_type:
+				continue
+			var bonus_skill: String = bonus.get("skill", "")
+			if skill_id == "" or bonus_skill == "" or bonus_skill == skill_id:
+				total += bonus.get("value", 0.0)
+	return total
+
 # XP table per skill (matching the game plan)
 const BASE_XP_ACTIONS: Dictionary = {
 	"pick_mushroom": {"skill": "herb_gathering", "xp": 2},
@@ -330,6 +353,7 @@ func get_perk_bonus(skill_id: String, effect_type: PerkData.PerkEffect) -> float
 		var perk = perk_definitions.get(perk_id) as PerkData
 		if perk and perk.skill_id == skill_id and perk.effect_type == effect_type:
 			total += perk.effect_value
+	total += _get_equipment_bonus(skill_id, effect_type)
 	return total
 
 func get_total_perk_bonus(effect_type: PerkData.PerkEffect) -> float:
@@ -338,6 +362,7 @@ func get_total_perk_bonus(effect_type: PerkData.PerkEffect) -> float:
 		var perk = perk_definitions.get(perk_id) as PerkData
 		if perk and perk.effect_type == effect_type:
 			total += perk.effect_value
+	total += _get_equipment_bonus("", effect_type)
 	return total
 
 # =====================

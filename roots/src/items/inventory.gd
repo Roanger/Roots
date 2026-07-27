@@ -49,7 +49,7 @@ func add_item(item_data: ItemData, quantity: int = 1, quality: ItemData.ItemQual
 	for i in range(max_slots):
 		if slots[i] == null or slots[i].is_empty():
 			var new_item = InventoryItem.new(item_data, min(remaining, item_data.max_stack_size))
-			new_item.quality = quality
+			new_item.set_quality(quality)
 			slots[i] = new_item
 			remaining -= new_item.quantity
 			inventory_changed.emit(i)
@@ -373,7 +373,7 @@ func use_hotbar_item(slot_index: int, user: Node = null) -> bool:
 	var item_data = item.item_data
 	if item_data.is_consumable:
 		if user and user.has_method("consume_item"):
-			user.consume_item(item_data)
+			user.consume_item(item_data, item.quality)
 		else:
 			if user and user.has_method("heal") and item_data.health_restore > 0:
 				user.heal(item_data.health_restore)

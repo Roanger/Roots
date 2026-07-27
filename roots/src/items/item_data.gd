@@ -84,6 +84,12 @@ enum ToolTier {
 @export var tool_power: int = 1
 @export var tool_range: float = 2.0
 
+# Profession equipment bonus — for TOOL items worn in the passive Tool 1/2/3
+# equipment slots (see Equipment.EquipmentSlot). Each entry: {"skill": String,
+# "effect": int (PerkData.PerkEffect), "value": float}. Summed into
+# SkillManager.get_perk_bonus()/get_total_perk_bonus() alongside unlocked perks.
+@export var equip_bonuses: Array[Dictionary] = []
+
 # Seed properties
 @export var crop_id: String = ""  # What crop this seed grows
 @export var growth_time: float = 60.0  # Seconds to grow
@@ -113,6 +119,30 @@ func get_sell_price() -> int:
 		ItemRarity.EPIC: multiplier = 5.0
 		ItemRarity.LEGENDARY: multiplier = 10.0
 	return int(base_value * multiplier * 0.5)  # Sell for 50% of value
+
+static func get_quality_multiplier(quality: ItemQuality) -> float:
+	match quality:
+		ItemQuality.POOR: return 0.8
+		ItemQuality.GOOD: return 1.15
+		ItemQuality.EXCELLENT: return 1.3
+		ItemQuality.PERFECT: return 1.5
+		_: return 1.0
+
+static func get_quality_name(quality: ItemQuality) -> String:
+	match quality:
+		ItemQuality.POOR: return "Poor"
+		ItemQuality.GOOD: return "Good"
+		ItemQuality.EXCELLENT: return "Excellent"
+		ItemQuality.PERFECT: return "Perfect"
+		_: return ""
+
+static func get_quality_color(quality: ItemQuality) -> Color:
+	match quality:
+		ItemQuality.POOR: return Color(0.6, 0.55, 0.5)
+		ItemQuality.GOOD: return Color(0.4, 0.8, 1.0)
+		ItemQuality.EXCELLENT: return Color(0.7, 0.4, 1.0)
+		ItemQuality.PERFECT: return Color(1.0, 0.75, 0.2)
+		_: return Color(0.85, 0.85, 0.85)
 
 func get_rarity_color() -> Color:
 	match rarity:

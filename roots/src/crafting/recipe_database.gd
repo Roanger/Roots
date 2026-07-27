@@ -230,6 +230,14 @@ func _init_recipes() -> void:
 		"anvil", 1, 8.0, "blacksmithing", 20.0, "blacksmithing", 5
 	))
 
+	# Blacksmith's Tongs — profession equipment (Tool slot), passive smelting/forging bonus
+	_register_recipe(_make_recipe(
+		"craft_blacksmiths_tongs", "Blacksmith's Tongs", "A well-worn pair of forge tongs, equippable in a Tool slot for a passive forge/anvil bonus.",
+		CraftingRecipe.RecipeCategory.TOOLS, CraftingRecipe.CraftingStation.FORGE,
+		[{"item_id": "iron_ingot", "amount": 2}, {"item_id": "stick", "amount": 1}],
+		"blacksmiths_tongs", 1, 6.0, "blacksmithing", 15.0, "blacksmithing", 10
+	))
+
 	# Alchemy Table — needs Workbench
 	_register_recipe(_make_recipe(
 		"craft_alchemy_table", "Alchemy Table", "A sturdy table for brewing potions.",
@@ -662,8 +670,16 @@ func _init_recipes() -> void:
 		"empty_bottle", 2, 2.0, "crafting", 3.0
 	))
 	
+	# Alchemist's Mortar & Pestle — profession equipment (Tool slot), passive brewing bonus
+	_register_recipe(_make_recipe(
+		"craft_alchemists_mortar", "Alchemist's Mortar & Pestle", "A polished stone mortar and pestle, equippable in a Tool slot for a passive alchemy table bonus.",
+		CraftingRecipe.RecipeCategory.TOOLS, CraftingRecipe.CraftingStation.ALCHEMY_TABLE,
+		[{"item_id": "stone", "amount": 2}, {"item_id": "wood_plank", "amount": 1}],
+		"alchemists_mortar", 1, 6.0, "alchemy", 15.0, "alchemy", 10
+	))
+
 	# ===== POTIONS (Alchemy Table) =====
-	
+
 	# Health Potion - chamomile + mushroom
 	_register_recipe(_make_recipe(
 		"brew_health_potion", "Health Potion", "Brew a potion that restores health.",
@@ -871,6 +887,14 @@ func _init_recipes() -> void:
 		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
 		[{"item_id": "wood_log", "amount": 6}, {"item_id": "wood_plank", "amount": 4}, {"item_id": "rope", "amount": 1}],
 		"hut", 1, 8.0, "crafting", 18.0, "crafting", 5
+	))
+
+	# House - a proper player home, with a working interior
+	_register_recipe(_make_recipe(
+		"craft_house", "House", "Build a proper house of your own, with a door leading inside.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_log", "amount": 14}, {"item_id": "wood_plank", "amount": 10}, {"item_id": "stone", "amount": 6}, {"item_id": "iron_ingot", "amount": 4}, {"item_id": "rope", "amount": 3}],
+		"house", 1, 14.0, "crafting", 35.0, "crafting", 15
 	))
 	
 	# Feeding Trough

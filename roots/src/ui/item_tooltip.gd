@@ -87,9 +87,10 @@ func show_item(inv_item: InventoryItem) -> void:
 	
 	var data: ItemData = inv_item.item_data
 	
-	# Name with rarity color
-	_name_label.text = data.item_name
-	_name_label.add_theme_color_override("font_color", data.get_rarity_color())
+	# Name with rarity color, quality prefix if not Normal
+	var quality_name = ItemData.get_quality_name(inv_item.quality)
+	_name_label.text = ("%s %s" % [quality_name, data.item_name]) if quality_name != "" else data.item_name
+	_name_label.add_theme_color_override("font_color", ItemData.get_quality_color(inv_item.quality) if quality_name != "" else data.get_rarity_color())
 	
 	# Type + tier line
 	_type_label.text = _get_type_string(data)
@@ -192,34 +193,35 @@ func _get_tier_name(tier: ItemData.ToolTier) -> String:
 
 func _build_stats_text(data: ItemData, inv_item: InventoryItem) -> String:
 	var lines: Array[String] = []
-	
+	var quality_mult = ItemData.get_quality_multiplier(inv_item.quality)
+
 	# Tool / Weapon stats
 	if data.item_type == ItemData.ItemType.TOOL or data.item_type == ItemData.ItemType.WEAPON:
 		if data.tool_power > 0:
-			lines.append("Power: %d" % data.tool_power)
+			lines.append("Power: %d" % roundi(data.tool_power * quality_mult))
 		if data.tool_range > 0 and data.tool_range != 2.0:
 			lines.append("Range: %.1f" % data.tool_range)
-	
+
 	# Armor defense
 	if data.item_type == ItemData.ItemType.EQUIPMENT and data.defense_value > 0:
-		lines.append("Defense: %d" % data.defense_value)
-	
+		lines.append("Defense: %d" % roundi(data.defense_value * quality_mult))
+
 	# Durability
 	if data.has_durability:
-		lines.append("Durability: %d / %d" % [inv_item.durability, data.max_durability])
-	
+		lines.append("Durability: %d / %d" % [inv_item.durability, inv_item.get_effective_max_durability()])
+
 	# Consumable stats
 	if data.is_consumable:
 		if data.health_restore > 0:
-			lines.append("Restores %.0f Health" % data.health_restore)
+			lines.append("Restores %.0f Health" % (data.health_restore * quality_mult))
 		if data.stamina_restore > 0:
-			lines.append("Restores %.0f Stamina" % data.stamina_restore)
+			lines.append("Restores %.0f Stamina" % (data.stamina_restore * quality_mult))
 		if data.hunger_restore > 0:
 			lines.append("Restores %.0f Hunger" % data.hunger_restore)
 		for buff in data.buff_effects:
 			var buff_type = buff.get("type", "")
-			var buff_val = buff.get("value", 0)
-			var buff_dur = buff.get("duration", 0)
+			var buff_val = buff.get("value", 0) * quality_mult
+			var buff_dur = buff.get("duration", 0) * quality_mult
 			if buff_type == "heal":
 				lines.append("+%.0f HP/s for %.0fs" % [buff_val, buff_dur])
 			elif buff_type == "stamina":
@@ -230,6 +232,9 @@ func _build_stats_text(data: ItemData, inv_item: InventoryItem) -> String:
 				lines.append("+%.0f%% Damage for %.0fs" % [(buff_val - 1.0) * 100, buff_dur])
 			elif buff_type == "antidote":
 				lines.append("Cures poison (%0.fs)" % buff_dur)
+
+	if inv_item.quality != ItemData.ItemQuality.NORMAL:
+		lines.append("Quality: %s (x%.2f)" % [ItemData.get_quality_name(inv_item.quality), quality_mult])
 	
 	# Value
 	if data.sellable and data.base_value > 0:

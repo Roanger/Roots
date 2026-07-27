@@ -113,6 +113,8 @@ graph TD
 - [x] Integrate FBX trees and rocks with scale/rotation variation
 - [x] Biome-based props (e.g. dead trees in Plains/Mountains/Snow)
 - [x] **[REWRITE]** Transition from Voxel Terrain to Smooth Heightmap Terrain (better AI nav, building placement, cozy aesthetic) — *Complete Feb 2026. See terrain_rewrite_plan.md*
+- [x] **[REWRITE v2]** Transition from Heightmap Terrain to godot_voxel `VoxelLodTerrain` (smooth SDF terrain, native collision, biome shader, real rivers/lakes) — *Complete Jul 2026. Old heightmap `chunk_manager`/`chunk_data` deleted. See terrain_rewrite_plan.md § Terrain v2*
+- [x] Loading screen with seed display; all entity spawns gated behind terrain collision readiness (fixes falling through world on load)
 
 #### 1.5 Basic UI Framework
 - [x] Create main menu with single/multiplayer options
@@ -198,8 +200,8 @@ graph TD
 - [x] Stone tier tools — hand-craftable from ground resources (small_stone + stick) at HAND station, no profession required
 - [x] Starting inventory gutted — players now start with 4 small_stone + 3 stick, must craft first stone tool to bootstrap
 - [x] small_stone added to rock loot tables so mining yields both small_stone and regular stone
-- [ ] Implement profession tools and equipment (higher tiers)
-- [ ] Add profession-specific interactions
+- [x] Implement profession tools and equipment (higher tiers) — Blacksmith's Tongs (Forge/Anvil) and Alchemist's Mortar & Pestle (Alchemy Table), new low-poly models via Blender MCP. Equip in the previously-unused passive `Equipment.EquipmentSlot.TOOL_1/2/3` slots (existed since early equipment work but `get_all_equipped_tools()` had zero callers until now) for a per-profession bonus: +15% crafting speed, +10 effective skill levels toward Master Craft quality tier (see 3.1 interactions above). New `ItemData.equip_bonuses: Array[Dictionary]` field, summed into `SkillManager.get_perk_bonus()`/`get_total_perk_bonus()` via `register_equipment()` — so equipped profession gear stacks with perks through the same existing bonus pools everywhere they're already read (crafting speed, resource saving, damage, defense, buff duration, crit chance).
+- [x] Add profession-specific interactions — "Master Craft" station actions: Forge/Anvil "Temper" (Blacksmithing-gated) and Alchemy Table "Distill" (Alchemy-gated) let players opt into crafting a higher-quality output once their skill level is high enough (Lv.15 Good, Lv.30 Excellent, Lv.50 Perfect). Activated the previously-unused `ItemData.ItemQuality`/`InventoryItem.quality` field end-to-end: quality now scales tool/weapon power (`player_controller.gd` swing), durability (`inventory_item.gd`), and potion/food potency + buff duration (`consume_item`); shown in `item_tooltip.gd`. Toggle lives in `crafting_ui.gd` (`MASTER_CRAFT_BY_STATION`).
 - [x] Design profession progression rewards (XP bonus, yield bonus, damage/defense, resource saving, buff duration, double harvest, crit chance perks)
 
 #### 3.2 Herb Gathering & Alchemy
@@ -210,7 +212,7 @@ graph TD
 - [x] Implement potion brewing mechanics (Alchemy Table crafting station, empty bottle recipe)
 - [x] Add potion effects system (buff system: heal-over-time, stamina regen, speed boost, strength boost, antidote)
 - [x] Herb gathering XP (HarvestableResource grants pick_mushroom/forage_item XP on harvest)
-- [ ] Create identification system (discovering new plants)
+- [x] Create identification system (discovering new plants) — Herbarium (`skill_manager.gd` `herbarium` dict + `discover_herb()`), wired via `harvestable_resource.gd` on HERB harvest, `herbarium_ui.gd` (H key), persisted in save data
 
 #### 3.3 Cooking & Baking
 - [x] Create cooking station (Cooking Fire, station_type=4, spawned near player)
@@ -253,7 +255,7 @@ graph TD
 - [x] Enemy loot drops (WorldItem auto-pickup)
 - [x] Enemy types: Skeleton Minion, Skeleton Rogue, Skeleton Warrior, Skeleton Mage
 - [x] Add combat skill progression (XP wiring exists, needs balancing)
-- [ ] Design defensive structures
+- [x] Design defensive structures — `wood_wall`/`stone_wall` (block enemies) and `spiked_barricade` (damages on contact) placeables in `item_database.gd`; `placeable_object.gd` implements `damage_on_contact` via an enemy-layer `Area3D`
 
 ---
 
@@ -291,15 +293,24 @@ graph TD
 - [x] **[REWRITE]** Save/load terrain modifications per chunk (per-chunk JSON at `user://saves/world_<seed>/chunks/`)
 - [x] Shovel digging — VoxelLodTerrain `do_sphere()` via correct local-coordinate raycast, persisted via VoxelStreamSQLite + dug-position serialization
 - [x] Design plot claiming — Claim Post placeable (Workbench recipe: 3 logs + 5 stone + 2 rope), spawns 8 boundary posts in 8m radius circle, claim data persisted in world_data
-- [ ] Implement housing placement
+- [x] Implement housing placement — `house` placeable (Workbench recipe: 14 logs + 10 planks + 6 stone + 4 iron ingots + 3 rope, crafting Lv.15), `HouseObject extends PlaceableObject` (mirrors `CommunityCenterObject`) spawns its own `BuildingDoor` + unique `interior_id`, reusing `small_house_interior.tscn`. While building this, found and fixed 3 bugs that made the *existing* (already-checked-off) interior system non-functional for every building type, not just houses — see note below.
 - [x] Create decoration system — added flower pot, wooden chair, small table with hand-craftable recipes and placeable via existing placement system
-- [x] Design community buildings (BuildingDoor + InteriorManager, 4 interior types, shared storage chest)
+- [x] Design community buildings (BuildingDoor + InteriorManager, 4 interior types, shared storage chest) — **corrected Jul 2026**: this was checked off but none of the 4 interiors actually worked once entered. Fixed for all 4 (`small_house_interior.gd`, `shop_interior.gd`, `tavern_interior.gd`, `community_center_interior.gd`): (1) no exit door existed anywhere and `is_exit`/`exit_interior()` had zero callers — players could enter but never leave; added an `ExitDoor` (`BuildingDoor.is_exit=true`) to each. (2) Room walls/ceiling were plain `MeshInstance3D` boxes with default backface culling — invisible from inside the room (their outward normals face away from a camera standing inside), rendering as a flat ambient-colored void. Fixed via `cull_mode = CULL_DISABLED`. (3) No collision at all on any floor/wall/furniture piece — the player fell straight through into real outdoor terrain far below the interior's hidden `y=500` pocket-dimension offset. Fixed by wrapping each box in a `StaticBody3D` + `CollisionShape3D` (layer 1, matching terrain). Also added a warm `OmniLight3D` to each interior since the sun doesn't reach the isolated pocket-dimension coordinates well. `SharedChest`/`shared_chests` world-data key is still dead code (defined, never instantiated) — out of scope here.
+- [ ] Furnish NPC building interiors — the BuildingDoor/InteriorManager system (proven out via player housing, Jul 2026) is a great fit for village NPC buildings too, but all 4 shared interior templates are currently bare (floor/walls/ceiling + at most 1-2 generic props: a shop counter, a tavern bar + 2 stools, community center benches, a house table). Give each NPC building type (General Store, Blacksmith, Bakery, Herbalist, Tavern, Town Hall, Farmer House, Guard Post) its own furnished interior reflecting its role — shopkeeper shelves/counter, forge/anvil dressing for the Blacksmith, herb shelves for the Herbalist, etc. — rather than reusing the same 4 generic rooms everywhere.
+- [ ] Player house interior decoration — let players place items from the existing decoration system (flower pot, wooden chair, small table, etc.) *inside* their own house's interior instance, not just outdoors. Likely needs the placement system (`_place_object()`/ghost preview) to work relative to the interior's local space instead of raycasting against outdoor terrain.
+- [ ] Piece-by-piece house building — a second, parallel building approach alongside the premade single-item `house` (see design note below): modular wall/floor/roof/door/window `PlaceableObject` pieces the player places individually in the open world, extending the existing fence/gate/post piece-based placement (currently the *only* working part of this — no wall/floor/roof pieces exist yet). No interior-teleport/pocket-dimension involved, so it's the "no loading screen" option for players who want to construct a custom structure directly rather than drop a single prefab house.
 - [ ] Add player-specific land permissions
+
+> **Design note (Jul 2026):** Roots is planned to end up with **two parallel player-housing systems**, not one replacing the other:
+> 1. **Premade house** (implemented) — craft a single `house` item, place it like any other building placeable, and it spawns its own door into a private pocket-dimension interior (reusing the BuildingDoor/InteriorManager system this session fixed/proved out on NPC buildings). Fast to place, always well-formed, but has the "enter a separate space" teleport feel.
+> 2. **Piece-by-piece building** (not yet started beyond fences/gates/posts) — construct a real, physical, open-world structure out of individual wall/floor/roof/door pieces, like the existing fence system but for full buildings. No teleport, no separate interior scene — what you build is what's actually standing in the world. This is the "no loading screen" option.
+>
+> The BuildingDoor/InteriorManager work above is *also* the right foundation for furnishing NPC building interiors, since it's the same system already used for the 4 village building types — furnishing them is a content task (props per building role), not a new system.
 
 #### 4.6 Quest System
 - [x] QuestData resource (status, objectives, rewards, prerequisites, NPC giver/turnin, quest chains)
 - [x] QuestManager autoload (accept, track progress, complete, turn in, prerequisite gating)
-- [x] QuestDatabase with 10+ quests across 3 chains (gather_supplies, first_harvest, skeleton_threat)
+- [x] QuestDatabase with 25 quests across 7 chains (gathering, farming, combat, crafting, cooking, alchemy, animal) — exceeds original 3-chain target
 - [x] Objective types: COLLECT_ITEM, DEFEAT_ENEMY, TALK_TO_NPC, CRAFT_ITEM, HARVEST_CROP, TILL_SOIL
 - [x] COLLECT_ITEM tracking via inventory polling (connected to inventory_changed/hotbar_changed signals)
 - [x] Quest Journal UI (J key toggle, full-screen panel with Active/Available/Completed tabs)
@@ -311,7 +322,7 @@ graph TD
 - [x] NPC dialogue-driven quest accept and turn-in with reward granting
 - [x] Quest notification popups (quest accepted, quest complete, quest turned in)
 - [x] Quest compass/waypoint markers
-- [ ] More quest content and chains
+- [x] More quest content and chains — grew from 10+/3 chains to 25 quests/7 chains; can always add more, but original goal is met
 
 #### 4.4 Wildlife System
 - [x] Design animal spawn tables per biome (Plains/Meadow for farm animals, Forest/Meadow for deer, Plains/Forest/Meadow for rabbits)
@@ -324,7 +335,7 @@ graph TD
   - Items: `raw_fish`, `salmon`, `pufferfish`, `cooked_fish`, `grilled_salmon`
   - Recipes: craft fishing rod, cook fish, grill salmon
   - Spawned every 2nd cell in water biome (8% chance per cell) during chunk generation
-- [ ] Add wildlife interactions
+- [x] Add wildlife interactions — `base_animal.gd` `AnimalType.HUNTABLE` (deer/rabbit/boar), flee AI from players/predators, `on_hit()`/`on_hit_by_predator()`, loot tables, combat XP
 - [ ] Design seasonal animal migrations
 
 #### 4.5 Environmental Systems
@@ -386,7 +397,7 @@ graph TD
 #### 6.2 Audio Design
 - [ ] Create ambient soundscapes
 - [ ] Design UI sounds
-- [ ] Add music system
+- [x] Add music system (menu + world `AudioStreamPlayer`, dedicated Music audio bus, volume slider in settings; Music/SFX/Voice/Ambient buses auto-created on startup)
 - [ ] Implement voice chat
 - [ ] Design environmental audio
 
@@ -560,25 +571,34 @@ sequenceDiagram
 - Implement chunk culling for unrendered areas
 - Use instancing for repeated objects (trees, rocks)
 
-### Smooth Heightmap Terrain Rewrite (Complete Feb 2026)
-- **Motivation:** Voxel terrain (while optimized) clashes with the smooth low-poly aesthetic, breaks standard AI NavMesh generation, and makes building placement (farmhouses, large plots) extremely difficult. A cozy game requires predictable, rolling terrain.
-- **Architecture:** `ChunkData` shifted from a 3D voxel array (`PackedByteArray`) to a 2D heightmap array (`PackedFloat32Array`).
-- **Mesh Generation:** Chunks generate a standard grid mesh using `ArrayMesh`.
-- **Physics:** The terrain uses a standard `StaticBody3D` with a `ConcavePolygonShape3D` (Jolt Physics). Players and AI use standard `CharacterBody3D` physics (`move_and_slide`, `is_on_floor`).
-- **Modifications:** Hoe tilling spawns dark-soil `FarmPlot` objects; shovel digging applies a localized cosine-falloff bowl depression with vertex color feedback. Per-chunk JSON at `user://saves/world_<seed>/chunks/`.
-- **Status:** Functional for walking, farming, and placement, but the current heightmap approach is a stepping stone. A full world-simulation rewrite is planned to support swimming, rivers, waterfalls, boats, and caves (see below).
+### Terrain v2: godot_voxel Rewrite (Complete Jul 2026)
+- **Motivation:** The Feb 2026 heightmap terrain (below) worked for walking/farming but couldn't support the full vision — land shape was bland (blobby noise hills, no rivers/cliffs), water was flat chunk-local quads, and shovel digging never persisted as real deformation.
+- **Architecture:** Rebuilt on **Voxel Tools (Zylann's godot_voxel) 1.6 GDExtension** (`roots/addons/zylann.voxel/`) using `VoxelLodTerrain` + `VoxelMesherTransvoxel` for smooth SDF terrain with native LOD/streaming/collision.
+- **World generation:** `terrain_v2/world_noise.gd` — redesigned elevation/moisture/temperature noise with real river valleys carved below sea level, lakes, and cliff/mountain shaping. Biome classification stays CPU-side (thresholds on noise) for gameplay queries; terrain coloring moved from vertex colors to a biome shader (`terrain_v2.gdshader`, 10 biomes via moisture/temperature noise).
+- **Facade:** `terrain_v2/terrain_service.gd` wraps `VoxelLodTerrain` + `WorldNoise` and preserves the old `ChunkManager` API (`get_terrain_height()`, `get_biome_at()`, `get_tile_mod_at()`, `modify_terrain_at()`, `dig_terrain_at()`, `chunk_loaded`/`chunk_unloaded` signals) so callers (`player_controller.gd`, `base_animal.gd`, `base_enemy.gd`, `town_builder.gd`, `settings.gd`) work unchanged via duck-typing.
+- **Object spawning:** `terrain_v2/world_object_spawner.gd` listens to chunk load/unload signals and spawns/despawns trees, rocks, grass, herbs, fishing spots, etc. per virtual 32×32 chunk — same FBX pools and biome-aware loot tables as the old system.
+- **Digging & persistence:** Shovel uses `VoxelTool.do_sphere(MODE_REMOVE)` for real persistent SDF deformation, stored in `VoxelStreamSQLite` at `user://saves/world_<seed>/voxels.sqlite` (only modified blocks saved). Confirmed to survive restarts. Old per-chunk JSON save format is gone.
+- **Water:** Global sea-level `PlaneMesh` (2000×2000) follows the player, using the existing depth/foam/Fresnel water shader. Swimming/buoyancy not yet implemented.
+- **Supporting fixes in this rewrite:** loading screen with seed display (all spawns gated behind terrain-collision readiness — fixes falling through the world on load), player physics disabled until terrain ready, village placement now dynamically searches for dry land instead of a hardcoded center, water-height rejection added to all entity spawns (NPCs/animals/enemies).
+- **Deleted:** old `chunks/chunk_manager.gd`, `chunks/chunk_data.gd`, `chunks/chunk_manager.tscn` (heightmap system) removed entirely.
+- **Known limitation:** generator-graph flatten-zone blending (village/building sites) is deferred — CPU queries used for gameplay still flatten correctly, but the voxel terrain mesh shows raw heights in the blend region.
+- See `plans/terrain_rewrite_plan.md` § "Terrain v2 (godot_voxel) Rewrite" for full phase-by-phase detail.
 
-### Future World Generation Rewrite (Post-Milestone 3)
-The current heightmap terrain + chunk water mesh approach works for the current vertical slice, but it cannot support the full game vision. A future rewrite will target:
-- **Hydrology:** Real river networks, lakes, and watersheds that flow downhill and feed water wheels.
+### Heightmap Terrain Rewrite (Feb 2026, superseded by Terrain v2 above)
+- **Motivation:** The original voxel terrain (pre-Feb 2026) clashed with the smooth low-poly aesthetic, broke standard AI NavMesh generation, and made building placement extremely difficult.
+- **Architecture:** `ChunkData` shifted from a 3D voxel array (`PackedByteArray`) to a 2D heightmap array (`PackedFloat32Array`), rendered as a standard grid `ArrayMesh` with `StaticBody3D` + `ConcavePolygonShape3D` collision (Jolt Physics).
+- **Status:** Fully replaced by the godot_voxel rewrite above; kept here for history only.
+
+### Remaining World-Generation Follow-ups (Post-Milestone 3)
+Terrain v2 solved hydrology (rivers/lakes) and persistent digging, but these remain out of scope and tracked separately:
 - **Swimming & Buoyancy:** Player/AI physics change when submerged; underwater exploration.
 - **Waterfalls:** Terrain overhangs and vertical water flows.
 - **Boats:** Placeable/craftable water vehicles on rivers and lakes.
 - **Caves:** Mountain regions get procedural or designer-authored cave entrances and interior scenes.
-- **Robust Terrain Modification:** Digging that actually persists as mesh deformation (paths, foundations, irrigation ditches) rather than purely visual vertex painting.
+- **NavMesh:** AI navigation mesh generation not yet wired to the voxel terrain.
 - **Forest & Grassland Density:** Biome-aware procedural forests with underbrush, clearings, and interactive grass.
 
-*This is acknowledged as a large later-phase effort; current systems are placeholders/prototypes.*
+*This is acknowledged as a later-phase effort; current systems (water plane, digging) are functional but these follow-ups are not yet started.*
 
 ### Save System
 - **Local Saves:** Player progress, inventory, skills
@@ -682,11 +702,15 @@ For solo development, prioritize these skills:
 27. ~~**4.3: Shovel digging** — Fixed VoxelLodTerrain coordinate-space bug (`do_sphere` now works), fixed `elif` indentation bug (shovel path was unreachable), fixed `VoxelRaycastResult.is_empty()` → `null` check. Digging is now functional.~~ ✓
 28. ~~**3.1: Stone tier + bootstrap** — STONE ToolTier added below WOOD (0.75x multiplier). 6 stone tools (hoe/axe/pickaxe/shovel/sickle/hammer), hand-craftable at HAND station from small_stone + stick. Starting inventory gutted to 4 small_stone + 3 stick. small_stone drops from rocks.~~ ✓
 29. ~~**Phase 3.1 / 3.3: Crafting station placeables** — 7 bench items (workbench, forge, anvil, cooking_fire, alchemy_table, loom, sawmill) added as PLACEABLE items with station_type in item_database. 7 hand-craftable recipes in recipe_database (Workbench + Cooking Fire at HAND, others at Workbench/Forge). `_place_object()` in player_controller.gd extended to detect station items and spawn `CraftingStationObject` with model/collision/label. `_spawn_crafting_stations()` and `_create_station()` removed from main_world.gd — stations must now be crafted and placed by the player.~~
-30. **Next (Phase 4 remaining):** housing placement (4.3), land permissions (4.3), quest content (4.6), wildlife interactions (4.4), environmental hazards (4.5), natural disasters (4.5).
-30. **Future (post-Milestone 3):** Full world-generation rewrite to support hydrology/rivers, swimming, waterfalls, boats, caves, robust digging, and dense forests/grasslands. Current terrain/water systems are placeholders for that rewrite.
+30. ~~**[REWRITE v2] Terrain — godot_voxel** — Replaced heightmap `chunk_manager`/`chunk_data` with `VoxelLodTerrain` + Transvoxel smooth SDF meshing. New world generator with real rivers/lakes carved below sea level, 10-biome shader, `TerrainService` facade preserving the old API (no caller changes needed), `VoxelStreamSQLite`-backed persistent digging, `WorldObjectSpawner` re-wiring all tree/rock/herb/fishing-spot spawning to virtual chunks. Also added: loading screen (seed display, spawns gated behind terrain readiness), menu/world music system, dynamic (non-hardcoded) village placement with dry-land search, water-height rejection on all entity spawns.~~ ✓
+31. ~~**Doc audit** — Found several checklist items already implemented but left unchecked: Herbarium/plant identification (3.2), defensive structures — walls/spiked barricade (3.6), wildlife hunting interactions (4.4), and quest content had grown to 25 quests/7 chains (originally logged as 10+/3). Corrected checkboxes above. Confirmed goat/deer/rabbit models (3.5) are real `.blend` models, not placeholder capsules — `AGENTS.md`'s stale "Next session" note was removed.~~ ✓
+32. ~~**3.1: Profession tools & equipment** — Blacksmith's Tongs (Forge/Anvil, blacksmithing) and Alchemist's Mortar & Pestle (Alchemy Table, alchemy), new low-poly Blender-MCP models. Equip in the previously-dead passive `Equipment.TOOL_1/2/3` slots for +15% crafting speed and +10 effective levels toward Master Craft quality. New `ItemData.equip_bonuses` summed into `SkillManager.get_perk_bonus()`/`get_total_perk_bonus()` via `register_equipment()`.~~ ✓ **Phase 3 (all of 3.1–3.6) is now fully complete.**
+33. ~~**4.3: Housing placement** — New `house` placeable (`HouseObject`, Workbench recipe). Along the way, fixed 3 latent bugs that had made the already-shipped interior system (community center, shops, tavern, small houses) completely non-functional once entered: no exit door anywhere, invisible walls from inside (backface culling), and zero collision (players fell through the floor into real terrain far below the interior's hidden pocket-dimension coordinates). Added a light to each interior too (was relying on the sun, which barely reaches those coordinates). Verified the full enter → stand on floor → exit round trip live via Godot MCP.~~ ✓
+34. **Next (Phase 4 remaining):** player-specific land permissions/claim enforcement (4.3 — `is_in_any_claim_zone()` exists but has zero callers), furnish NPC building interiors (4.3), player house interior decoration (4.3), piece-by-piece house building (4.3), seasonal animal migrations (4.4), environmental hazards (4.5), natural disasters (4.5).
+35. **Future (post-Milestone 3):** Swimming/buoyancy, waterfalls, boats, caves, and AI NavMesh generation on the new voxel terrain (hydrology/rivers and persistent digging are now done — see Terrain v2 above).
 
 ---
 
 *Plan created for: Roots - Cozy Farming Game*  
 *Engine: Godot 4.7 | Multiplayer: GD-Sync | Art: Low Poly Procedural*  
-*Last updated: Jul 2026 – **Crafting station placeables, Stone tier, bootstrap, Mythril armor, combat perks, shovel digging.** 7 station items/recipes, stations now player-crafted (no auto-spawn). Also: STONE ToolTier (0.75x), 6 stone tools hand-craftable at HAND, small_stone item, bootstrap starting inventory.*
+*Last updated: Jul 28, 2026 – **4.3 Housing placement**: new `house` placeable/`HouseObject` with its own interior door, plus 3 bug fixes to the shared interior system (missing exit doors, invisible walls from backface culling, zero floor/wall collision) that had made every existing building interior (community center, shops, tavern) unusable once entered. Planned forward from here: furnish the 4 NPC building interior templates (currently bare), let players decorate inside their own house, and build a second, parallel piece-by-piece open-world housing system (wall/floor/roof pieces, no interior teleport) for players who want a "no loading screen" alternative to the premade `house` item — see the Design Note under 4.3. Also this session: Phase 3 completed (Blacksmith's Tongs + Alchemist's Mortar & Pestle profession equipment via Blender-MCP models); Blender MCP wired up (`.mcp.json`) alongside Godot MCP; remade `basic_shovel`/`basic_hammer` low-poly models (fixed a degenerate-UV mesh-corruption bug, caught by `godot_validate_meshes`); Master Craft Temper/Distill station actions; doc audit (herbarium/plant ID, defensive structures, wildlife hunting, quest count 25/7 chains); Terrain v2 (godot_voxel/VoxelLodTerrain) rewrite documented.*

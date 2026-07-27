@@ -132,6 +132,9 @@ func _ready() -> void:
 	# Initialize equipment
 	equipment = Equipment.new()
 	equipment.equipment_changed.connect(_on_equipment_changed)
+	var sm = get_node_or_null("/root/SkillManager")
+	if sm and sm.has_method("register_equipment"):
+		sm.register_equipment(equipment)
 	
 	# Initialize farming component
 	farming = PlayerFarming.new()
@@ -506,6 +509,10 @@ func _swing_tool() -> void:
 	var tool_type: String = current_tool if current_tool != "" else ""
 	var base_power: int = held_item_data.tool_power if held_item_data else 1
 	var tool_tier: int = held_item_data.tool_tier if held_item_data else 0
+	# Quality (e.g. from a Forge/Anvil "Temper" master-craft) boosts tool/weapon power
+	var quality_mult: float = 1.0
+	if _selected_hotbar_item and not _selected_hotbar_item.is_empty() and _selected_hotbar_item.item_data == held_item_data:
+		quality_mult = ItemData.get_quality_multiplier(_selected_hotbar_item.quality)
 	
 	# Check what we're hitting with the raycast
 	if raycast.is_colliding():
@@ -525,6 +532,7 @@ func _swing_tool() -> void:
 			var effectiveness: float = ToolAffinity.get_effectiveness(tool_type, target_type)
 			if effectiveness > 0.0:
 				var power = ToolAffinity.calculate_power(tool_type, target_type, base_power, tool_tier)
+				power *= quality_mult
 				if has_buff("strength"):
 					power *= get_buff_value("strength")
 				# Apply perk damage bonuses
@@ -954,11 +962,13 @@ func restore_stamina(amount: float) -> void:
 # CONSUMABLE & BUFF SYSTEM
 # =====================
 
-func consume_item(item_data: ItemData) -> void:
+func consume_item(item_data: ItemData, quality: ItemData.ItemQuality = ItemData.ItemQuality.NORMAL) -> void:
+	# Quality (e.g. from an Alchemy Table "Distill" master-craft) boosts potency
+	var potency: float = ItemData.get_quality_multiplier(quality)
 	if item_data.health_restore > 0:
-		heal(item_data.health_restore)
+		heal(item_data.health_restore * potency)
 	if item_data.stamina_restore > 0:
-		restore_stamina(item_data.stamina_restore)
+		restore_stamina(item_data.stamina_restore * potency)
 	# Apply buff effects from potions
 	var buff_dur_bonus := 0.0
 	var sm = get_node_or_null("/root/SkillManager")
@@ -969,8 +979,8 @@ func consume_item(item_data: ItemData) -> void:
 		var buff_value: float = buff.get("value", 0.0)
 		var buff_duration: float = buff.get("duration", 0.0)
 		if buff_type != "" and buff_duration > 0:
-			buff_duration *= (1.0 + buff_dur_bonus)
-			_apply_buff(buff_type, buff_value, buff_duration)
+			buff_duration *= (1.0 + buff_dur_bonus) * potency
+			_apply_buff(buff_type, buff_value * potency, buff_duration)
 	# Grant XP based on item type
 	var skill_manager = get_node_or_null("/root/SkillManager")
 	if skill_manager and skill_manager.has_method("grant_action_xp"):
@@ -1199,10 +1209,12 @@ func _place_object() -> void:
 			_show_tool_feedback("No %s in inventory!" % item_data.item_name)
 			return
 	
-	# Create the actual PlaceableObject (or CommunityCenterObject for the community center)
+	# Create the actual PlaceableObject (or a subclass for buildings with an interior)
 	var obj: PlaceableObject
 	if item_data.item_id == "community_center":
 		obj = CommunityCenterObject.new()
+	elif item_data.item_id == "house":
+		obj = HouseObject.new()
 	else:
 		obj = PlaceableObject.new()
 	obj.name = "Placed_%s" % item_data.item_id

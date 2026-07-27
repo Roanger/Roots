@@ -343,6 +343,41 @@ func _initialize_items() -> void:
 	mythril_boots.rarity = ItemData.ItemRarity.RARE
 	_register_item(mythril_boots)
 	
+	# ===== Profession Equipment (Tool 1/2/3 passive equipment slots) =====
+	# TOOL-type items with no combat/harvest use of their own — equip them in a
+	# Tool slot (character screen) for a passive profession bonus while worn.
+	var blacksmiths_tongs = ItemData.new()
+	blacksmiths_tongs.item_id = "blacksmiths_tongs"
+	blacksmiths_tongs.item_name = "Blacksmith's Tongs"
+	blacksmiths_tongs.description = "A well-worn pair of forge tongs. Equip in a Tool slot to work the forge and anvil faster and with a steadier hand."
+	blacksmiths_tongs.item_type = ItemData.ItemType.TOOL
+	blacksmiths_tongs.base_value = 120
+	blacksmiths_tongs.max_stack_size = 1
+	blacksmiths_tongs.is_stackable = false
+	blacksmiths_tongs.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	blacksmiths_tongs.world_model_path = "res://assets/Tools/blacksmiths_tongs.blend"
+	blacksmiths_tongs.equip_bonuses.assign([
+		{"skill": "blacksmithing", "effect": PerkData.PerkEffect.SPEED_BONUS, "value": 0.15},
+		{"skill": "blacksmithing", "effect": PerkData.PerkEffect.QUALITY_BONUS, "value": 0.10},
+	])
+	_register_item(blacksmiths_tongs)
+
+	var alchemists_mortar = ItemData.new()
+	alchemists_mortar.item_id = "alchemists_mortar"
+	alchemists_mortar.item_name = "Alchemist's Mortar & Pestle"
+	alchemists_mortar.description = "A polished stone mortar and pestle. Equip in a Tool slot to grind ingredients more efficiently at the alchemy table."
+	alchemists_mortar.item_type = ItemData.ItemType.TOOL
+	alchemists_mortar.base_value = 120
+	alchemists_mortar.max_stack_size = 1
+	alchemists_mortar.is_stackable = false
+	alchemists_mortar.icon = _load_icon("res://Weapon & Tool/Hammer.png")
+	alchemists_mortar.world_model_path = "res://assets/Tools/alchemists_mortar.blend"
+	alchemists_mortar.equip_bonuses.assign([
+		{"skill": "alchemy", "effect": PerkData.PerkEffect.SPEED_BONUS, "value": 0.15},
+		{"skill": "alchemy", "effect": PerkData.PerkEffect.QUALITY_BONUS, "value": 0.10},
+	])
+	_register_item(alchemists_mortar)
+
 	# ===== Fishing =====
 	var fishing_rod = _create_tool("basic_fishing_rod", "Fishing Rod", "A simple fishing rod for catching fish.", 40, "fishing_rod", 1, 60)
 	fishing_rod.icon = _load_icon("res://Weapon & Tool/Shovel.png")
@@ -704,6 +739,13 @@ func _initialize_items() -> void:
 	hut.icon = _load_icon("res://Misc/Crate.png")
 	hut.rarity = ItemData.ItemRarity.UNCOMMON
 	_register_item(hut)
+
+	var house = _create_placeable("house", "House", "A proper house of your own, with a door leading inside.", 150,
+		"res://assets/Buildings/Blends/House_3.blend", 1.3,
+		Vector3(2.0, 2.2, 2.2))
+	house.icon = _load_icon("res://Misc/Crate.png")
+	house.rarity = ItemData.ItemRarity.UNCOMMON
+	_register_item(house)
 	
 	var feeding_trough = _create_placeable("feeding_trough", "Feeding Trough", "A wooden trough for feeding farm animals.", 20,
 		"res://assets/Placeables/feeding_trough.blend", 1.0,

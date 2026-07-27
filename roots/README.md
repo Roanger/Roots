@@ -7,7 +7,7 @@ A peaceful multiplayer farming simulation built with Godot 4.7, featuring proced
 ### Core Gameplay
 - **Exploration** — Discover 9+ biomes (Plains, Forest, Desert, Taiga, Mountains, Snow, Swamp, Beach, Highland) and settle wherever you choose
 - **Farming** — Till soil with a hoe, plant seeds, water crops, harvest at full growth, recover seeds
-- **Digging** — Shovel carves bowl-shaped depressions and drops dirt/sand/snow based on biome *(visual polish in progress)*
+- **Digging** — Shovel carves persistent SDF terrain deformation via `VoxelTool.do_sphere()`, saved across restarts
 - **Professions** — 7 professions with action-based XP and perk trees:
   - Cultivation (Farming)
   - Resource Gathering (Mining, Lumberjack, Foraging)
@@ -20,11 +20,13 @@ A peaceful multiplayer farming simulation built with Godot 4.7, featuring proced
 - **Combat** — Melee weapons (sword, axe, dagger), 4 enemy types, loot drops
 
 ### World
-- Smooth 2D heightmap terrain with real physics collision (`StaticBody3D` + `ConcavePolygonShape3D`)
-- Threaded chunk generation with seamless boundary stitching
-- Procedural medieval village (8 NPCs, market stalls)
+- Smooth voxel terrain (`VoxelLodTerrain` via godot_voxel/Voxel Tools 1.6) with Transvoxel SDF meshing, real rivers/lakes, and a 10-biome shader
+- Native LOD/streaming/collision, persistent digging via `VoxelStreamSQLite`
+- Loading screen with seed display; spawns gated behind terrain-collision readiness
+- Procedural medieval village (8 NPCs, market stalls), dynamically placed on dry land
 - Day/night cycle with seasonal sky/fog variation
 - In-game clock (time, day of week, season)
+- Menu/world music system with dedicated audio bus and volume slider
 
 ### Animals & Husbandry
 - 8 species: Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit
@@ -86,9 +88,9 @@ roots/
 │   ├── player/               # player_controller.gd, camera, farming, tool swing
 │   ├── ui/                   # HUD, inventory, hotbar, crafting, skill tree, quest journal, dialogue, shop
 │   ├── world/
-│   │   ├── chunks/           # chunk_manager.gd, chunk_data.gd — heightmap terrain
-│   │   ├── crops/            # farm_plot.gd, crop growth
-│   │   ├── terrain/          # noise_utilities.gd — biome/height noise
+│   │   ├── terrain_v2/        # terrain_service.gd (VoxelLodTerrain facade), world_noise.gd, world_object_spawner.gd
+│   │   ├── crops/             # farm_plot.gd, crop growth
+│   │   ├── biomes/, props/, structures/, town_buildings/, interiors/
 │   │   └── harvestable_resource.gd
 │   ├── entities/
 │   │   ├── npcs/             # base_npc.gd, npc_data.gd
@@ -99,7 +101,8 @@ roots/
 │   │   └── databases/        # ItemDatabase, CropDatabase, RecipeDatabase, QuestDatabase
 │   └── skills/               # skill_manager.gd, perk_data.gd
 ├── addons/
-│   └── GD-Sync/              # Multiplayer framework
+│   ├── GD-Sync/              # Multiplayer framework
+│   └── zylann.voxel/         # Voxel Tools (godot_voxel) 1.6 GDExtension
 └── plans/                    # Design docs (roots_game_plan.md, terrain_rewrite_plan.md)
 ```
 
@@ -108,11 +111,11 @@ roots/
 ## Technical Details
 
 - **Engine:** Godot 4.7 (Forward Plus renderer)
-- **Physics:** Jolt Physics — `CharacterBody3D` (player/AI), `RigidBody3D` (world items), `StaticBody3D` (terrain/objects)
-- **Terrain:** 2D `PackedFloat32Array` heightmap per chunk, `WorkerThreadPool` async mesh + collision generation
+- **Physics:** Jolt Physics — `CharacterBody3D` (player/AI), `RigidBody3D` (world items), native voxel collision (terrain)
+- **Terrain:** `VoxelLodTerrain` (godot_voxel/Voxel Tools 1.6 GDExtension), Transvoxel smooth SDF meshing
 - **Multiplayer:** GD-Sync
 - **Scripting:** GDScript 2.0
-- **Save System:** JSON per-chunk saves for terrain modifications; player data via SaveManager
+- **Save System:** `VoxelStreamSQLite` for terrain/digging modifications; player data via SaveManager
 
 ---
 

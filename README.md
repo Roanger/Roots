@@ -39,32 +39,34 @@ For controls and detailed structure, see [roots/README.md](roots/README.md).
 
 ---
 
-## Current Status (Feb 2026)
+## Current Status (Jul 2026)
 
 Phases 1–4 are largely complete. The game has a full playable loop.
 
 ### What's Working
-- ✅ **Smooth Heightmap Terrain** — 2D heightmap chunks with real physics collision (`StaticBody3D` + `ConcavePolygonShape3D`), threaded generation, seamless chunk stitching
+- ✅ **Voxel Terrain (v2)** — `VoxelLodTerrain` (godot_voxel/Voxel Tools 1.6) with Transvoxel smooth SDF meshing, real rivers/lakes carved below sea level, 10-biome shader, persistent SQLite-backed digging
 - ✅ **Player** — `CharacterBody3D` with `move_and_slide`, gravity, jump, crouch, sprint, first/third person camera
 - ✅ **Farming** — Hoe tilling (dark soil + FarmPlot spawn), planting, watering, growth stages, harvesting, crop drops
-- ✅ **Shovel Digging** — 3×3 bowl depression with DUG vertex coloring *(visual polish in progress)*
+- ✅ **Shovel Digging** — Persistent SDF deformation via `VoxelTool.do_sphere()`, survives restarts
 - ✅ **Inventory & Hotbar** — Drag-and-drop between inventory, hotbar, and equipment slots
-- ✅ **Crafting** — 40+ recipes across Workbench, Forge, Anvil, Alchemy Table, Cooking Fire
-- ✅ **Tool System** — 5 tiers (Wood → Mythril), tool affinity per target type, durability
+- ✅ **Crafting** — 40+ recipes across Workbench, Forge, Anvil, Alchemy Table, Cooking Fire (stations are now player-crafted placeables)
+- ✅ **Tool System** — 6 tiers (Stone → Wood → Bronze → Iron → Steel → Mythril), tool affinity per target type, durability
 - ✅ **Skill System** — 7 professions, action-based XP, perk tree with synergy bonuses
 - ✅ **Animals** — 8 species (Chicken, Cow, Sheep, Goat, Duck, Boar, Deer, Rabbit), feeding, petting, breeding, products
 - ✅ **Fences & Placeables** — Fence/gate/post placement with ghost preview, 5 building types
 - ✅ **Enemies** — 4 Skeleton types with AI (idle/wander/chase/attack), loot drops, XP
 - ✅ **Herb Gathering & Alchemy** — 9 harvestable herbs, 6 potions with timed buff system
 - ✅ **Cooking** — 14 recipes, food buffs (well_fed, speed, strength, heal-over-time)
-- ✅ **NPCs** — 8 village NPCs with dialogue trees, shops (gold coin currency), quest giving
+- ✅ **NPCs** — 8 village NPCs with dialogue trees, shops (gold coin currency), quest giving, dynamic dry-land village placement
 - ✅ **Quest System** — 25 quests across multiple chains, journal UI, HUD tracker
 - ✅ **Village** — Procedural medieval village (MegaKit modular buildings, town well, market stalls)
 - ✅ **Day/Night & Seasons** — BinbunSky shader, seasonal sky/fog variation, in-game clock UI
 - ✅ **World Items** — `RigidBody3D` drops with proximity auto-pickup, not pushed by player
+- ✅ **Loading Screen** — seed display, all entity spawns gated behind terrain-collision readiness
+- ✅ **Music System** — menu/world music with a dedicated Music audio bus and settings volume slider
 
 ### In Progress
-- ⚠️ Shovel digging visual polish (bowl shape works, refinement needed)
+- ⚠️ Generator-graph flatten zones (village/building sites) — CPU gameplay queries flatten correctly, but the voxel mesh still shows raw heights in the blend region
 - ⚠️ GD-Sync multiplayer lobby (framework integrated, not yet wired)
 
 ---
@@ -74,8 +76,8 @@ Phases 1–4 are largely complete. The game has a full playable loop.
 - **Engine:** Godot 4.7 (Forward+, Jolt Physics)
 - **Multiplayer:** GD-Sync
 - **Scripting:** GDScript 2.0
-- **Terrain:** 2D heightmap chunks, `WorkerThreadPool` async generation
-- **Physics:** `CharacterBody3D` (player/AI), `RigidBody3D` (items), `StaticBody3D` (terrain/objects)
+- **Terrain:** `VoxelLodTerrain` (godot_voxel/Voxel Tools 1.6 GDExtension), Transvoxel meshing, `VoxelStreamSQLite` persistence
+- **Physics:** `CharacterBody3D` (player/AI), `RigidBody3D` (items), `StaticBody3D`/native voxel collision (terrain/objects)
 
 ---
 

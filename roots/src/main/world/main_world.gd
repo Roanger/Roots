@@ -28,6 +28,7 @@ const NotificationPopupScript = preload("res://src/ui/notification_popup.gd")
 const WeatherEffectsScript = preload("res://src/world/weather_effects.gd")
 const InteriorManagerScript = preload("res://src/world/interior_manager.gd")
 const CommunityCenterObject = preload("res://src/world/community_center_object.gd")
+const HouseObjectScript = preload("res://src/world/house_object.gd")
 var hud: Control = null
 var town_builder: Node3D = null
 var water_plane: MeshInstance3D = null
@@ -794,6 +795,14 @@ func _load_placed_objects() -> void:
 			cc.global_position = pos
 			cc.rotation.y = rot_y
 			add_child(cc)
+		elif item_id == "house":
+			var house = HouseObjectScript.new()
+			var interior_id: String = data.get("interior_id", "")
+			house.name = "Placed_%s" % item_id
+			house.global_position = pos
+			house.rotation.y = rot_y
+			house.setup(item_id, item.item_name, item.placeable_model_path, item.placeable_scale, item.placeable_collision_size, false, interior_id)
+			add_child(house)
 		else:
 			var obj := PlaceableObject.new()
 			obj.name = "Placed_%s" % item_id

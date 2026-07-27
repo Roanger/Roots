@@ -66,13 +66,15 @@ Art style: **Low Poly** — clean geometry, flat/simple materials, minimal textu
 | `[tier]_pickaxe.blend` | Pickaxe | Wood, Bronze, Iron, Steel, Mythril | Curved double-point pickaxe. Material colors match tiers. | `[x]` |
 | `[tier]_hoe.blend` | Hoe | Wood, Bronze, Iron, Steel, Mythril | Curved neck, angled soil-tilling hoe blade. | `[x]` |
 | `[tier]_sickle.blend` | Sickle | Wood, Bronze, Iron, Steel, Mythril | Short handled crescent blade tool for harvesting. | `[x]` |
-| `basic_shovel.blend` | Shovel | Basic | Standard D-handle grip spade shovel with curved tip. | `[x]` |
+| `basic_shovel.blend` | Shovel | Basic | Remade Jul 2026 via Blender MCP: octagonal tapered handle, T-grip, metal ferrule, scooped blade with foot-ridge tab. Original was a crude 4-primitive stack — replaced. | `[x]` |
 | `basic_watering_can.blend` | Watering Can | Basic | Cylindrical tin watering can with carry and pouring handle. | `[x]` |
-| `basic_hammer.blend` | Hammer | Basic | Stout rectangular wooden-handled smithing hammer. | `[x]` |
+| `basic_hammer.blend` | Hammer | Basic | Remade Jul 2026 via Blender MCP: proper cross-peen T-head (flat striking face + wedge peen) on a tapered handle, replacing the old block-on-a-stick mace shape. | `[x]` |
 | `basic_saw.blend` | Saw | Basic | Wood handled frame saw with serrated blade bottom. | `[x]` |
 | `basic_chisel.blend` | Chisel | Basic | Beveled iron tip chisel for woodworking. | `[x]` |
 | `basic_fishing_rod.blend` | Fishing Rod | Basic | Tapering bamboo rod with guides and line. | `[x]` |
 | `torch.blend` | Torch | Basic | Cloth-wrapped torch stick with fire emissive blocks. | `[x]` |
+| `blacksmiths_tongs.blend` | Profession Equipment | N/A | Jul 2026 via Blender MCP: two flat steel arms crossing at a pivot rivet (scissor/tongs silhouette). Passive Tool-slot equipment, not swung — see item_database.gd `blacksmiths_tongs`. | `[x]` |
+| `alchemists_mortar.blend` | Profession Equipment | N/A | Jul 2026 via Blender MCP: tapered stone bowl with rim + leaning wood pestle (rounded grip/grind ends). Passive Tool-slot equipment — see item_database.gd `alchemists_mortar`. | `[x]` |
 
 ### Weapons
 

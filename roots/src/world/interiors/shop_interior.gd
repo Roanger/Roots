@@ -1,9 +1,21 @@
 extends Node3D
 
 const GRID: float = 2.0
+const BuildingDoorScript = preload("res://src/world/building_door.gd")
 
 func _ready() -> void:
 	_generate_interior()
+	_add_exit_door()
+	_add_light()
+
+func _add_light() -> void:
+	var light = OmniLight3D.new()
+	light.light_color = Color(1.0, 0.92, 0.8)
+	light.light_energy = 2.2
+	light.omni_range = 6.0
+	light.shadow_enabled = false
+	light.position = Vector3(0, 2.4, 0)
+	add_child(light)
 
 func _generate_interior() -> void:
 	# Floor
@@ -29,11 +41,33 @@ func _generate_interior() -> void:
 	counter_mat.albedo_color = Color(0.5, 0.35, 0.2)
 	_add_box(Vector3(1.2, 1.0, 0.5), counter_mat, Vector3(0, 0.5, -0.8))
 
+func _add_exit_door() -> void:
+	var door = BuildingDoorScript.new()
+	door.name = "ExitDoor"
+	door.building_name = "Shop"
+	door.is_exit = true
+	door.position = Vector3(0, 1.0, -1.0)
+	add_child(door)
+
 func _add_box(size: Vector3, material: Material, position: Vector3) -> void:
-	var box = MeshInstance3D.new()
+	var body = StaticBody3D.new()
+	body.position = position
+	body.collision_layer = 1
+	body.collision_mask = 0
+
+	var mesh_inst = MeshInstance3D.new()
 	var mesh = BoxMesh.new()
 	mesh.size = size
-	box.mesh = mesh
-	box.material_override = material
-	box.position = position
-	add_child(box)
+	mesh_inst.mesh = mesh
+	if material is BaseMaterial3D:
+		(material as BaseMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh_inst.material_override = material
+	body.add_child(mesh_inst)
+
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	body.add_child(col)
+
+	add_child(body)
