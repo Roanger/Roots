@@ -104,6 +104,7 @@ enum ToolTier {
 @export var placeable_can_rotate: bool = true  # R key to rotate 90°
 @export var placeable_collision_size: Vector3 = Vector3(1.0, 1.0, 0.2)  # Collision box size
 @export var placeable_is_gate: bool = false  # Gates pivot from hinge edge
+@export var placeable_indoor_ok: bool = false  # Can be placed inside a building interior (decorations only)
 
 # Crafting
 @export var crafting_recipes: Array[String] = []  # IDs of recipes this item is used in

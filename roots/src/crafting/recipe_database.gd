@@ -872,7 +872,27 @@ func _init_recipes() -> void:
 		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "string", "amount": 2}, {"item_id": "iron_ingot", "amount": 1}],
 		"fence_gate", 1, 3.0, "crafting", 10.0, "crafting", 5
 	))
-	
+
+	# ===== Piece-by-Piece House Building =====
+	_register_recipe(_make_recipe(
+		"craft_wall_wood", "Wooden Wall", "Craft a half-timber wall panel.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "rope", "amount": 1}],
+		"wall_wood", 1, 3.0, "crafting", 6.0, "crafting", 5
+	))
+	_register_recipe(_make_recipe(
+		"craft_floor_wood", "Wooden Floor", "Craft a wooden floor tile.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 3}],
+		"floor_wood", 1, 2.5, "crafting", 5.0, "crafting", 5
+	))
+	_register_recipe(_make_recipe(
+		"craft_door_wood", "Wooden Door", "Craft a proper door that opens and closes.",
+		CraftingRecipe.RecipeCategory.BUILDING, CraftingRecipe.CraftingStation.WORKBENCH,
+		[{"item_id": "wood_plank", "amount": 3}, {"item_id": "string", "amount": 2}, {"item_id": "iron_ingot", "amount": 1}],
+		"door_wood", 1, 3.0, "crafting", 10.0, "crafting", 5
+	))
+
 	# Barn - large building, expensive
 	_register_recipe(_make_recipe(
 		"craft_barn", "Barn", "Build a barn to shelter your animals.",

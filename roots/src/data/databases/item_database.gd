@@ -723,7 +723,30 @@ func _initialize_items() -> void:
 	fence_gate.icon = _load_icon("res://Material/Wooden Plank.png")
 	fence_gate.placeable_is_gate = true
 	_register_item(fence_gate)
-	
+
+	# ===== Piece-by-Piece House Building =====
+	# Build a real, physical, open-world structure out of individual pieces —
+	# no interior teleport, unlike the premade `house` item. Grid-snapped like
+	# fences so wall/floor pieces butt up edge-to-edge.
+	var wall_wood = _create_placeable("wall_wood", "Wooden Wall", "A half-timber wall panel for building your own structure, piece by piece.", 20,
+		"res://assets/Placeables/wall_wood.blend", 1.0,
+		Vector3(2.0, 2.6, 0.18))
+	wall_wood.icon = _load_icon("res://Material/Wooden Plank.png")
+	_register_item(wall_wood)
+
+	var floor_wood = _create_placeable("floor_wood", "Wooden Floor", "A wooden floor tile for building your own structure, piece by piece.", 15,
+		"res://assets/Placeables/floor_wood.blend", 1.0,
+		Vector3(2.0, 0.14, 2.0))
+	floor_wood.icon = _load_icon("res://Material/Wooden Plank.png")
+	_register_item(floor_wood)
+
+	var door_wood = _create_placeable("door_wood", "Wooden Door", "A proper door that opens and closes, for building your own structure, piece by piece.", 25,
+		"res://assets/Placeables/door_wood.blend", 1.0,
+		Vector3(1.1, 2.2, 0.18))
+	door_wood.icon = _load_icon("res://Material/Wooden Plank.png")
+	door_wood.placeable_is_gate = true
+	_register_item(door_wood)
+
 	# ===== Placeable Buildings =====
 	
 	var barn = _create_placeable("barn", "Barn", "A cozy barn to shelter your animals.", 80,
@@ -770,15 +793,23 @@ func _initialize_items() -> void:
 		"res://assets/Placeables/sitting_log.blend", 1.0,
 		Vector3(1.2, 0.5, 0.5))
 	sitting_log.icon = _load_icon("res://Material/Wood Log.png")
+	sitting_log.placeable_indoor_ok = true
 	_register_item(sitting_log)
-	
+
 	# ===== Decoration Placeables =====
-	_register_item(_create_placeable("flower_pot", "Flower Pot", "A charming pot with wildflowers.", 6,
-		"res://assets/Placeables/flower_pot.blend", 1.0, Vector3(0.3, 0.4, 0.3)))
-	_register_item(_create_placeable("chair_wood", "Wooden Chair", "A simple wooden chair.", 10,
-		"res://assets/Placeables/chair_wood.blend", 1.0, Vector3(0.5, 0.8, 0.5)))
-	_register_item(_create_placeable("table_small", "Small Table", "A small wooden table.", 15,
-		"res://assets/Placeables/table_small.blend", 1.0, Vector3(0.8, 0.6, 0.8)))
+	# indoor_ok: can also be placed inside your own house's interior, not just outdoors
+	var flower_pot = _create_placeable("flower_pot", "Flower Pot", "A charming pot with wildflowers.", 6,
+		"res://assets/Placeables/flower_pot.blend", 1.0, Vector3(0.3, 0.4, 0.3))
+	flower_pot.placeable_indoor_ok = true
+	_register_item(flower_pot)
+	var chair_wood = _create_placeable("chair_wood", "Wooden Chair", "A simple wooden chair.", 10,
+		"res://assets/Placeables/chair_wood.blend", 1.0, Vector3(0.5, 0.8, 0.5))
+	chair_wood.placeable_indoor_ok = true
+	_register_item(chair_wood)
+	var table_small = _create_placeable("table_small", "Small Table", "A small wooden table.", 15,
+		"res://assets/Placeables/table_small.blend", 1.0, Vector3(0.8, 0.6, 0.8))
+	table_small.placeable_indoor_ok = true
+	_register_item(table_small)
 
 	# ===== Defensive Placeables =====
 	

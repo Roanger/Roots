@@ -49,6 +49,10 @@ var base_run_speed: float = 8.0
 
 var current_state: PlayerState = PlayerState.IDLE
 var is_on_ground: bool = false
+var _fall_peak_y: float = 0.0
+const FALL_DAMAGE_SAFE_HEIGHT: float = 5.0  # meters of freefall before it starts to hurt
+const FALL_DAMAGE_PER_METER: float = 5.0
+const FALL_DAMAGE_MAX: float = 50.0  # cozy game — a bad fall should never be lethal on its own
 var is_crouching: bool = false
 var current_tool: String = ""
 var interaction_target: Node3D = null
@@ -344,6 +348,9 @@ func _physics_process(delta: float) -> void:
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
+		_fall_peak_y = maxf(_fall_peak_y, global_position.y)
+	else:
+		_fall_peak_y = global_position.y
 
 func _handle_movement_input() -> void:
 	move_input = Vector2.ZERO
@@ -422,10 +429,21 @@ func _move_character(delta: float) -> void:
 	_update_model_rotation()
 	
 	# Update ground state tracking
+	var was_on_ground = is_on_ground
 	is_on_ground = is_on_floor()
-	
+	if is_on_ground and not was_on_ground:
+		_handle_fall_landing()
+
 	# Update position signal
 	emit_signal("position_changed", global_position)
+
+func _handle_fall_landing() -> void:
+	var fall_distance = _fall_peak_y - global_position.y
+	if fall_distance <= FALL_DAMAGE_SAFE_HEIGHT:
+		return
+	var damage = minf((fall_distance - FALL_DAMAGE_SAFE_HEIGHT) * FALL_DAMAGE_PER_METER, FALL_DAMAGE_MAX)
+	take_damage(damage)
+	_show_tool_feedback("Ouch! That was a hard landing.")
 
 func _jump() -> void:
 	if is_on_floor() and not is_crouching:
@@ -779,76 +797,17 @@ func set_chunk_manager(manager: Node) -> void:
 func _give_starting_items() -> void:
 	if not item_database:
 		return
-	
-	# Give basic tools
-	var hoe = item_database.get_item("basic_hoe")
-	var shovel = item_database.get_item("basic_shovel")
-	var watering_can = item_database.get_item("basic_watering_can")
-	var sickle = item_database.get_item("basic_sickle")
-	var axe = item_database.get_item("basic_axe")
-	var pickaxe = item_database.get_item("basic_pickaxe")
-	var seeds = item_database.get_item("wheat_seeds")
-	var sword = item_database.get_item("basic_sword")
-	
-	if hoe:
-		inventory.add_item(hoe, 1)
-	if shovel:
-		inventory.add_item(shovel, 1)
-	if watering_can:
-		inventory.add_item(watering_can, 1)
-	if sickle:
-		inventory.add_item(sickle, 1)
-	if axe:
-		inventory.add_item(axe, 1)
-	if pickaxe:
-		inventory.add_item(pickaxe, 1)
-	if sword:
-		inventory.add_item(sword, 1)
-	if seeds:
-		inventory.add_item(seeds, 10)
-	
-	# Give starting crafting materials for testing
-	var wood_log = item_database.get_item("wood_log")
-	var stone_item = item_database.get_item("stone")
-	var string_item = item_database.get_item("string")
-	var coal_item = item_database.get_item("coal")
-	var iron_nugget = item_database.get_item("iron_nugget")
-	
-	if wood_log:
-		inventory.add_item(wood_log, 10)
-	if stone_item:
-		inventory.add_item(stone_item, 10)
-	if string_item:
-		inventory.add_item(string_item, 10)
-	if coal_item:
-		inventory.add_item(coal_item, 5)
-	if iron_nugget:
-		inventory.add_item(iron_nugget, 9)
-	
-	# Give starting alchemy materials for testing
-	var chamomile_item = item_database.get_item("chamomile")
-	var mushroom_item = item_database.get_item("common_mushroom")
-	var empty_bottle_item = item_database.get_item("empty_bottle")
-	var health_pot = item_database.get_item("health_potion")
-	if chamomile_item:
-		inventory.add_item(chamomile_item, 5)
-	if mushroom_item:
-		inventory.add_item(mushroom_item, 5)
-	if empty_bottle_item:
-		inventory.add_item(empty_bottle_item, 3)
-	if health_pot:
-		inventory.add_item(health_pot, 2)
-	
-	# Give starting fences for testing placement
-	var fence_item = item_database.get_item("fence_wood")
-	var gate_item = item_database.get_item("fence_gate")
-	var post_item = item_database.get_item("fence_post")
-	if fence_item:
-		inventory.add_item(fence_item, 10)
-	if gate_item:
-		inventory.add_item(gate_item, 2)
-	if post_item:
-		inventory.add_item(post_item, 6)
+
+	# Bootstrap kit only: no ready-made tools. Players hand-craft their first
+	# Stone-tier tool (at the HAND station) from these before anything else
+	# is possible — see Phase 3.1 "Stone tier + bootstrap" in the game plan.
+	var small_stone = item_database.get_item("small_stone")
+	var stick = item_database.get_item("stick")
+
+	if small_stone:
+		inventory.add_item(small_stone, 4)
+	if stick:
+		inventory.add_item(stick, 3)
 
 func get_inventory() -> Inventory:
 	return inventory
@@ -1059,30 +1018,112 @@ func _update_placement_preview() -> void:
 	# Check if the held item is placeable
 	var held = _get_held_item_data()
 	var is_placeable = held and held.item_type == ItemData.ItemType.PLACEABLE
-	
+
 	if not is_placeable:
 		_destroy_placement_ghost()
 		return
-	
+
 	# Create ghost if needed or if item changed
 	if not _placement_ghost or _placement_item_data != held:
 		_create_placement_ghost(held)
-	
+
+	var house_interior_id := _get_own_house_interior_id()
+
+	if house_interior_id != "":
+		# Inside your own house: only decoration items go here, on the interior floor
+		if not held.placeable_indoor_ok:
+			_placement_ghost.visible = false
+			_placement_valid = false
+			return
+		var indoor_pos := _get_indoor_placement_position(held, house_interior_id)
+		if indoor_pos == Vector3.ZERO:
+			_placement_ghost.visible = false
+			_placement_valid = false
+			return
+		_placement_ghost.global_position = indoor_pos
+		_placement_ghost.rotation.y = _placement_rotation
+		_placement_ghost.visible = true
+		_placement_valid = true
+		_tint_ghost(Color(0.3, 1.0, 0.3, 0.5))
+		return
+
+	# Inside someone else's interior (NPC building): no placement at all
+	var im = get_node_or_null("/root/MainWorld/InteriorManager")
+	if im and im.has_method("is_player_inside") and im.is_player_inside(self):
+		_placement_ghost.visible = false
+		_placement_valid = false
+		return
+
 	# Get placement position from terrain look
 	var target_pos = _get_placement_position(held)
 	if target_pos == Vector3.ZERO:
 		_placement_ghost.visible = false
 		_placement_valid = false
 		return
-	
+
 	# Position and rotate the ghost
 	_placement_ghost.global_position = target_pos
 	_placement_ghost.rotation.y = _placement_rotation
 	_placement_ghost.visible = true
 	_placement_valid = true
-	
+
+	# Claimed land blocks placement (including a rival claim post) unless it's your own claim
+	if chunk_manager and chunk_manager.has_method("can_build_at"):
+		_placement_valid = chunk_manager.can_build_at(target_pos, _get_local_owner_id())
+
 	# Tint ghost green (valid) or red (invalid)
 	_tint_ghost(Color(0.3, 1.0, 0.3, 0.5) if _placement_valid else Color(1.0, 0.3, 0.3, 0.5))
+
+## Returns the current interior_id if the player is inside a player-crafted house
+## (HouseObject always mints ids starting with "house_"), or "" otherwise —
+## NPC building interiors (shops, tavern, etc.) are not decoratable.
+func _get_own_house_interior_id() -> String:
+	var im = get_node_or_null("/root/MainWorld/InteriorManager")
+	if not im or not im.has_method("is_player_inside") or not im.is_player_inside(self):
+		return ""
+	var interior_id: String = im.get_current_interior_id(self)
+	return interior_id if interior_id.begins_with("house_") else ""
+
+## small_house_interior.tscn's room is a fixed 3.6x3.6 floor centered on the
+## interior root (walls at +/-1.8); this margin keeps placement clear of them.
+const INDOOR_ROOM_HALF_EXTENT := 1.5
+
+func _get_indoor_placement_position(item_data: ItemData, interior_id: String) -> Vector3:
+	if not camera:
+		return Vector3.ZERO
+	var im = get_node_or_null("/root/MainWorld/InteriorManager")
+	var interior = im.get_interior_node(interior_id) if im else null
+	if not interior:
+		return Vector3.ZERO
+	var floor_y = interior.global_position.y
+	var min_x = interior.global_position.x - INDOOR_ROOM_HALF_EXTENT
+	var max_x = interior.global_position.x + INDOOR_ROOM_HALF_EXTENT
+	var min_z = interior.global_position.z - INDOOR_ROOM_HALF_EXTENT
+	var max_z = interior.global_position.z + INDOOR_ROOM_HALF_EXTENT
+
+	var cam_pos = camera.global_position
+	var cam_dir = -camera.global_transform.basis.z.normalized()
+	var max_reach := 3.0
+	var step := 0.2
+	var steps := int(max_reach / step)
+
+	for i in range(1, steps + 1):
+		var sample_pos = cam_pos + cam_dir * (step * i)
+		# Stop once the look-ray leaves the room's floor footprint entirely —
+		# without this a shallow downward angle can "hit" a point past the wall.
+		if sample_pos.x < min_x - 0.5 or sample_pos.x > max_x + 0.5 or sample_pos.z < min_z - 0.5 or sample_pos.z > max_z + 0.5:
+			return Vector3.ZERO
+		if sample_pos.y <= floor_y + 0.5:
+			var px = sample_pos.x
+			var pz = sample_pos.z
+			if item_data.placeable_snap_to_grid:
+				px = roundf(px)
+				pz = roundf(pz)
+			# Clamp AFTER snapping so the grid-rounded result can't land back outside the room
+			px = clampf(px, min_x, max_x)
+			pz = clampf(pz, min_z, max_z)
+			return Vector3(px, floor_y, pz)
+	return Vector3.ZERO
 
 func _get_placement_position(item_data: ItemData) -> Vector3:
 	if not camera or not chunk_manager:
@@ -1194,21 +1235,34 @@ func _apply_ghost_material(node: Node, color: Color) -> void:
 	for child in node.get_children():
 		_apply_ghost_material(child, color)
 
+func _get_local_owner_id() -> String:
+	var gm = get_node_or_null("/root/GameManager")
+	return str(gm.local_player_id) if gm else "1"
+
 func _place_object() -> void:
-	if not _placement_ghost or not _placement_valid or not _placement_item_data:
+	if not _placement_ghost or not _placement_item_data:
 		return
-	
+	var house_interior_id := _get_own_house_interior_id()
+	if not _placement_valid:
+		var msg = "Can't place here."
+		if _placement_ghost.visible and house_interior_id == "":
+			msg = "Can't place here — this land is claimed by someone else."
+		elif house_interior_id != "":
+			msg = "That can't be placed indoors."
+		_show_tool_feedback(msg)
+		return
+
 	var item_data = _placement_item_data
 	var place_pos = _placement_ghost.global_position
 	var place_rot = _placement_rotation
-	
+
 	# Consume one item from inventory
 	if inventory:
 		var removed = inventory.remove_item(item_data.item_id, 1)
 		if removed < 1:
 			_show_tool_feedback("No %s in inventory!" % item_data.item_name)
 			return
-	
+
 	# Create the actual PlaceableObject (or a subclass for buildings with an interior)
 	var obj: PlaceableObject
 	if item_data.item_id == "community_center":
@@ -1218,9 +1272,20 @@ func _place_object() -> void:
 	else:
 		obj = PlaceableObject.new()
 	obj.name = "Placed_%s" % item_data.item_id
+
+	# Decorations placed inside your own house become children of that interior
+	# instance (not the outdoor world) — added to the tree BEFORE setting global
+	# position, since the interior itself sits at a large, non-origin world offset.
+	var parent_node: Node = get_tree().current_scene
+	if house_interior_id != "":
+		var im = get_node_or_null("/root/MainWorld/InteriorManager")
+		var interior = im.get_interior_node(house_interior_id) if im else null
+		if interior:
+			parent_node = interior
+	parent_node.add_child(obj)
 	obj.global_position = place_pos
 	obj.rotation.y = place_rot
-	
+
 	var is_gate = item_data.placeable_is_gate
 	obj.setup(
 		item_data.item_id,
@@ -1230,8 +1295,7 @@ func _place_object() -> void:
 		item_data.placeable_collision_size,
 		is_gate
 	)
-	
-	get_tree().current_scene.add_child(obj)
+
 	_show_tool_feedback("Placed %s" % item_data.item_name)
 
 	# Claim post special handling — mark territory

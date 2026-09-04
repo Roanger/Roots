@@ -68,14 +68,22 @@ var _night_spawn_timer: float = 0.0
 var _night_spawn_interval: float = 25.0  # seconds between night spawn waves
 var _is_night: bool = false
 
-# Wild animal spawn rules per species: which biomes and how many
+# Wild animal spawn rules per species: which biomes, how many, and which
+# seasons they're around for (GameManager.Season ints: 0=SPRING 1=SUMMER
+# 2=AUTUMN 3=WINTER). Missing "seasons" key = year-round. Re-rolled across
+# all currently-loaded chunks on every season change — see _on_season_changed.
 const WILD_SPAWN_RULES: Dictionary = {
-	"deer":		{ "biomes": [3, 8],		"count_range": [1, 2], "spawn_chance": 0.5 },
+	"deer":		{ "biomes": [3, 8],		"count_range": [1, 2], "spawn_chance": 0.5,  "seasons": [0, 1, 2] },
 	"rabbit":	{ "biomes": [2, 3, 8],		"count_range": [1, 3], "spawn_chance": 0.7 },
-	"boar":		{ "biomes": [2, 3, 8],		"count_range": [1, 1], "spawn_chance": 0.25 },
-	"wolf":		{ "biomes": [3, 5, 9, 6],	"count_range": [0, 1], "spawn_chance": 0.12 },
-	"duck":		{ "biomes": [1, 8],		"count_range": [1, 2], "spawn_chance": 0.35 },
-	"goat":		{ "biomes": [6, 9],		"count_range": [1, 1], "spawn_chance": 0.25 },
+	"boar":		{ "biomes": [2, 3, 8],		"count_range": [1, 1], "spawn_chance": 0.25, "seasons": [1, 2, 3] },
+	"wolf":		{ "biomes": [3, 5, 9, 6],	"count_range": [0, 1], "spawn_chance": 0.12, "seasons": [2, 3] },
+	"duck":		{ "biomes": [1, 8],		"count_range": [1, 2], "spawn_chance": 0.35, "seasons": [0, 1, 2] },
+	"goat":		{ "biomes": [6, 9],		"count_range": [1, 1], "spawn_chance": 0.25, "seasons": [0, 1] },
+}
+
+## Display names for the migration notification (falls back to capitalized species_id).
+const MIGRATION_DISPLAY_NAMES: Dictionary = {
+	"deer": "Deer", "boar": "Boars", "wolf": "Wolves", "duck": "Ducks", "goat": "Mountain Goats", "rabbit": "Rabbits",
 }
 
 # Explicit references to autoload singletons
@@ -208,27 +216,37 @@ func _on_terrain_ready() -> void:
 	await get_tree().process_frame
 
 	# --- Spawn everything ---
-	_spawn_player()
-	_position_farm_plots()
-	_setup_inventory_ui()
-	_setup_character_ui()
-	_setup_hotbar_ui()
-	_setup_hud()
-	_setup_skill_tree_ui()
-	_setup_crafting_ui()
+	# NOTE: any of these that contain an internal `await` (process_frame,
+	# create_timer, ...) MUST be awaited here too. Calling an async function
+	# without awaiting it just fires it and moves on immediately in GDScript
+	# — that's what this block used to do, which let _hide_loading_screen()
+	# run almost instantly while village building / NPC / animal / enemy
+	# spawning / UI setup were all still queued to run over the following
+	# frames: the loading screen would close but the game kept doing heavy
+	# synchronous setup work for several more seconds, looking frozen. If you
+	# add an `await` inside any of the currently-synchronous functions below,
+	# add `await` to its call here too or this bug comes right back.
+	await _spawn_player()
+	await _position_farm_plots()
+	await _setup_inventory_ui()
+	await _setup_character_ui()
+	await _setup_hotbar_ui()
+	await _setup_hud()
+	await _setup_skill_tree_ui()
+	await _setup_crafting_ui()
 	_setup_herbarium_ui()
-	_spawn_enemies()
-	_spawn_animals()
-	_setup_interior_manager()
-	_build_village()
+	await _spawn_enemies()
+	await _spawn_animals()
+	await _setup_interior_manager()
+	await _build_village()
 	_init_quest_system()
-	_spawn_npcs()
+	await _spawn_npcs()
 	_setup_dialogue_ui()
 	_setup_shop_ui()
 	_setup_quest_journal_ui()
 	_setup_notification_ui()
 	_setup_reputation()
-	_setup_weather()
+	await _setup_weather()
 	_load_player_data()
 	_load_farm_plots()
 	_load_placed_objects()
@@ -481,6 +499,53 @@ func _on_day_changed(day: int) -> void:
 
 func _on_season_changed(season: int) -> void:
 	_update_season_sky(season)
+	_migrate_wildlife()
+
+func _migrate_wildlife() -> void:
+	## Re-roll wild animal spawns across every currently-loaded chunk under the
+	## new season's WILD_SPAWN_RULES, then tell the player what changed.
+	if _wildlife_by_chunk.is_empty():
+		return
+
+	var species_before := _get_loaded_wildlife_species()
+	var chunk_positions = _wildlife_by_chunk.keys()
+	for chunk_pos in chunk_positions:
+		_despawn_wildlife_for_chunk(chunk_pos)
+	for chunk_pos in chunk_positions:
+		_spawn_wildlife_for_chunk(chunk_pos)
+	var species_after := _get_loaded_wildlife_species()
+
+	var arrived: Array = []
+	var left: Array = []
+	for species_id in species_after:
+		if not species_before.has(species_id) and WILD_SPAWN_RULES.get(species_id, {}).has("seasons"):
+			arrived.append(species_id)
+	for species_id in species_before:
+		if not species_after.has(species_id) and WILD_SPAWN_RULES.get(species_id, {}).has("seasons"):
+			left.append(species_id)
+
+	if arrived.is_empty() and left.is_empty():
+		return
+	var msg_parts: Array[String] = []
+	if left.size() > 0:
+		msg_parts.append(_migration_names(left) + (" has" if left.size() == 1 else " have") + " migrated away for the season.")
+	if arrived.size() > 0:
+		msg_parts.append(_migration_names(arrived) + (" has" if arrived.size() == 1 else " have") + " arrived for the season.")
+	_show_placed_notification("Wildlife Migration", " ".join(msg_parts))
+
+func _get_loaded_wildlife_species() -> Dictionary:
+	var species: Dictionary = {}
+	for chunk_pos in _wildlife_by_chunk:
+		for animal in _wildlife_by_chunk[chunk_pos]:
+			if is_instance_valid(animal) and animal.animal_data:
+				species[animal.animal_data.species_id] = true
+	return species
+
+func _migration_names(species_ids: Array) -> String:
+	var names: Array[String] = []
+	for species_id in species_ids:
+		names.append(MIGRATION_DISPLAY_NAMES.get(species_id, str(species_id).capitalize()))
+	return ", ".join(names)
 
 func _update_biome_climate() -> void:
 	if not player or not chunk_manager:
@@ -776,6 +841,11 @@ func _load_placed_objects() -> void:
 		var item_id: String = data.get("item_id", "")
 		var pos_data: Dictionary = data.get("position", {})
 		var pos := Vector3(pos_data.get("x", 0.0), pos_data.get("y", 0.0), pos_data.get("z", 0.0))
+		# Interior decorations live at the InteriorManager's hidden y=500 pocket-dimension
+		# offset and are restored per-interior (on enter) by InteriorManager instead —
+		# the interior they belong to doesn't exist yet at outdoor-world load time.
+		if pos.y > 100.0:
+			continue
 		var rot_y: float = data.get("rotation_y", 0.0)
 		var is_gate: bool = data.get("is_gate", false)
 		var gate_open: bool = data.get("gate_open", false)
@@ -1404,6 +1474,8 @@ func _spawn_wildlife_for_chunk(chunk_pos: Vector2i) -> void:
 		var rule = WILD_SPAWN_RULES[species_id]
 		if center_biome not in rule["biomes"]:
 			continue
+		if rule.has("seasons") and game_manager and game_manager.current_season not in rule["seasons"]:
+			continue  # out of season — migrated away
 		if rng.randf() > rule["spawn_chance"]:
 			continue
 		var count = rng.randi_range(rule["count_range"][0], rule["count_range"][1])
@@ -1997,9 +2069,12 @@ func _spawn_claim_boundary(center: Vector3, radius: float, _owner: String) -> vo
 func _on_claim_post_placed(pos: Vector3) -> void:
 	## Called when a claim post is placed in the world.
 	var claim_radius := 8.0
-	var owner_id := "player"
+	var owner_id := _get_local_owner_id()
 	_spawn_claim_boundary(pos, claim_radius, owner_id)
 	_show_placed_notification("Claim Established", "Territory claimed!")
+
+func _get_local_owner_id() -> String:
+	return str(game_manager.local_player_id) if game_manager else "1"
 
 func _show_placed_notification(title: String, msg: String) -> void:
 	var eb = get_node_or_null("/root/EventBus")

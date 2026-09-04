@@ -3,8 +3,9 @@ extends Node3D
 const GRID: float = 2.0
 const BuildingDoorScript = preload("res://src/world/building_door.gd")
 
-func _ready() -> void:
+func setup(_role_id: String) -> void:
 	_generate_interior()
+	_furnish()
 	_add_exit_door()
 	_add_light()
 
@@ -47,6 +48,20 @@ func _generate_interior() -> void:
 	_add_box(Vector3(1.0, 0.1, 0.4), bench_mat, Vector3(1.0, 0.55, 0))
 	_add_box(Vector3(0.1, 0.5, 0.4), bench_mat, Vector3(1.0, 0.25, -0.4))
 	_add_box(Vector3(0.1, 0.5, 0.4), bench_mat, Vector3(1.0, 0.25, 0.4))
+
+func _furnish() -> void:
+	# Lectern for addressing the room
+	var lectern_mat = StandardMaterial3D.new()
+	lectern_mat.albedo_color = Color(0.4, 0.26, 0.14)
+	_add_box(Vector3(0.5, 1.0, 0.4), lectern_mat, Vector3(0, 0.5, -2.4))
+	# Bookshelf with the town's records
+	var shelf_mat = StandardMaterial3D.new()
+	shelf_mat.albedo_color = Color(0.38, 0.25, 0.14)
+	_add_box(Vector3(0.3, 1.8, 1.4), shelf_mat, Vector3(2.6, 0.9, -1.8))
+	var book_mat = StandardMaterial3D.new()
+	book_mat.albedo_color = Color(0.5, 0.4, 0.2)
+	for i in range(3):
+		_add_box(Vector3(0.22, 0.25, 0.2), book_mat, Vector3(2.55, 0.5 + i * 0.5, -2.3 + i * 0.4))
 
 func _add_exit_door() -> void:
 	var door = BuildingDoorScript.new()

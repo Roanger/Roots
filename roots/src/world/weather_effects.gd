@@ -16,6 +16,34 @@ var snow_particles: GPUParticles3D
 var _current_type: String = WEATHER_CLEAR
 var _current_intensity: float = 0.0
 
+# ── Environmental hazards ──────────────────────────────────────────────
+const LIGHTNING_MIN_INTERVAL := 8.0
+const LIGHTNING_MAX_INTERVAL := 18.0
+const LIGHTNING_STRIKE_RADIUS := 20.0  # how far from the player a strike can visually land
+const LIGHTNING_DANGER_RADIUS := 3.0   # strikes landing this close to the player deal damage
+const LIGHTNING_DAMAGE := 18.0
+const COLD_TICK_INTERVAL := 5.0
+const COLD_DAMAGE_PER_TICK := 2.0
+
+var _player: Node3D = null
+var _lightning_timer: float = 0.0
+var _next_lightning_delay: float = randf_range(LIGHTNING_MIN_INTERVAL, LIGHTNING_MAX_INTERVAL)
+var _cold_timer: float = 0.0
+
+# ── Natural disasters ───────────────────────────────────────────────────
+# A rarer, more dramatic escalation of Storm weather: real stakes (movement
+# slowed) balanced by a cozy silver lining (storm-blown wood, free for the
+# taking) rather than pure destruction.
+const WINDSTORM_CHANCE := 0.2  # chance a fresh Storm escalates into a windstorm
+const WINDSTORM_MIN_DURATION := 45.0
+const WINDSTORM_MAX_DURATION := 75.0
+const WINDSTORM_SLOW_FACTOR := 0.75  # reuses the player's "speed" buff, same as a Speed Potion but < 1.0
+const WINDSTORM_DEBRIS_INTERVAL := 18.0
+
+var _windstorm_active: bool = false
+var _windstorm_timer: float = 0.0
+var _windstorm_debris_timer: float = 0.0
+
 var _base_fog: float = 0.001
 var _base_cloud_density: float = 1.5
 var _base_cloud_color: Color = Color(0.8, 0.8, 0.8, 1.0)
@@ -42,6 +70,10 @@ func _on_weather_changed(weather_type: String, _intensity: float) -> void:
 	_current_type = weather_type
 	_current_intensity = 0.0
 	_update_targets()
+	if weather_type == WEATHER_STORM:
+		_maybe_start_windstorm()
+	elif _windstorm_active:
+		_end_windstorm()
 
 func _on_season_changed(season: int) -> void:
 	_update_season_base(season)
@@ -85,14 +117,124 @@ func _update_targets() -> void:
 			_target_cloud_density = _base_cloud_density
 			_target_fog = _base_fog
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_follow_player()
 	_tick_weather()
+	_tick_hazards(delta)
 
 func _follow_player() -> void:
-	var player := get_node_or_null("/root/MainWorld/Player")
-	if player:
-		global_position = player.global_position
+	if not _player or not is_instance_valid(_player):
+		_player = get_node_or_null("/root/MainWorld/Player")
+	if _player:
+		global_position = _player.global_position
+
+func _tick_hazards(delta: float) -> void:
+	if not _player or not is_instance_valid(_player):
+		return
+
+	if _current_type == WEATHER_STORM:
+		_lightning_timer += delta
+		if _lightning_timer >= _next_lightning_delay:
+			_lightning_timer = 0.0
+			_next_lightning_delay = randf_range(LIGHTNING_MIN_INTERVAL, LIGHTNING_MAX_INTERVAL)
+			_strike_lightning()
+	else:
+		_lightning_timer = 0.0
+
+	if _current_type == WEATHER_SNOW:
+		_cold_timer += delta
+		if _cold_timer >= COLD_TICK_INTERVAL:
+			_cold_timer = 0.0
+			_apply_cold_exposure()
+	else:
+		_cold_timer = 0.0
+
+	if _windstorm_active and _current_type != WEATHER_STORM:
+		_end_windstorm()  # storm ended naturally before the windstorm's own timer ran out
+	elif _windstorm_active:
+		_windstorm_timer -= delta
+		_windstorm_debris_timer += delta
+		if _windstorm_debris_timer >= WINDSTORM_DEBRIS_INTERVAL:
+			_windstorm_debris_timer = 0.0
+			_grant_storm_debris()
+		if _windstorm_timer <= 0.0:
+			_end_windstorm()
+
+func _maybe_start_windstorm() -> void:
+	if _windstorm_active or randf() > WINDSTORM_CHANCE:
+		return
+	_windstorm_active = true
+	_windstorm_timer = randf_range(WINDSTORM_MIN_DURATION, WINDSTORM_MAX_DURATION)
+	_windstorm_debris_timer = 0.0
+	if _player and _player.has_method("_apply_buff"):
+		_player._apply_buff("speed", WINDSTORM_SLOW_FACTOR, _windstorm_timer)
+	_notify("Natural Disaster", "A fierce windstorm is tearing through the area! Movement is slower until it passes.")
+
+func _end_windstorm() -> void:
+	if not _windstorm_active:
+		return
+	_windstorm_active = false
+	# Don't rely on the speed buff's own timer — this can fire well before it
+	# expires (e.g. the storm weather itself ending early), and leaving the
+	# player slowed after "the windstorm has passed" already fired would be
+	# a confusing bug.
+	if _player and _player.has_method("_remove_buff"):
+		_player._remove_buff("speed")
+	_notify("Storm Passing", "The windstorm has died down.")
+
+func _grant_storm_debris() -> void:
+	if not _player or not _player.has_method("get_inventory"):
+		return
+	var inv = _player.get_inventory()
+	var item_db = get_node_or_null("/root/ItemDatabase")
+	if not inv or not item_db:
+		return
+	var wood_data = item_db.get_item("wood_log")
+	if not wood_data:
+		return
+	var amount = randi_range(2, 4)
+	inv.add_item(wood_data, amount)
+	if _player.has_method("_show_tool_feedback"):
+		_player._show_tool_feedback("The wind blew some branches your way! +%d Wood" % amount)
+
+func _notify(title: String, msg: String) -> void:
+	if event_bus:
+		event_bus.notification_shown.emit(title, msg, "info")
+
+func _strike_lightning() -> void:
+	var angle := randf() * TAU
+	var dist := randf_range(0.5, LIGHTNING_STRIKE_RADIUS)
+	var strike_pos := _player.global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+	var chunk_manager = get_node_or_null("/root/MainWorld/TerrainService")
+	if chunk_manager and chunk_manager.has_method("get_terrain_height"):
+		strike_pos.y = chunk_manager.get_terrain_height(strike_pos)
+	else:
+		strike_pos.y = _player.global_position.y
+
+	_spawn_lightning_flash(strike_pos)
+
+	if dist <= LIGHTNING_DANGER_RADIUS and _player.has_method("take_damage"):
+		_player.take_damage(LIGHTNING_DAMAGE)
+		if _player.has_method("_show_tool_feedback"):
+			_player._show_tool_feedback("Struck by lightning!")
+
+func _spawn_lightning_flash(pos: Vector3) -> void:
+	var bolt := OmniLight3D.new()
+	bolt.light_color = Color(0.85, 0.9, 1.0)
+	bolt.light_energy = 12.0
+	bolt.omni_range = 40.0
+	bolt.shadow_enabled = false
+	get_tree().current_scene.add_child(bolt)
+	bolt.global_position = pos + Vector3(0, 6.0, 0)
+	var tween := bolt.create_tween()
+	tween.tween_property(bolt, "light_energy", 0.0, 0.35)
+	tween.tween_callback(bolt.queue_free)
+
+func _apply_cold_exposure() -> void:
+	if _player.has_method("take_damage"):
+		_player.take_damage(COLD_DAMAGE_PER_TICK)
+	if _player.has_method("_show_tool_feedback"):
+		_player._show_tool_feedback("You're freezing in the snow...")
 
 func _tick_weather() -> void:
 	if not weather_manager:

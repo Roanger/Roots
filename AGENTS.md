@@ -164,10 +164,14 @@ Blender MCP only drives Blender itself, not the Godot project.
 Repo: `github.com/Roanger/Roots`. Default branch `main`. Only commit when
 explicitly asked. `*.import` and `.godot/` are gitignored.
 
-## Next session: Phase 4 remaining
+## Next session: Phase 4 complete — Phase 5 or 6 next
 
 Next time start here. See `plans/roots_game_plan.md` for details.
-**Phase 3 (3.1–3.6) is now fully complete.**
+**Phases 1-4 are now fully complete** (see the bottom of this section for
+the small, deliberately-deferred piece-by-piece-building/cold-exposure
+follow-ups — those are polish, not blockers). Next up is either Phase 5
+(Multiplayer Depth) or Phase 6 (Polish & Content) — ask the user which to
+prioritize, since both are fully unstarted and roughly comparable in scope.
 
 A Jul 2026 doc audit found several items below were already done but left
 unchecked in the plan (now corrected): plant identification (herbarium),
@@ -204,19 +208,152 @@ parallel housing systems, not one replacing the other — (1) the premade
 wall/floor/roof/door pieces, no teleport — the "no loading screen" option;
 today only fences/gates/posts work this way, no building pieces exist yet).
 The BuildingDoor/InteriorManager system is also the intended foundation for
-furnishing NPC building interiors (currently bare reused templates) and for
-letting players decorate inside their own house.
+furnishing NPC building interiors and for letting players decorate inside
+their own house.
 
-**Phase 4 to-dos:**
-- Player-specific land permissions — claim posts are placed/persisted but not
-  enforced (`TerrainService.is_in_any_claim_zone()` exists, zero callers);
-  also no multiplayer networking exists yet to have "other players" (4.3)
-- Furnish NPC building interiors — give each of the 4 shared interior
-  templates per-building-role props instead of the current bare rooms (4.3)
-- Player house interior decoration — place decoration items inside your own
-  house's interior instance (4.3)
-- Piece-by-piece house building — modular wall/floor/roof/door placeables
-  built directly in the world, no interior teleport (4.3)
-- Seasonal animal migrations (4.4)
-- Environmental hazards (4.5)
-- Natural disasters (4.5)
+**Land permissions (4.3) is done** — `TerrainService.can_build_at()`/
+`get_claim_owner_at()`, claims keyed by `GameManager.local_player_id` (was a
+hardcoded `"player"` string). Wired into `player_controller.gd`'s placement
+ghost — `_placement_valid` was hardcoded `true` unconditionally before this,
+so the existing red/green tint code was dead. Real cross-player enforcement
+still needs actual multiplayer wiring to matter beyond single-player
+self-consistency (no "other players" exist yet to test against for real).
+
+**Furnish NPC building interiors (4.3) is done** — the 4 shared interior
+scripts take a `setup(role_id)` call from `InteriorManager` (was
+`_ready()`-driven, no role awareness) and each has a `_furnish(role_id)` match
+dressing it per building type (Blacksmith forge/anvil/rack,
+Town Hall desk/bookshelf, Farmer House bed/chest, Guard Post weapon
+rack/cot, General Store shelves/crates, Bakery oven/bread rack, Herbalist
+potion shelves, plus enriched Tavern/Community Center furnishing). If you add
+a new NPC building role, add a `match` case in the relevant `_furnish()`
+rather than a new interior scene — the shell (floor/walls/ceiling/exit
+door/light/collision) is already shared.
+
+**Player house interior decoration (4.3) is done** — `ItemData.
+placeable_indoor_ok` gates which placeables work indoors (flower pot, wooden
+chair, small table, sitting log). `player_controller.gd._get_own_house_interior_id()`
+gates it to your own `house_*` interior only (never NPC buildings). Indoor
+placement uses a new `_get_indoor_placement_position()` (floor-height stepping
+clamped to the room's known footprint — clamp AFTER grid-snap rounding, not
+before, or `roundf()` can push the result back outside the room). Persistence
+reuses the existing outdoor `placed_objects` save pipeline (it already walked
+indirect `PlaceableObject` children via the `"placeables"` group) rather than
+a new system — `main_world._load_placed_objects()` now skips y>100 entries
+(interior-space) and `InteriorManager._restore_decorations()` re-spawns them
+into the right interior on next entry.
+
+**Piece-by-piece house building (4.3) MVP is done** — `wall_wood`,
+`floor_wood`, `door_wood` (`src/data/databases/item_database.gd`, Workbench
+recipes in `recipe_database.gd`). Plain `PlaceableObject`s, real world-space
+collision, no interior teleport. `door_wood` sets `placeable_is_gate = true`
+and reuses the existing fence-gate hinge/open-close code as-is — didn't need
+anything new for that part. Models are in `roots/assets/Placeables/
+{wall,floor,door}_wood.blend`, built via Blender MCP. **Follow-up scope, not
+started:** roof pieces (needs corner/ridge/edge variants for a real sloped
+roof — `floor_wood` tiles work as a flat-roof stopgap for now), window
+pieces, and a wall-with-doorway variant (today `door_wood` just stands where
+a `wall_wood` would, it doesn't inset into one).
+
+**Blender-MCP gotcha found building these:** `bpy.ops.mesh.primitive_cube_add(size=1)`
+makes a 1×1×1 cube (±0.5), and `obj.scale` multiplies that directly — so
+`scale.x` IS the final edge length, not a half-extent. Assumed the opposite
+at first (as if `size=1` meant a 2-unit cube), which quietly built a wall
+panel at half the intended size in two axes; only caught because the
+diagonal braces' geometry happened to dominate the bounding box and look
+*approximately* right in the viewport screenshot. Always check
+`object.dimensions` against the real-world target after scaling a primitive
+— don't trust the screenshot alone when exact size matters (grid-snapping,
+collision).
+
+**Seasonal animal migrations (4.4) is done** — `WILD_SPAWN_RULES` in
+`main_world.gd` gained an optional per-species `"seasons"` array
+(`GameManager.Season` ints; omitted = year-round). `_migrate_wildlife()`,
+called from `_on_season_changed()`, re-rolls every currently-loaded chunk
+(despawn+respawn via the existing `_despawn_wildlife_for_chunk`/
+`_spawn_wildlife_for_chunk` — same pattern as the night-enemy-wave
+despawn/respawn) and diffs before/after species sets to fire a "Wildlife
+Migration" notification. Season assignments: Deer/Duck Spring–Autumn (gone
+Winter), Boar Summer–Winter (gone Spring), Wolf Autumn–Winter only, Goat
+Spring–Summer only, Rabbit year-round.
+
+**Environmental hazards (4.5) is done** — three hazards, none of which
+existed before (fall/weather/trap damage was previously confirmed to be
+zero anywhere in the codebase):
+- **Fall damage** (`player_controller.gd`): `_fall_peak_y` tracks the
+  highest point reached while airborne (updated in `_apply_gravity`);
+  `_handle_fall_landing()` fires on the not-grounded→grounded transition.
+  5m safe height, 5 dmg/m, capped at 50 — deliberately can't be lethal on
+  its own, this is a cozy game.
+- **Lightning strikes** during Storm weather (`weather_effects.gd`,
+  `_tick_hazards`/`_strike_lightning`): random 8–18s interval, bright
+  fading `OmniLight3D` flash at a random point near the player, damages
+  (18 dmg) only within a 3m "danger radius" of the strike.
+- **Cold exposure** during Snow weather: flat 2 HP/5s drain the whole time
+  it's snowing. **No warmth/escape mechanism yet** (no campfire-proximity
+  or clothing check) — revisit if it feels too punishing in real play.
+
+Found and fixed two real bugs while testing this: the lightning
+danger-radius damage path was mathematically unreachable (the random
+strike-distance range's *minimum* already exceeded the danger radius, so
+close strikes could never actually roll), and the flash light hit the same
+"set global_position before add_child" ordering bug documented earlier in
+this file for the HouseObject work — check for that pattern specifically
+whenever spawning a Node3D and immediately positioning it.
+
+**Bugfix (Aug 2026): loading screen was closing 5-15s early.**
+`_on_terrain_ready()` in `main_world.gd` calls ~24 world-setup functions
+(village building, NPC/animal/enemy spawning, several UI panels, save-data
+loading) then hides the loading screen. ~13 of those functions internally
+`await get_tree().process_frame` (or a timer) but were being called
+*without* `await` from `_on_terrain_ready()`. Calling an async function
+without awaiting it in GDScript fires it and moves on immediately — it does
+not block. So `_hide_loading_screen()` ran almost instantly while village
+building (the heaviest single piece) and everything else were still queued,
+and the player watched all that setup happen in bursts for 5-15s with the
+loading screen already gone — looked like a frozen/hitching game. Fixed:
+added `await` to every call in that sequence that's an actual coroutine.
+**If you add an `await` inside any of those setup functions later, you must
+add `await` to its call in `_on_terrain_ready()` too, or this comes right
+back** — there's a comment at the call site as a tripwire. General lesson:
+in this codebase, a function starting with `await get_tree().process_frame`
+is a strong signal to check whether its caller awaits it.
+
+**Natural disasters (4.5) is done — Phase 4 is now fully complete.**
+Windstorm: a rarer escalation of Storm weather (`weather_effects.gd`,
+`_maybe_start_windstorm`/`_end_windstorm`/`_grant_storm_debris`), 20% chance
+per fresh storm, 45-75s duration. Player slowed to 75% speed (reuses the
+existing "speed" buff — same mechanism a Speed Potion uses, just <1.0) with
+periodic free wood as a cozy silver lining. Found and fixed a real bug:
+`_end_windstorm()` only cleared its own flag and didn't explicitly remove
+the speed buff, so ending early (e.g. the underlying storm weather itself
+ending before the windstorm's own timer) left the player slowed after the
+"windstorm has passed" notification already said otherwise — fixed by
+calling `player._remove_buff("speed")` explicitly instead of trusting the
+buff's own timer to line up.
+
+Every Phase 4 section (4.1 Biome, 4.2 NPC, 4.3 Settlement, 4.4 Wildlife, 4.5
+Environmental, 4.6 Quest) is checked off now except the deliberately-deferred
+piece-by-piece-building follow-ups noted below. Next project-wide work is
+Phase 5 (Multiplayer Depth — GD-Sync framework exists but nothing in it is
+wired for real multi-user play) or Phase 6 (Polish & Content — art, audio,
+QoL, endgame), both fully unstarted; see `plans/roots_game_plan.md` for the
+full section breakdowns.
+
+**Remaining follow-ups (not gaps, deliberately deferred):**
+- Roof/window pieces + wall-doorway variant for piece-by-piece building (4.3)
+- Cold exposure warmth/escape mechanism (4.5 — see note above)
+
+**Pre-playtest smoke test (Aug 2026) — see `docs/playtest_notes.md` for the
+full pass.** Two real findings, both fixed:
+1. `player_controller.gd`'s `_give_starting_items()` had regressed to a
+   leftover full "testing" kit (own code comments said "for testing"),
+   completely bypassing the documented Stone-tier bootstrap (3.1). Restored
+   to exactly 4 small_stone + 3 stick; verified spawn → craft Stone Hoe at
+   HAND station works end-to-end. **If you ever need a full item set for
+   testing again, do it via `godot_exec`/a debug-only path — don't add it
+   back into `_give_starting_items()`, that's what caused this.**
+2. Controls docs said "I" for Inventory; the actual (and intended) key is
+   Tab, which also opens Character together. `roots/README.md` fixed to
+   match. The `InputMap`'s `"inventory"` action (bound to I) is unused dead
+   code — harmless, left as-is.

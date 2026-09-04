@@ -203,16 +203,25 @@ func clear_all_chunks() -> void:
 
 func is_in_any_claim_zone(world_pos: Vector3) -> bool:
 	## Returns true if world_pos falls within any established claim zone.
+	return get_claim_owner_at(world_pos) != ""
+
+func get_claim_owner_at(world_pos: Vector3) -> String:
+	## Returns the owner_id of the claim zone containing world_pos, or "" if unclaimed.
 	var main_world = get_node_or_null("/root/MainWorld")
 	if not main_world:
-		return false
+		return ""
 	for child in main_world.get_children():
 		if child.has_meta("claim_radius"):
 			var center = child.global_position
 			var radius = child.get_meta("claim_radius", 8.0)
 			if world_pos.distance_to(center) <= radius:
-				return true
-	return false
+				return str(child.get_meta("claim_owner", ""))
+	return ""
+
+func can_build_at(world_pos: Vector3, requesting_owner_id: String) -> bool:
+	## True if world_pos is unclaimed, or claimed by requesting_owner_id.
+	var claim_owner = get_claim_owner_at(world_pos)
+	return claim_owner == "" or claim_owner == requesting_owner_id
 
 
 # ── Exclusion zones ────────────────────────────────────────────────────

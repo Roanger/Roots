@@ -66,7 +66,7 @@ A peaceful multiplayer farming simulation built with Godot 4.7, featuring proced
 | Interact / Use Tool | Left Click |
 | Interact with NPC/Object | E |
 | Toggle First/Third Person | T |
-| Inventory | I |
+| Inventory / Character | Tab |
 | Crafting | R |
 | Skill Tree | K |
 | Quest Journal | J |

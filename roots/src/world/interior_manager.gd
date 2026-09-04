@@ -64,10 +64,47 @@ func _get_or_load_interior(interior_id: String, scene_path: String) -> Node3D:
 	add_child(interior)
 	_interiors[interior_id] = interior
 
+	# Build the room, furnished per building role (interior_id), exit door, and lighting
+	if interior.has_method("setup"):
+		interior.setup(interior_id)
+
 	# Fix exit doors inside this interior: set their interior_id to match
 	_fix_exit_doors(interior, interior_id)
 
+	_restore_decorations(interior)
+
 	return interior
+
+func _restore_decorations(interior: Node3D) -> void:
+	## Player-placed decorations (flower pots, chairs, etc.) inside this specific
+	## interior instance were saved as PlaceableObjects via the normal outdoor
+	## placed_objects pipeline (main_world.gd's group-based scan already picks up
+	## indirect children), just at this interior's y=500 pocket-dimension offset.
+	## Restore only the ones that belong to THIS interior (matched by proximity to
+	## its deterministic hash position — see _get_or_load_interior).
+	var game_manager = get_node_or_null("/root/GameManager")
+	var item_db = get_node_or_null("/root/ItemDatabase")
+	if not game_manager or not item_db:
+		return
+	var PlaceableObjectScript = load("res://src/world/placeable_object.gd")
+	var objs_data: Array = game_manager.world_data.get("placed_objects", [])
+	for data in objs_data:
+		var pos_data: Dictionary = data.get("position", {})
+		var pos := Vector3(pos_data.get("x", 0.0), pos_data.get("y", 0.0), pos_data.get("z", 0.0))
+		if pos.y < 100.0:
+			continue  # not an interior decoration
+		if interior.global_position.distance_to(pos) > 5.0:
+			continue  # belongs to a different interior instance
+		var item_id: String = data.get("item_id", "")
+		var item = item_db.get_item(item_id)
+		if not item:
+			continue
+		var obj = PlaceableObjectScript.new()
+		obj.name = "Placed_%s" % item_id
+		interior.add_child(obj)
+		obj.global_position = pos
+		obj.rotation.y = data.get("rotation_y", 0.0)
+		obj.setup(item_id, item.item_name, item.placeable_model_path, item.placeable_scale, item.placeable_collision_size, data.get("is_gate", false))
 
 func _fix_exit_doors(node: Node, interior_id: String) -> void:
 	for child in node.get_children():
@@ -82,6 +119,9 @@ func _unload_interior(interior_id: String) -> void:
 	if interior and is_instance_valid(interior):
 		interior.queue_free()
 	_interiors.erase(interior_id)
+
+func get_interior_node(interior_id: String) -> Node3D:
+	return _interiors.get(interior_id, null)
 
 func is_player_inside(player: Node3D) -> bool:
 	var path_str = player.get_path()
